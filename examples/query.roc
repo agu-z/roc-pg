@@ -10,6 +10,7 @@ app "query"
         pf.Process,
         Json.{ Json },
         pg.Bytes.Encode,
+        pg.Bytes.Decode,
     ]
     provides [main] to pf
 
@@ -19,7 +20,15 @@ main =
         stream <- Tcp.withConnect "localhost" 5432
         _ <- Tcp.writeBytes startupMsg stream |> await
         received <- Tcp.readBytes stream |> await
-        printBytes received
+
+        msg =
+            Bytes.Decode.decode received msgDecoder
+            |> Result.withDefault (UnknownMessageType 0)
+
+        if msg == AuthenticationOk then
+            Stdout.line "authed"
+        else
+            Stdout.line "something else"
 
     Task.attempt task \result ->
         when result is
@@ -45,6 +54,24 @@ startupMsg =
     ]
     |> withLength
 
+msgDecoder =
+    messageType <- Bytes.Decode.await Bytes.Decode.u8
+    _messageLength <- Bytes.Decode.await Bytes.Decode.i32
+
+    when messageType is
+        'R' ->
+            authMsgDecoder
+
+        _ ->
+            Bytes.Decode.succeed (UnknownMessageType messageType)
+
+authMsgDecoder =
+    success <- Bytes.Decode.await Bytes.Decode.i32
+
+    if success == 0 then
+        Bytes.Decode.succeed AuthenticationOk
+    else
+        Bytes.Decode.succeed AuthenticationFailed
 
 # Message helpers
 
