@@ -16,6 +16,8 @@ interface Bytes.Decode
         succeed,
         fail,
         await,
+        Step,
+        loop,
     ]
     imports []
 
@@ -28,10 +30,9 @@ Decode value err :=
         }
         err
 
-decode : List U8, Decode value err -> Result value err
+decode : List U8, Decode value err -> Result { decoded : value, remaining : List U8 } err
 decode = \bytes, @Decode decoder ->
     decoder bytes
-    |> Result.map .decoded
 
 # Unsigned Integers
 
@@ -113,18 +114,16 @@ cStr : Decode Str [TerminatorNotFound, Utf8DecodeError _]
 cStr =
     bytes <- @Decode
 
-    when List.findFirstIndex bytes (\b -> b == 0) is
-        Ok index ->
-            { before, others } = List.split bytes index
-
+    when List.splitFirst bytes 0 is
+        Ok { before, after } ->
             when Str.fromUtf8 before is
                 Ok value ->
-                    Ok { decoded: value, remaining: others }
+                    Ok { decoded: value, remaining: after }
 
                 Err err ->
                     Err (Utf8DecodeError err)
 
-        Err NotFound ->
+        Err _ ->
             Err TerminatorNotFound
 
 # Mapping
@@ -150,7 +149,7 @@ map : Decode a err, (a -> b) -> Decode b err
 map = \@Decode decoder, mapFn ->
     bytes <- @Decode
     { decoded, remaining } <- Result.map (decoder bytes)
-    { decoded: mapFn decoded, remaining: remaining }
+    { decoded: mapFn decoded, remaining }
 
 map2 : Decode a err, Decode b err, (a, b -> c) -> Decode c err
 map2 = \@Decode decoderA, @Decode decoderB, mapFn ->
@@ -158,3 +157,25 @@ map2 = \@Decode decoderA, @Decode decoderB, mapFn ->
     a <- Result.try (decoderA bytes)
     b <- Result.map (decoderB a.remaining)
     { decoded: mapFn a.decoded b.decoded, remaining: b.remaining }
+
+# Loop
+
+Step state a : [Loop state, Done a]
+
+loop : state, (state -> Decode (Step state a) err) -> Decode a err
+loop = \state, step ->
+    bytes <- @Decode
+
+    loopHelp step state bytes
+
+loopHelp = \step, state, bytes ->
+    (@Decode decoder) = step state
+
+    { decoded, remaining } <- Result.try (decoder bytes)
+
+    when decoded is
+        Loop newState ->
+            loopHelp step newState remaining
+
+        Done result ->
+            Ok { decoded: result, remaining }
