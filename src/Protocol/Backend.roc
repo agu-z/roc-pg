@@ -25,7 +25,7 @@ Message : [
     AuthOk,
     AuthRequired,
     ErrorResponse Error,
-    Unrecognized U8,
+    ParameterStatus { name : Str, value : Str },
 ]
 
 message : Decode Message _
@@ -37,11 +37,14 @@ message =
         'R' ->
             authRequest
 
+        'S' ->
+            paramStatus
+
         'E' ->
             errorResponse
 
         _ ->
-            succeed (Unrecognized msgType)
+            fail (UnrecognizedBackendMessage msgType)
 
 authRequest : Decode Message _
 authRequest =
@@ -53,6 +56,12 @@ authRequest =
 
         _ ->
             AuthRequired
+
+paramStatus : Decode Message _
+paramStatus =
+    name <- await cStr
+    value <- await cStr
+    succeed (ParameterStatus { name, value })
 
 Error : {
     localizedSeverity : Str,
