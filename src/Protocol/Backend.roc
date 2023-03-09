@@ -26,6 +26,7 @@ Message : [
     AuthRequired,
     ErrorResponse Error,
     ParameterStatus { name : Str, value : Str },
+    BackendKeyData { processId : I32, secretKey : I32 },
 ]
 
 message : Decode Message _
@@ -42,6 +43,9 @@ message =
 
         'E' ->
             errorResponse
+
+        'K' ->
+            backendKeyData
 
         _ ->
             fail (UnrecognizedBackendMessage msgType)
@@ -62,6 +66,12 @@ paramStatus =
     name <- await cStr
     value <- await cStr
     succeed (ParameterStatus { name, value })
+
+backendKeyData : Decode Message _
+backendKeyData =
+    processId <- await i32
+    secretKey <- await i32
+    succeed (BackendKeyData { processId, secretKey })
 
 Error : {
     localizedSeverity : Str,

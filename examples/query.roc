@@ -11,6 +11,7 @@ app "query"
         Json,
         pg.Protocol.Frontend,
         pg.Protocol.Backend,
+        Encode,
     ]
     provides [main] to pf
 
@@ -40,7 +41,6 @@ messageTick = \bytes ->
     else
         Task.map (handleMessage bytes) Step
 
-
 handleMessage : List U8 -> Task (List U8) _
 handleMessage = \bytes ->
     backendMsg = Protocol.Backend.decode bytes
@@ -58,6 +58,17 @@ handleMessage = \bytes ->
 
                 ParameterStatus { name, value } ->
                     _ <- Stdout.line "\(name): \(value)" |> await
+                    Task.succeed remaining
+
+                BackendKeyData { processId, secretKey } ->
+                    _ <- Stdout.line "Backend Key Data:" |> await
+
+                    processIdStr = Num.toStr processId
+                    _ <- Stdout.line "\tProcess:    \(processIdStr)" |> await
+
+                    secretKeyStr = Num.toStr secretKey
+                    _ <- Stdout.line "\tSecret Key: \(secretKeyStr)" |> await
+
                     Task.succeed remaining
 
                 ErrorResponse error ->
