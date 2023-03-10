@@ -71,6 +71,11 @@ handleMessage = \bytes ->
 
                     Task.succeed remaining
 
+                ReadyForQuery _ ->
+                    _ <- Stdout.line "Ready for query!" |> await
+
+                    Task.succeed remaining
+
                 ErrorResponse error ->
                     _ <- Stdout.line (Protocol.Backend.errorToStr error) |> await
                     Task.succeed remaining

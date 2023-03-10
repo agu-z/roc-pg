@@ -27,6 +27,7 @@ Message : [
     ErrorResponse Error,
     ParameterStatus { name : Str, value : Str },
     BackendKeyData { processId : I32, secretKey : I32 },
+    ReadyForQuery [Idle, TransactionBlock, FailedTransactionBlock]
 ]
 
 message : Decode Message _
@@ -46,6 +47,9 @@ message =
 
         'K' ->
             backendKeyData
+
+        'Z' ->
+            readyForQuery
 
         _ ->
             fail (UnrecognizedBackendMessage msgType)
@@ -72,6 +76,24 @@ backendKeyData =
     processId <- await i32
     secretKey <- await i32
     succeed (BackendKeyData { processId, secretKey })
+
+readyForQuery : Decode Message _
+readyForQuery =
+    status <- await u8
+
+    when status is
+        'I' ->
+            succeed (ReadyForQuery Idle)
+
+        'T' ->
+            succeed (ReadyForQuery TransactionBlock)
+
+        'E' ->
+            succeed (ReadyForQuery FailedTransactionBlock)
+
+        _ ->
+            fail (UnrecognizedBackendStatus status)
+    
 
 Error : {
     localizedSeverity : Str,
