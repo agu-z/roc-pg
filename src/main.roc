@@ -1,3 +1,3 @@
 package "pg"
-    exposes [Bytes, Protocol]
+    exposes [Bytes, Protocol, Client]
     packages {}

@@ -1,17 +1,18 @@
 interface Protocol.Frontend
-    exposes [startup]
+    exposes [startup, query]
     imports [
         Bytes.Encode.{
             sequence,
             nullTerminate,
+            u8,
             i16,
             i32,
             cStr,
         },
     ]
 
-startup : { user: Str, database ? [Specific Str, Unspecified] } -> List U8
-startup = \{ user, database ? Unspecified } ->
+startup : { user : Str, database : Str } -> List U8
+startup = \{ user, database } ->
     sequence [
         # Version number
         i16 3,
@@ -20,12 +21,7 @@ startup = \{ user, database ? Unspecified } ->
         sequence [
             param "client_encoding" "utf_8",
             param "user" user,
-            when database is
-                Specific db ->
-                    param "database" db
-
-                Unspecified ->
-                    []
+            param "database" database,
         ]
         |> nullTerminate,
     ]
@@ -36,6 +32,19 @@ param = \key, value ->
     sequence [
         cStr key,
         cStr value,
+    ]
+
+query : Str -> List U8
+query = \source ->
+    message 'Q' [
+        cStr source,
+    ]
+
+message : U8, List (List U8) -> List U8
+message = \msgType, content ->
+    sequence [
+        u8 msgType,
+        prependLength (sequence content),
     ]
 
 prependLength : List U8 -> List U8

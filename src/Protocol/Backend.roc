@@ -2,6 +2,9 @@ interface Protocol.Backend
     exposes [
         decode,
         errorToStr,
+        Message,
+        KeyData,
+        Status,
     ]
     imports [
         Bytes.Decode.{
@@ -26,9 +29,13 @@ Message : [
     AuthRequired,
     ErrorResponse Error,
     ParameterStatus { name : Str, value : Str },
-    BackendKeyData { processId : I32, secretKey : I32 },
-    ReadyForQuery [Idle, TransactionBlock, FailedTransactionBlock]
+    BackendKeyData KeyData,
+    ReadyForQuery Status,
 ]
+
+KeyData : { processId : I32, secretKey : I32 }
+
+Status : [Idle, TransactionBlock, FailedTransactionBlock]
 
 message : Decode Message _
 message =
@@ -93,7 +100,6 @@ readyForQuery =
 
         _ ->
             fail (UnrecognizedBackendStatus status)
-    
 
 Error : {
     localizedSeverity : Str,
