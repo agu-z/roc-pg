@@ -11,6 +11,7 @@ interface Bytes.Decode
         i32,
         i64,
         cStr,
+        take,
         map,
         map2,
         succeed,
@@ -49,54 +50,73 @@ u8 =
 
 u16 : Decode U16 [NotEnoughBytes]
 u16 =
-    sized 16 Num.toU16
+    bytes <- @Decode
+
+    when bytes is
+        [b0, b1, ..] ->
+            value = Num.shiftLeftBy (Num.toU16 b0) 8
+                |> Num.bitwiseOr (Num.toU16 b1)
+
+            Ok { decoded: value, remaining: List.drop bytes 2 }
+
+        _ ->
+            Err NotEnoughBytes
 
 u32 : Decode U32 [NotEnoughBytes]
 u32 =
-    sized 32 Num.toU32
+    bytes <- @Decode
+
+    when bytes is
+        [b0, b1, b2, b3, ..] ->
+            value =
+                Num.shiftLeftBy (Num.toU32 b0) 24
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU32 b1) 16)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU32 b2) 8)
+                |> Num.bitwiseOr (Num.toU32 b3)
+
+            Ok { decoded: value, remaining: List.drop bytes 4 }
+
+        _ ->
+            Err NotEnoughBytes
 
 u64 : Decode U64 [NotEnoughBytes]
 u64 =
-    sized 64 Num.toU64
+    bytes <- @Decode
+
+    when bytes is
+        [b0, b1, b2, b3, b4, b5, b6, b7, ..] ->
+            value =
+                Num.shiftLeftBy (Num.toU64 b0) 56
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b1) 48)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b2) 40)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b3) 32)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b4) 24)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b5) 16)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b6) 8)
+                |> Num.bitwiseOr (Num.toU64 b7)
+
+            Ok { decoded: value, remaining: List.drop bytes 8 }
+
+        _ ->
+            Err NotEnoughBytes
 
 # Signed Integers
 
 i8 : Decode I8 [NotEnoughBytes]
 i8 =
-    bytes <- @Decode
-
-    when bytes is
-        [byte, ..] ->
-            Ok { decoded: Num.toI8 byte, remaining: List.drop bytes 1 }
-
-        _ ->
-            Err NotEnoughBytes
+    map u8 Num.toI8
 
 i16 : Decode I16 [NotEnoughBytes]
 i16 =
-    sized 16 Num.toI16
+    map u16 Num.toI16
 
 i32 : Decode I32 [NotEnoughBytes]
 i32 =
-    sized 32 Num.toI32
+    map u32 Num.toI32
 
 i64 : Decode I64 [NotEnoughBytes]
 i64 =
-    sized 64 Num.toI64
-
-sized : U8, (U8 -> Int a) -> Decode (Int a) [NotEnoughBytes]
-sized = \size, toType ->
-    bytes <- take (Num.toNat size // 8)
-
-    result = List.walk bytes { value: 0, offset: size - 8 } \{ value, offset }, byte -> {
-        value: byte
-        |> toType
-        |> Num.shiftLeftBy offset
-        |> Num.bitwiseOr value,
-        offset: if offset == 0 then 0 else offset - 8,
-    }
-
-    result.value
+    map u64 Num.toI64
 
 take : Nat, (List U8 -> value) -> Decode value [NotEnoughBytes]
 take = \count, callback ->
