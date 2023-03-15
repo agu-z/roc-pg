@@ -1,3 +1,3 @@
 package "pg"
-    exposes [Bytes, Protocol, Client]
+    exposes [Pg.Client]
     packages {}

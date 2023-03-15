@@ -1,4 +1,4 @@
-interface Client
+interface Pg.Client
     exposes [
         withConnect,
         query,

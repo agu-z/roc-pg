@@ -7,14 +7,14 @@ app "query"
         pf.Task.{ Task, await },
         pf.Process,
         pf.Stdout,
-        pg.Client,
+        pg.Pg.Client,
     ]
     provides [main] to pf
 
 main : Task {} []
 main =
     task =
-        client <- Client.withConnect {
+        client <- Pg.Client.withConnect {
                 host: "localhost",
                 port: 5432,
                 user: "aguz",
@@ -24,7 +24,7 @@ main =
         _ <- Stdout.line "Connected!" |> await
 
         result <- client
-            |> Client.query "SELECT 'Hi Roc!' as message, 42 as answer"
+            |> Pg.Client.query "SELECT 'Hi Roc!' as message, 42 as answer"
             |> await
 
         rows =
