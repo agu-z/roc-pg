@@ -8,6 +8,7 @@ app "query"
         pf.Process,
         pf.Stdout,
         pg.Pg.Client,
+        pg.Pg.Result.{ succeed, apply },
     ]
     provides [main] to pf
 
@@ -24,15 +25,27 @@ main =
         _ <- Stdout.line "Connected!" |> await
 
         result <- client
-            |> Pg.Client.query "SELECT 'Hi Roc!' as message, 42 as answer"
+            |> Pg.Client.query
+                """
+                select 'John' as name, 25 as age 
+                union all
+                select 'Julio' as name, 23 as age
+                """
             |> await
 
         rows =
-            result.rows
-            |> List.map (\row -> List.keepOks row Str.fromUtf8 |> Str.joinWith ", ")
-            |> Str.joinWith "\n"
+            result
+            |> Pg.Result.decode
+                (
+                    succeed (\name -> \age -> { name, age })
+                    |> apply (Pg.Result.str "name")
+                    |> apply (Pg.Result.i32 "age")
+                )
 
-        Stdout.line "\nResult:\n\(rows)"
+        dbg
+            rows
+
+        Stdout.line "Result"
 
     Task.attempt task \result ->
         when result is

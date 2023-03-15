@@ -6,6 +6,7 @@ interface Pg.Client
     imports [
         Protocol.Backend,
         Protocol.Frontend,
+        Pg.Result.{ QueryResult },
         pf.Task.{ Task, await },
         pf.Tcp,
     ]
@@ -65,15 +66,19 @@ withConnect = \{ host, port, database, user }, callback ->
         _ ->
             Task.fail (UnexpectedMsg msg)
 
+query : Client, Str -> Task QueryResult _
 query = \@Client { stream }, sql ->
     _ <- Protocol.Frontend.query sql
         |> Tcp.writeBytes stream
         |> await
 
-    msg, state <- messageLoop stream {
-            fields: [],
-            rows: [],
-        }
+    initResult = {
+        fields: [],
+        rows: [],
+    }
+
+    msg, state <- messageLoop stream initResult
+
     when msg is
         RowDescription fields ->
             loopWith { state & fields: fields }
@@ -85,7 +90,9 @@ query = \@Client { stream }, sql ->
             loopWith state
 
         ReadyForQuery _ ->
-            Task.succeed (Done state)
+            Pg.Result.create state
+            |> Done
+            |> Task.succeed
 
         ErrorResponse error ->
             Task.fail (ErrorResponse error)
@@ -95,7 +102,11 @@ query = \@Client { stream }, sql ->
 
 # Helpers
 
-messageLoop = \stream, initState, step ->
+messageLoop : Tcp.Stream,
+    state,
+    (Protocol.Backend.Message, state -> Task [Step state, Done done] _)
+    -> Task done _
+messageLoop = \stream, initState, stepFn ->
     initBytes <- Tcp.readBytes stream |> await
 
     { bytes, state } <- Task.loop { bytes: initBytes, state: initState }
@@ -107,7 +118,7 @@ messageLoop = \stream, initState, step ->
 
         when backendMsg is
             Ok { decoded, remaining } ->
-                result <- Task.map (step decoded state)
+                result <- Task.map (stepFn decoded state)
 
                 when result is
                     Step newState ->
