@@ -4,7 +4,7 @@ app "query"
         pg: "../src/main.roc",
     }
     imports [
-        pf.Task.{ Task },
+        pf.Task.{ Task, await },
         pf.Process,
         pf.Stdout,
         pg.Client,
@@ -14,14 +14,25 @@ app "query"
 main : Task {} []
 main =
     task =
-        _ <- Client.withConnect {
+        client <- Client.withConnect {
                 host: "localhost",
                 port: 5432,
                 user: "aguz",
                 database: "aguz",
             }
 
-        Stdout.line "Connected!"
+        _ <- Stdout.line "Connected!" |> await
+
+        result <- client
+            |> Client.query "SELECT 'Hi Roc!' as message, 42 as answer"
+            |> await
+
+        rows =
+            result.rows
+            |> List.map (\row -> List.keepOks row Str.fromUtf8 |> Str.joinWith ", ")
+            |> Str.joinWith "\n"
+
+        Stdout.line "\nResult:\n\(rows)"
 
     Task.attempt task \result ->
         when result is

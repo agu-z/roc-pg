@@ -1,5 +1,8 @@
 interface Client
-    exposes [withConnect]
+    exposes [
+        withConnect,
+        query,
+    ]
     imports [
         Protocol.Backend,
         Protocol.Frontend,
@@ -11,7 +14,6 @@ Client := {
     stream : Tcp.Stream,
     parameters : Dict Str Str,
     backendKey : Result Protocol.Backend.KeyData [Pending],
-    status : Protocol.Backend.Status,
 }
 
 withConnect :
@@ -26,8 +28,9 @@ withConnect :
 withConnect = \{ host, port, database, user }, callback ->
     stream <- Tcp.withConnect host port
 
-    startupMsg = Protocol.Frontend.startup { user, database }
-    _ <- Tcp.writeBytes startupMsg stream |> await
+    _ <- Protocol.Frontend.startup { user, database }
+        |> Tcp.writeBytes stream
+        |> await
 
     msg, state <- messageLoop stream {
             parameters: Dict.empty {},
@@ -47,12 +50,11 @@ withConnect = \{ host, port, database, user }, callback ->
         BackendKeyData backendKey ->
             loopWith { state & backendKey: Ok backendKey }
 
-        ReadyForQuery status ->
+        ReadyForQuery _ ->
             @Client {
                 stream,
                 parameters: state.parameters,
                 backendKey: state.backendKey,
-                status,
             }
             |> callback
             |> Task.map Done
@@ -60,13 +62,46 @@ withConnect = \{ host, port, database, user }, callback ->
         ErrorResponse error ->
             Task.fail (ErrorResponse error)
 
+        _ ->
+            Task.fail (UnexpectedMsg msg)
+
+query = \@Client { stream }, sql ->
+    _ <- Protocol.Frontend.query sql
+        |> Tcp.writeBytes stream
+        |> await
+
+    msg, state <- messageLoop stream {
+            fields: [],
+            rows: [],
+        }
+    when msg is
+        RowDescription fields ->
+            loopWith { state & fields: fields }
+
+        DataRow row ->
+            loopWith { state & rows: List.append state.rows row }
+
+        CommandComplete _ ->
+            loopWith state
+
+        ReadyForQuery _ ->
+            Task.succeed (Done state)
+
+        ErrorResponse error ->
+            Task.fail (ErrorResponse error)
+
+        _ ->
+            Task.fail (UnexpectedMsg msg)
+
+# Helpers
+
 messageLoop = \stream, initState, step ->
     initBytes <- Tcp.readBytes stream |> await
 
     { bytes, state } <- Task.loop { bytes: initBytes, state: initState }
 
     if List.isEmpty bytes then
-        Task.fail (UnexpectedEndOfMessages state)
+        Task.fail UnexpectedEndOfMessages
     else
         backendMsg = Protocol.Backend.decode bytes
 

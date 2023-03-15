@@ -54,7 +54,8 @@ u16 =
 
     when bytes is
         [b0, b1, ..] ->
-            value = Num.shiftLeftBy (Num.toU16 b0) 8
+            value =
+                Num.shiftLeftBy (Num.toU16 b0) 8
                 |> Num.bitwiseOr (Num.toU16 b1)
 
             Ok { decoded: value, remaining: List.drop bytes 2 }

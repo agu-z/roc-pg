@@ -5,6 +5,7 @@ interface Protocol.Backend
         Message,
         KeyData,
         Status,
+        RowField,
     ]
     imports [
         Bytes.Decode.{
@@ -15,8 +16,10 @@ interface Protocol.Backend
             fail,
             loop,
             u8,
+            i16,
             i32,
             cStr,
+            take,
         },
     ]
 
@@ -27,15 +30,14 @@ decode = \bytes ->
 Message : [
     AuthOk,
     AuthRequired,
-    ErrorResponse Error,
     ParameterStatus { name : Str, value : Str },
     BackendKeyData KeyData,
     ReadyForQuery Status,
+    ErrorResponse Error,
+    RowDescription (List RowField),
+    DataRow (List (List U8)),
+    CommandComplete Str,
 ]
-
-KeyData : { processId : I32, secretKey : I32 }
-
-Status : [Idle, TransactionBlock, FailedTransactionBlock]
 
 message : Decode Message _
 message =
@@ -49,14 +51,23 @@ message =
         'S' ->
             paramStatus
 
-        'E' ->
-            errorResponse
-
         'K' ->
             backendKeyData
 
         'Z' ->
             readyForQuery
+
+        'E' ->
+            errorResponse
+
+        'T' ->
+            rowDescription
+
+        'D' ->
+            dataRow
+
+        'C' ->
+            commandComplete
 
         _ ->
             fail (UnrecognizedBackendMessage msgType)
@@ -78,11 +89,15 @@ paramStatus =
     value <- await cStr
     succeed (ParameterStatus { name, value })
 
+KeyData : { processId : I32, secretKey : I32 }
+
 backendKeyData : Decode Message _
 backendKeyData =
     processId <- await i32
     secretKey <- await i32
     succeed (BackendKeyData { processId, secretKey })
+
+Status : [Idle, TransactionBlock, FailedTransactionBlock]
 
 readyForQuery : Decode Message _
 readyForQuery =
@@ -153,7 +168,7 @@ errorToStr = \err ->
 
 errorResponse : Decode Message _
 errorResponse =
-    dict <- await fields
+    dict <- await knownStrFields
 
     localizedSeverity <- 'S' |> requiredField dict
     severity <- 'V' |> optionalFieldWith dict decodeSeverity
@@ -257,8 +272,8 @@ decodeSeverity = \str ->
         _ ->
             Err (InvalidSeverity str)
 
-fields : Decode (Dict U8 Str) _
-fields =
+knownStrFields : Decode (Dict U8 Str) _
+knownStrFields =
     collected <- loop (Dict.empty {})
 
     fieldId <- await u8
@@ -271,3 +286,75 @@ fields =
         collected
         |> Dict.insert fieldId value
         |> Loop
+
+RowField : {
+    name : Str,
+    column : Result { tableOid : I32, attributeNumber : I16 } [NotAColumn],
+    dataTypeOid : I32,
+    dataTypeSize : I16,
+    typeModifier : I32,
+    formatCode : I16,
+}
+
+rowDescription : Decode Message _
+rowDescription =
+    fieldCount <- await i16
+
+    fixedList fieldCount rowField
+    |> map RowDescription
+
+rowField : Decode RowField _
+rowField =
+    name <- await cStr
+    tableOid <- await i32
+    attributeNumber <- await i16
+    dataTypeOid <- await i32
+    dataTypeSize <- await i16
+    typeModifier <- await i32
+    formatCode <- map i16
+
+    column =
+        if tableOid != 0 && attributeNumber != 0 then
+            Ok { tableOid, attributeNumber }
+        else
+            Err NotAColumn
+
+    {
+        name,
+        column,
+        dataTypeOid,
+        dataTypeSize,
+        typeModifier,
+        formatCode,
+    }
+
+dataRow : Decode Message _
+dataRow =
+    columnCount <- await i16
+
+    fixedList
+        columnCount
+        (
+            valueLen <- await i32
+
+            if valueLen == -1 then
+                succeed []
+            else
+                take (Num.toNat valueLen) \x -> x
+        )
+    |> map DataRow
+
+fixedList = \count, itemDecode ->
+    loop [] \collected ->
+        item <- map itemDecode
+
+        added = List.append collected item
+
+        if List.len added == Num.toNat count then
+            Done added
+        else
+            Loop added
+
+commandComplete : Decode Message _
+commandComplete =
+    map cStr CommandComplete
