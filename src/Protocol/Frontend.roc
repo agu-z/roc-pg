@@ -1,5 +1,5 @@
 interface Protocol.Frontend
-    exposes [startup, query]
+    exposes [startup, query, terminate]
     imports [
         Bytes.Encode.{
             sequence,
@@ -39,6 +39,10 @@ query = \source ->
     message 'Q' [
         cStr source,
     ]
+
+terminate : List U8
+terminate =
+    message 'X' []
 
 message : U8, List (List U8) -> List U8
 message = \msgType, content ->

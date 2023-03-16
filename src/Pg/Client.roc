@@ -52,13 +52,20 @@ withConnect = \{ host, port, database, user }, callback ->
             loopWith { state & backendKey: Ok backendKey }
 
         ReadyForQuery _ ->
-            @Client {
-                stream,
-                parameters: state.parameters,
-                backendKey: state.backendKey,
-            }
-            |> callback
-            |> Task.map Done
+            done <-
+                @Client {
+                    stream,
+                    parameters: state.parameters,
+                    backendKey: state.backendKey,
+                }
+                |> callback
+                |> await
+
+            _ <- Protocol.Frontend.terminate
+                |> Tcp.writeBytes stream
+                |> await
+
+            Task.succeed (Done done)
 
         ErrorResponse error ->
             Task.fail (ErrorResponse error)
