@@ -1,11 +1,11 @@
 interface Protocol.Backend
     exposes [
         decode,
-        errorToStr,
         Message,
         KeyData,
         Status,
         RowField,
+        Error,
     ]
     imports [
         Bytes.Decode.{
@@ -34,9 +34,12 @@ Message : [
     BackendKeyData KeyData,
     ReadyForQuery Status,
     ErrorResponse Error,
+    ParseComplete,
+    BindComplete,
     RowDescription (List RowField),
     DataRow (List (List U8)),
     CommandComplete Str,
+    EmptyQueryResponse,
 ]
 
 message : Decode Message _
@@ -60,6 +63,12 @@ message =
         'E' ->
             errorResponse
 
+        '1' ->
+            succeed ParseComplete
+
+        '2' ->
+            succeed BindComplete
+
         'T' ->
             rowDescription
 
@@ -68,6 +77,9 @@ message =
 
         'C' ->
             commandComplete
+
+        'I' ->
+            succeed EmptyQueryResponse
 
         _ ->
             fail (UnrecognizedBackendMessage msgType)
@@ -136,35 +148,6 @@ Error : {
     line : Result Str {},
     routine : Result Str {},
 }
-
-errorToStr : Error -> Str
-errorToStr = \err ->
-    addField = \str, name, result ->
-        when result is
-            Ok value ->
-                "\(str)\n\(name): \(value)"
-
-            Err {} ->
-                str
-
-    fieldsStr =
-        ""
-        |> addField "Detail" err.detail
-        |> addField "Hint" err.hint
-        |> addField "Position" (err.position |> Result.map Num.toStr)
-        |> addField "Internal Position" (err.internalPosition |> Result.map Num.toStr)
-        |> addField "Internal Query" err.internalQuery
-        |> addField "Where" err.where
-        |> addField "Schema" err.schemaName
-        |> addField "Table" err.tableName
-        |> addField "Data type" err.dataTypeName
-        |> addField "Constraint" err.constraintName
-        |> addField "File" err.file
-        |> addField "Line" err.line
-        |> addField "Routine" err.line
-
-    "\(err.localizedSeverity) (\(err.code)): \(err.message)\n\(fieldsStr)"
-    |> Str.trim
 
 errorResponse : Decode Message _
 errorResponse =

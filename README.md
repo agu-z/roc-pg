@@ -6,7 +6,7 @@ Interface with PostgreSQL databases from pure Roc.
 
 - [x] Simple queries
 - [x] Decoding results
-- [ ] Parameter bindings
+- [x] Parameter bindings
 - [ ] Cursors
 - [ ] Prepared statements
 - [ ] SSL

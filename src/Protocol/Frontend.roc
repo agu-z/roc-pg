@@ -1,5 +1,14 @@
 interface Protocol.Frontend
-    exposes [startup, query, terminate]
+    exposes [
+        startup,
+        terminate,
+        parse,
+        bind,
+        FormatCode,
+        describePortal,
+        execute,
+        sync,
+    ]
     imports [
         Bytes.Encode.{
             sequence,
@@ -34,15 +43,89 @@ param = \key, value ->
         cStr value,
     ]
 
-query : Str -> List U8
-query = \source ->
-    message 'Q' [
-        cStr source,
-    ]
-
 terminate : List U8
 terminate =
     message 'X' []
+
+parse : { sql : Str, name ? Str, paramTypeIds ? List I32 } -> List U8
+parse = \{ sql, name ? "", paramTypeIds ? [] } ->
+    message 'P' [
+        cStr name,
+        cStr sql,
+        array paramTypeIds i32,
+    ]
+
+bind :
+    {
+        portal ? Str,
+        preparedStatement ? Str,
+        formatCodes ? List FormatCode,
+        paramValues : List [Null, Value (List U8)],
+        columnFormatCodes ? List FormatCode,
+    }
+    -> List U8
+bind = \{ portal ? "", preparedStatement ? "", formatCodes ? [], paramValues, columnFormatCodes ? [] } ->
+    message 'B' [
+        cStr portal,
+        cStr preparedStatement,
+        array formatCodes formatCode,
+        array
+            paramValues
+            (\value ->
+                when value is
+                    Null ->
+                        i32 -1
+
+                    Value b ->
+                        bytes b
+            ),
+        array columnFormatCodes formatCode,
+    ]
+
+FormatCode : [Text, Binary]
+
+formatCode : FormatCode -> List U8
+formatCode = \code ->
+    when code is
+        Text ->
+            i16 0
+
+        Binary ->
+            i16 1
+
+describePortal : { name ? Str } -> List U8
+describePortal = \{ name ? "" } ->
+    message 'D' [
+        u8 'P',
+        cStr name,
+    ]
+
+execute : { portal ? Str } -> List U8
+execute = \{ portal ? "" } ->
+    message 'E' [
+        cStr portal,
+
+        # No row limit
+        i32 0,
+    ]
+
+sync : List U8
+sync =
+    message 'S' []
+
+array : List item, (item -> List U8) -> List U8
+array = \items, itemEncode ->
+    sequence [
+        i16 (List.len items |> Num.toI16),
+        sequence (List.map items itemEncode),
+    ]
+
+bytes : List U8 -> List U8
+bytes = \value ->
+    sequence [
+        i32 (List.len value |> Num.toI32),
+        value,
+    ]
 
 message : U8, List (List U8) -> List U8
 message = \msgType, content ->

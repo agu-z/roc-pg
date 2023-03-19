@@ -7,53 +7,69 @@ app "query"
         pf.Task.{ Task, await },
         pf.Process,
         pf.Stdout,
+        pf.Stderr,
+        pg.Pg.Bind,
         pg.Pg.Client,
         pg.Pg.Result.{ succeed, apply },
     ]
     provides [main] to pf
 
+task =
+    client <- Pg.Client.withConnect {
+            host: "localhost",
+            port: 5432,
+            user: "aguz",
+            database: "aguz",
+        }
+
+    _ <- Stdout.line "Connected!" |> await
+
+    result <- client
+        |> Pg.Client.query
+            """
+            select $1 as name, $2 as age 
+            union all
+            select 'Julio' as name, 23 as age
+            """
+            [
+                Pg.Bind.str "John",
+                Pg.Bind.i32 25,
+            ]
+        |> await
+
+    dbg
+        result
+
+    out <-
+        result
+        |> Pg.Result.decode
+            (
+                succeed
+                    (\name -> \age ->
+                            ageStr = Num.toStr age
+
+                            "\(name): \(ageStr)"
+                    )
+                |> apply (Pg.Result.str "name")
+                |> apply (Pg.Result.i32 "age")
+            )
+        |> Result.map (\rows -> Str.joinWith rows "\n")
+        |> Task.fromResult
+        |> await
+
+    Stdout.line out
+
 main : Task {} []
 main =
-    task =
-        client <- Pg.Client.withConnect {
-                host: "localhost",
-                port: 5432,
-                user: "aguz",
-                database: "aguz",
-            }
-
-        _ <- Stdout.line "Connected!" |> await
-
-        result <- client
-            |> Pg.Client.query
-                """
-                select 'John' as name, 25 as age 
-                union all
-                select 'Julio' as name, 23 as age
-                """
-            |> await
-
-        rows =
-            result
-            |> Pg.Result.decode
-                (
-                    succeed (\name -> \age -> { name, age })
-                    |> apply (Pg.Result.str "name")
-                    |> apply (Pg.Result.i32 "age")
-                )
-
-        dbg
-            rows
-
-        Stdout.line "Result"
-
     Task.attempt task \result ->
         when result is
             Ok _ ->
                 Process.exit 0
 
-            Err err ->
-                dbg
-                    err
+            Err (ErrorResponse err) ->
+                _ <- Stderr.line (Pg.Client.errorToStr err) |> await
+                Process.exit 2
 
+            Err _ ->
+                _ <- Stderr.line "Something went wrong" |> await
                 Process.exit 1
