@@ -4,19 +4,21 @@ Interface with PostgreSQL databases from pure Roc.
 
 ## Features
 
-- [x] Simple queries
+- [x] Connection handling
+- [x] Parameterized queries
 - [x] Decoding results
-- [x] Parameter bindings
+- [x] Decoding errors
+- [ ] [`Decode`](https://www.roc-lang.org/builtins/Decode) ability implementation
 - [ ] Authentication
   - [ ] Cleartext password
   - [ ] MD5 password
   - [ ] SASL
   - [ ] GSS
   - [ ] SSPI
-- [ ] Cursors
 - [ ] Prepared statements
+- [ ] Bulk copying
+- [ ] Cursors
 - [ ] SSL
 - [ ] Connection pooling
-- [ ] Bulk copying
 - [ ] Notifications (listen/notify)
 - [ ] Notices
