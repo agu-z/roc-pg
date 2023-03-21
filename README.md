@@ -9,12 +9,10 @@ Interface with PostgreSQL databases from pure Roc.
 - [x] Decoding results
 - [x] Decoding errors
 - [ ] [`Decode`](https://www.roc-lang.org/builtins/Decode) ability implementation
-- [ ] Authentication
+- [ ] Authentication methods
   - [ ] Cleartext password
   - [ ] MD5 password
-  - [ ] SASL
-  - [ ] GSS
-  - [ ] SSPI
+  - [ ] SASL / SCRAM-SHA-256
 - [ ] Prepared statements
 - [ ] Bulk copying
 - [ ] Cursors
