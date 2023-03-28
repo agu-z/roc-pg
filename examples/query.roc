@@ -1,6 +1,6 @@
 app "query"
     packages {
-        pf: "../../basic-cli/src/main.roc",
+        pf: "https://github.com/agu-z/roc-basic-cli/releases/download/0.4.0/-fLszy7e5Po5sGVcMP6YCsi3e38T7ToTdHiXL8ws2KU.tar.gz",
         pg: "../src/main.roc",
     }
     imports [
