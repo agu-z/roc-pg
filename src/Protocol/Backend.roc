@@ -26,7 +26,8 @@ interface Protocol.Backend
 
 Message : [
     AuthOk,
-    AuthRequired,
+    AuthCleartextPassword,
+    AuthUnsupported,
     ParameterStatus { name : Str, value : Str },
     BackendKeyData KeyData,
     ReadyForQuery Status,
@@ -93,8 +94,11 @@ authRequest =
         0 ->
             AuthOk
 
+        3 -> 
+            AuthCleartextPassword
+
         _ ->
-            AuthRequired
+            AuthUnsupported
 
 paramStatus : Decode Message _
 paramStatus =

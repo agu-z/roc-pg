@@ -1,6 +1,7 @@
 interface Protocol.Frontend
     exposes [
         startup,
+        passwordMessage,
         terminate,
         parse,
         bind,
@@ -41,6 +42,12 @@ param = \key, value ->
     sequence [
         cStr key,
         cStr value,
+    ]
+
+passwordMessage : Str -> List U8
+passwordMessage = \pwd ->
+    message 'p' [
+        cStr pwd
     ]
 
 terminate : List U8

@@ -19,6 +19,7 @@ task =
             host: "localhost",
             port: 5432,
             user: "aguz",
+            auth: Password "the_password",
             database: "aguz",
         }
 

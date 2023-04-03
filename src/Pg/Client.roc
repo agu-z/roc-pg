@@ -26,11 +26,12 @@ withConnect :
         host : Str,
         port : U16,
         user : Str,
+        auth ? [None, Password Str],
         database : Str,
     },
     (Client -> Task {} _)
     -> Task {} _
-withConnect = \{ host, port, database, user }, callback ->
+withConnect = \{ host, port, database, auth ? None, user }, callback ->
     stream <- Tcp.withConnect host port
 
     _ <- Protocol.Frontend.startup { user, database } |> send stream
@@ -44,7 +45,18 @@ withConnect = \{ host, port, database, user }, callback ->
         AuthOk ->
             next state
 
-        AuthRequired ->
+        AuthCleartextPassword ->
+            when auth is 
+                None ->
+                    fail PasswordRequired
+
+                Password pwd ->
+                    _ <- Protocol.Frontend.passwordMessage pwd 
+                        |> send stream
+
+                    next state
+
+        AuthUnsupported ->
             fail UnsupportedAuth
 
         BackendKeyData backendKey ->

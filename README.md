@@ -10,7 +10,7 @@ Interface with PostgreSQL databases from pure Roc.
 - [x] Decoding errors
 - [ ] [`Decode`](https://www.roc-lang.org/builtins/Decode) ability implementation
 - [ ] Authentication methods
-  - [ ] Cleartext password
+  - [x] Cleartext password
   - [ ] MD5 password
   - [ ] SASL / SCRAM-SHA-256
 - [ ] Prepared statements
