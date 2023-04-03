@@ -1,6 +1,7 @@
 interface Protocol.Backend
     exposes [
-        decode,
+        header,
+        message,
         Message,
         KeyData,
         Status,
@@ -23,10 +24,6 @@ interface Protocol.Backend
         },
     ]
 
-decode : List U8 -> Result { decoded : Message, remaining : List U8 } _
-decode = \bytes ->
-    Bytes.Decode.decode bytes message
-
 Message : [
     AuthOk,
     AuthRequired,
@@ -42,11 +39,15 @@ Message : [
     EmptyQueryResponse,
 ]
 
-message : Decode Message _
-message =
+header : Decode { msgType : U8, len : I32 } _
+header =
     msgType <- await u8
-    _len <- await i32
+    len <- map i32
 
+    { msgType, len: len - 4 }
+
+message : U8 -> Decode Message _
+message = \msgType ->
     when msgType is
         'R' ->
             authRequest

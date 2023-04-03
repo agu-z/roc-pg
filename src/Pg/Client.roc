@@ -9,9 +9,10 @@ interface Pg.Client
         Protocol.Backend,
         Protocol.Frontend,
         Bytes.Encode,
+        Bytes.Decode.{ decode },
         Pg.Result.{ QueryResult },
         Pg.Bind.{ Binding },
-        pf.Task.{ Task, await },
+        pf.Task.{ Task, await, fail },
         pf.Tcp,
     ]
 
@@ -32,9 +33,7 @@ withConnect :
 withConnect = \{ host, port, database, user }, callback ->
     stream <- Tcp.withConnect host port
 
-    _ <- Protocol.Frontend.startup { user, database }
-        |> Tcp.writeBytes stream
-        |> await
+    _ <- Protocol.Frontend.startup { user, database } |> send stream
 
     msg, state <- messageLoop stream {
             parameters: Dict.empty {},
@@ -43,16 +42,16 @@ withConnect = \{ host, port, database, user }, callback ->
 
     when msg is
         AuthOk ->
-            loopWith state
+            next state
 
         AuthRequired ->
-            Task.fail UnsupportedAuth
+            fail UnsupportedAuth
 
         BackendKeyData backendKey ->
-            loopWith { state & backendKey: Ok backendKey }
+            next { state & backendKey: Ok backendKey }
 
         ReadyForQuery _ ->
-            done <-
+            result <-
                 @Client {
                     stream,
                     backendKey: state.backendKey,
@@ -60,11 +59,9 @@ withConnect = \{ host, port, database, user }, callback ->
                 |> callback
                 |> await
 
-            _ <- Protocol.Frontend.terminate
-                |> Tcp.writeBytes stream
-                |> await
+            _ <- Protocol.Frontend.terminate |> send stream
 
-            Task.succeed (Done done)
+            return result
 
         _ ->
             unexpected msg
@@ -81,9 +78,7 @@ query = \@Client { stream }, sql, bindings ->
         Protocol.Frontend.sync,
     ]
 
-    _ <- initMessages
-        |> Tcp.writeBytes stream
-        |> await
+    _ <- send initMessages stream
 
     initResult = {
         fields: [],
@@ -94,22 +89,22 @@ query = \@Client { stream }, sql, bindings ->
 
     when msg is
         ParseComplete ->
-            loopWith state
+            next state
 
         BindComplete ->
-            loopWith state
+            next state
 
         RowDescription fields ->
-            loopWith { state & fields: fields }
+            next { state & fields: fields }
 
         DataRow row ->
-            loopWith { state & rows: List.append state.rows row }
+            next { state & rows: List.append state.rows row }
 
         CommandComplete _ ->
-            loopWith state
+            next state
 
         EmptyQueryResponse ->
-            loopWith state
+            next state
 
         ReadyForQuery _ ->
             Pg.Result.create state
@@ -152,35 +147,49 @@ errorToStr = \err ->
 
 # Helpers
 
-messageLoop = \stream, initState, stepFn ->
-    initBytes <- Tcp.readBytes stream |> await
+readMessage : Tcp.Stream -> Task Protocol.Backend.Message _
+readMessage = \stream ->
+    headerBytes <- Tcp.readExactly 5 stream |> await
+    meta <- headerBytes |> decode Protocol.Backend.header |> try
 
-    { bytes, state } <- Task.loop { bytes: initBytes, state: initState }
-
-    if List.isEmpty bytes then
-        Task.fail UnexpectedEnd
+    if meta.len > 0 then
+        payload <- Tcp.readExactly (Num.toNat meta.len) stream |> await
+        decode payload (Protocol.Backend.message meta.msgType) |> Task.fromResult
     else
-        { decoded, remaining } <- Protocol.Backend.decode bytes |> Task.fromResult |> await
+        decode [] (Protocol.Backend.message meta.msgType) |> Task.fromResult
 
-        when decoded is
-            ErrorResponse error ->
-                Task.fail (ErrorResponse error)
+messageLoop : Tcp.Stream, state, (Protocol.Backend.Message, state -> Task [Done done, Step state] _) -> Task done _
+messageLoop = \stream, initState, stepFn ->
+    state <- Task.loop initState
 
-            ParameterStatus _ ->
-                Task.succeed (Step { bytes: remaining, state })
+    message <- readMessage stream |> await
 
-            _ ->
-                result <- stepFn decoded state |> Task.map
+    when message is
+        ErrorResponse error ->
+            fail (ErrorResponse error)
 
-                when result is
-                    Step newState ->
-                        Step { bytes: remaining, state: newState }
+        ParameterStatus _ ->
+            Task.succeed (Step state)
 
-                    Done done ->
-                        Done done
+        _ ->
+            stepFn message state
 
-loopWith = \state ->
+next : a -> Task [Step a] *
+next = \state ->
     Task.succeed (Step state)
 
+return : a -> Task [Done a] *
+return = \result ->
+    Task.succeed (Done result)
+
+unexpected : a -> Task * [UnexpectedMsg a]
 unexpected = \msg ->
-    Task.fail (UnexpectedMsg msg)
+    fail (UnexpectedMsg msg)
+
+send : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
+send = \bytes, stream, callback ->
+    Tcp.write bytes stream |> await callback
+
+try : Result a err, (a -> Task b err) -> Task b err
+try = \result, callback ->
+    Task.fromResult result |> await callback

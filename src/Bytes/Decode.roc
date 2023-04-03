@@ -13,7 +13,6 @@ interface Bytes.Decode
         cStr,
         take,
         map,
-        map2,
         succeed,
         fail,
         await,
@@ -31,9 +30,10 @@ Decode value err :=
         }
         err
 
-decode : List U8, Decode value err -> Result { decoded : value, remaining : List U8 } err
+decode : List U8, Decode value err -> Result value err
 decode = \bytes, @Decode decoder ->
     decoder bytes
+    |> Result.map .decoded
 
 # Unsigned Integers
 
@@ -171,13 +171,6 @@ map = \@Decode decoder, mapFn ->
     bytes <- @Decode
     { decoded, remaining } <- Result.map (decoder bytes)
     { decoded: mapFn decoded, remaining }
-
-map2 : Decode a err, Decode b err, (a, b -> c) -> Decode c err
-map2 = \@Decode decoderA, @Decode decoderB, mapFn ->
-    bytes <- @Decode
-    a <- Result.try (decoderA bytes)
-    b <- Result.map (decoderB a.remaining)
-    { decoded: mapFn a.decoded b.decoded, remaining: b.remaining }
 
 # Loop
 
