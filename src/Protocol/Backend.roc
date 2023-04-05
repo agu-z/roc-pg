@@ -35,6 +35,7 @@ Message : [
     ParseComplete,
     BindComplete,
     RowDescription (List RowField),
+    ParameterDescription,
     DataRow (List (List U8)),
     CommandComplete Str,
     EmptyQueryResponse,
@@ -74,6 +75,9 @@ message = \msgType ->
         'T' ->
             rowDescription
 
+        't' ->
+            succeed ParameterDescription
+
         'D' ->
             dataRow
 
@@ -94,7 +98,7 @@ authRequest =
         0 ->
             AuthOk
 
-        3 -> 
+        3 ->
             AuthCleartextPassword
 
         _ ->

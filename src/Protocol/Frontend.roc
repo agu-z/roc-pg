@@ -7,6 +7,7 @@ interface Protocol.Frontend
         bind,
         FormatCode,
         describePortal,
+        describeStatement,
         execute,
         sync,
     ]
@@ -47,7 +48,7 @@ param = \key, value ->
 passwordMessage : Str -> List U8
 passwordMessage = \pwd ->
     message 'p' [
-        cStr pwd
+        cStr pwd,
     ]
 
 terminate : List U8
@@ -104,6 +105,13 @@ describePortal : { name ? Str } -> List U8
 describePortal = \{ name ? "" } ->
     message 'D' [
         u8 'P',
+        cStr name,
+    ]
+
+describeStatement : { name ? Str } -> List U8
+describeStatement = \{ name ? "" } ->
+    message 'D' [
+        u8 'S',
         cStr name,
     ]
 

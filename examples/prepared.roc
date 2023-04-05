@@ -1,4 +1,4 @@
-app "query"
+app "prepared"
     packages {
         pf: "https://github.com/agu-z/roc-basic-cli/releases/download/0.5.0/S8r4wytSGYKi-iMrjaRZxv2Hope_CX7dF6rMdciYja8.tar.gz",
         pg: "../src/main.roc",
@@ -10,7 +10,7 @@ app "query"
         pf.Stderr,
         pg.Pg.Cmd,
         pg.Pg.Client,
-        pg.Pg.Result.{ succeed, apply },
+        pg.Pg.Result,
     ]
     provides [main] to pf
 
@@ -25,35 +25,36 @@ task =
 
     _ <- Stdout.line "Connected!" |> await
 
-    result <-
-        Pg.Cmd.new
-            """
-            select $1 as name, $2 as age 
-            union all
-            select 'Julio' as name, 23 as age
-            """
-        |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
-        |> Pg.Client.command client
-        |> await       
-       
-    out <-
-        result
-        |> Pg.Result.decode
-            (
-                succeed
-                    (\name -> \age ->
-                            ageStr = Num.toStr age
-
-                            "\(name): \(ageStr)"
-                    )
-                |> apply (Pg.Result.str "name")
-                |> apply (Pg.Result.i32 "age")
-            )
-        |> Result.map (\rows -> Str.joinWith rows "\n")
-        |> Task.fromResult
+    addCmd <-
+        """
+        select $1 + $2 as result
+        """
+        |> Pg.Client.prepare {client, name: "add"}
         |> await
 
-    Stdout.line out
+    addAndPrint = \a, b ->
+        result <-
+            addCmd
+            |> Pg.Cmd.bind [Pg.Cmd.u8 a, Pg.Cmd.u8 b]
+            |> Pg.Client.command client
+            |> await       
+
+        decoded <-
+            result
+            |> Pg.Result.decode (Pg.Result.u8 "result")
+            |> Result.try List.first
+            |> Task.fromResult
+            |> await
+
+        aStr = Num.toStr a
+        bStr = Num.toStr b
+        resultStr = Num.toStr decoded
+
+        Stdout.line "\(aStr) + \(bStr) = \(resultStr)"
+
+    _ <- addAndPrint 1 2 |> await
+
+    addAndPrint 11 31
 
 main : Task {} []
 main =

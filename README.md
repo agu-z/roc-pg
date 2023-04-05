@@ -13,7 +13,8 @@ Interface with PostgreSQL databases from pure Roc.
   - [x] Cleartext password
   - [ ] MD5 password
   - [ ] SASL / SCRAM-SHA-256
-- [ ] Prepared statements
+- [x] Prepared statements
+- [ ] Pipelining
 - [ ] Bulk copying
 - [ ] Cursors
 - [ ] SSL

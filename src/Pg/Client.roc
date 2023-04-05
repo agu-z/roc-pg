@@ -1,7 +1,8 @@
 interface Pg.Client
     exposes [
         withConnect,
-        query,
+        command,
+        prepare,
         Error,
         errorToStr,
     ]
@@ -11,9 +12,10 @@ interface Pg.Client
         Bytes.Encode,
         Bytes.Decode.{ decode },
         Pg.Result.{ QueryResult },
-        Pg.Bind.{ Binding },
+        Pg.Cmd.{ Cmd, Unprepared },
         pf.Task.{ Task, await, fail },
         pf.Tcp,
+        Cmd,
     ]
 
 Client := {
@@ -46,12 +48,12 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
             next state
 
         AuthCleartextPassword ->
-            when auth is 
+            when auth is
                 None ->
                     fail PasswordRequired
 
                 Password pwd ->
-                    _ <- Protocol.Frontend.passwordMessage pwd 
+                    _ <- Protocol.Frontend.passwordMessage pwd
                         |> send stream
 
                     next state
@@ -78,32 +80,47 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
         _ ->
             unexpected msg
 
-query : Client, Str, List Binding -> Task QueryResult _
-query = \@Client { stream }, sql, bindings ->
-    { formatCodes, paramValues } = Pg.Bind.encode bindings
+command : Cmd, Client -> Task QueryResult _
+command = \cmd, @Client { stream } ->
+    { formatCodes, paramValues } = Cmd.encodeBindings cmd
 
-    initMessages = Bytes.Encode.sequence [
-        Protocol.Frontend.parse { sql },
-        Protocol.Frontend.bind { formatCodes, paramValues },
-        Protocol.Frontend.describePortal {},
-        Protocol.Frontend.execute {},
-        Protocol.Frontend.sync,
-    ]
+    init =
+        when Cmd.getState cmd is
+            Unprepared sql ->
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.parse { sql },
+                        Protocol.Frontend.bind { formatCodes, paramValues },
+                        Protocol.Frontend.describePortal {},
+                        Protocol.Frontend.execute {},
+                        Protocol.Frontend.sync,
+                    ],
+                    fields: [],
+                }
 
-    _ <- send initMessages stream
+            Prepared prepared ->
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.bind {
+                            formatCodes,
+                            paramValues,
+                            preparedStatement: prepared.name,
+                        },
+                        Protocol.Frontend.execute {},
+                        Protocol.Frontend.sync,
+                    ],
+                    fields: prepared.fields,
+                }
 
-    initResult = {
-        fields: [],
-        rows: [],
-    }
+    _ <- send init.messages stream
 
-    msg, state <- messageLoop stream initResult
+    msg, state <- messageLoop stream {
+            fields: init.fields,
+            rows: [],
+        }
 
     when msg is
-        ParseComplete ->
-            next state
-
-        BindComplete ->
+        ParseComplete | BindComplete | ParameterDescription ->
             next state
 
         RowDescription fields ->
@@ -112,16 +129,39 @@ query = \@Client { stream }, sql, bindings ->
         DataRow row ->
             next { state & rows: List.append state.rows row }
 
-        CommandComplete _ ->
-            next state
-
-        EmptyQueryResponse ->
+        CommandComplete _ | EmptyQueryResponse ->
             next state
 
         ReadyForQuery _ ->
             Pg.Result.create state
             |> Done
             |> Task.succeed
+
+        _ ->
+            unexpected msg
+
+prepare : Str, { name : Str, client : Client } -> Task Cmd _
+prepare = \sql, { name, client } ->
+    (@Client { stream }) = client
+
+    _ <- Bytes.Encode.sequence [
+            Protocol.Frontend.parse { sql, name },
+            Protocol.Frontend.describeStatement { name },
+            Protocol.Frontend.sync,
+        ]
+        |> send stream
+
+    msg, state <- messageLoop stream []
+
+    when msg is
+        ParseComplete | ParameterDescription ->
+            next state
+
+        RowDescription fields ->
+            next fields
+
+        ReadyForQuery _ ->
+            return (Cmd.prepared { name, fields: state })
 
         _ ->
             unexpected msg
