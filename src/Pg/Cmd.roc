@@ -2,6 +2,9 @@ interface Pg.Cmd
     exposes [
         Cmd,
         new,
+        expectN,
+        expect1,
+        map,
         bind,
         Binding,
         null,
@@ -22,16 +25,40 @@ interface Pg.Cmd
     ]
     imports [
         Cmd.{ makeBinding },
+        pg.Pg.Result.{ CmdResult },
     ]
 
-Cmd : Cmd.Cmd
+Cmd a err : Cmd.Cmd a err
+
+new : Str -> Cmd CmdResult []
+new = Cmd.fromSql
+
+# Result
+
+expectN : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
+expectN = \cmd, decoder ->
+    Cmd.withDecode cmd \r -> Pg.Result.decode r decoder
+
+expect1 : Cmd CmdResult [], Pg.Result.Decode a [EmptyResult]err -> Cmd a [EmptyResult, FieldNotFound Str]err
+expect1 = \cmd, decoder ->
+    cmdResult <- cmd |> Cmd.withLimit 1 |> Cmd.withDecode
+    rows <- Pg.Result.decode cmdResult decoder |> Result.try
+
+    when rows is
+        [row] ->
+            Ok row
+
+        _ ->
+            Err EmptyResult
+
+map : Cmd a err, (a -> b) -> Cmd b err
+map = Cmd.map
+
+# Bindings
 
 Binding : Cmd.Binding
 
-new : Str -> Cmd
-new = Cmd.unprepared
-
-bind : Cmd, List Binding -> Cmd
+bind : Cmd a err, List Binding -> Cmd a err
 bind = Cmd.bind
 
 null : Binding

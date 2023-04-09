@@ -1,9 +1,11 @@
 interface Pg.Result
     exposes [
-        QueryResult,
+        CmdResult,
+        RowField,
         create,
         len,
         decode,
+        Decode,
         str,
         u8,
         u16,
@@ -24,34 +26,36 @@ interface Pg.Result
     ]
     imports [Protocol.Backend]
 
-QueryResult := {
-    fields : List Protocol.Backend.RowField,
+RowField : Protocol.Backend.RowField
+
+CmdResult := {
+    fields : List RowField,
     rows : List (List (List U8)),
 }
 
-create = @QueryResult
+create = @CmdResult
 
-len : QueryResult -> Nat
-len = \@QueryResult result ->
+len : CmdResult -> Nat
+len = \@CmdResult result ->
     List.len result.rows
 
 Decode a err :=
-    List Protocol.Backend.RowField
+    List RowField
     ->
     Result
         (List (List U8)
         ->
-        Result a [FieldNotFound]err)
-        [FieldNotFound]
+        Result a [FieldNotFound Str]err)
+        [FieldNotFound Str]
 
-decode : QueryResult, Decode a err -> Result (List a) [FieldNotFound]err
-decode = \@QueryResult r, @Decode getDecode ->
+decode : CmdResult, Decode a err -> Result (List a) [FieldNotFound Str]err
+decode = \@CmdResult r, @Decode getDecode ->
     when getDecode r.fields is
         Ok fn ->
             List.mapTry r.rows fn
 
-        Err FieldNotFound ->
-            Err FieldNotFound
+        Err (FieldNotFound name) ->
+            Err (FieldNotFound name)
 
 str = decoder Ok
 
@@ -100,10 +104,10 @@ decoder = \fn -> \name ->
                                 Err err
 
                     Err OutOfBounds ->
-                        Err FieldNotFound
+                        Err (FieldNotFound name)
 
             Err NotFound ->
-                Err FieldNotFound
+                Err (FieldNotFound name)
 
 map2 = \@Decode a, @Decode b, cb ->
     fields <- @Decode

@@ -1,7 +1,7 @@
 interface Pg.Client
     exposes [
         withConnect,
-        command,
+        execute,
         prepare,
         Error,
         errorToStr,
@@ -11,7 +11,7 @@ interface Pg.Client
         Protocol.Frontend,
         Bytes.Encode,
         Bytes.Decode.{ decode },
-        Pg.Result.{ QueryResult },
+        Pg.Result.{ CmdResult },
         Pg.Cmd.{ Cmd, Unprepared },
         pf.Task.{ Task, await, fail },
         pf.Tcp,
@@ -80,25 +80,37 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
         _ ->
             unexpected msg
 
-command : Cmd, Client -> Task QueryResult _
-command = \cmd, @Client { stream } ->
+execute : Cmd a err,
+    Client
+    -> Task
+        a
+        [
+            PgExpectErr err,
+            PgErr Error,
+            PgProtoErr _,
+            TcpReadErr _,
+            TcpUnexpectedEOF,
+            TcpWriteErr _,
+        ]
+execute = \cmd, @Client { stream } ->
+    { kind, limit } = Cmd.unwrap cmd
     { formatCodes, paramValues } = Cmd.encodeBindings cmd
 
     init =
-        when Cmd.getState cmd is
-            Unprepared sql ->
+        when kind is
+            SqlCmd sql ->
                 {
                     messages: Bytes.Encode.sequence [
                         Protocol.Frontend.parse { sql },
                         Protocol.Frontend.bind { formatCodes, paramValues },
                         Protocol.Frontend.describePortal {},
-                        Protocol.Frontend.execute {},
+                        Protocol.Frontend.execute { limit },
                         Protocol.Frontend.sync,
                     ],
                     fields: [],
                 }
 
-            Prepared prepared ->
+            PreparedCmd prepared ->
                 {
                     messages: Bytes.Encode.sequence [
                         Protocol.Frontend.bind {
@@ -106,7 +118,7 @@ command = \cmd, @Client { stream } ->
                             paramValues,
                             preparedStatement: prepared.name,
                         },
-                        Protocol.Frontend.execute {},
+                        Protocol.Frontend.execute { limit },
                         Protocol.Frontend.sync,
                     ],
                     fields: prepared.fields,
@@ -129,18 +141,29 @@ command = \cmd, @Client { stream } ->
         DataRow row ->
             next { state & rows: List.append state.rows row }
 
-        CommandComplete _ | EmptyQueryResponse ->
+        PortalSuspended | CommandComplete _ | EmptyQueryResponse ->
             next state
 
         ReadyForQuery _ ->
             Pg.Result.create state
-            |> Done
-            |> Task.succeed
+            |> Cmd.decode cmd
+            |> Result.mapErr PgExpectErr
+            |> Task.fromResult
+            |> Task.map Done
 
         _ ->
             unexpected msg
 
-prepare : Str, { name : Str, client : Client } -> Task Cmd _
+prepare : Str,{ name : Str, client : Client }
+    -> Task
+        (Cmd CmdResult [])
+        [
+            PgErr Error,
+            PgProtoErr _,
+            TcpReadErr _,
+            TcpUnexpectedEOF,
+            TcpWriteErr _,
+        ]
 prepare = \sql, { name, client } ->
     (@Client { stream }) = client
 
@@ -199,16 +222,22 @@ errorToStr = \err ->
 
 # Helpers
 
-readMessage : Tcp.Stream -> Task Protocol.Backend.Message _
+readMessage : Tcp.Stream -> Task Protocol.Backend.Message [PgProtoErr _, TcpReadErr _, TcpUnexpectedEOF]
 readMessage = \stream ->
     headerBytes <- Tcp.readExactly 5 stream |> await
-    meta <- headerBytes |> decode Protocol.Backend.header |> try
+
+    protoDecode = \bytes, dec ->
+        decode bytes dec
+        |> Result.mapErr PgProtoErr
+        |> Task.fromResult
+
+    meta <- headerBytes |> protoDecode Protocol.Backend.header |> await
 
     if meta.len > 0 then
         payload <- Tcp.readExactly (Num.toNat meta.len) stream |> await
-        decode payload (Protocol.Backend.message meta.msgType) |> Task.fromResult
+        protoDecode payload (Protocol.Backend.message meta.msgType)
     else
-        decode [] (Protocol.Backend.message meta.msgType) |> Task.fromResult
+        protoDecode [] (Protocol.Backend.message meta.msgType)
 
 messageLoop : Tcp.Stream, state, (Protocol.Backend.Message, state -> Task [Done done, Step state] _) -> Task done _
 messageLoop = \stream, initState, stepFn ->
@@ -218,7 +247,7 @@ messageLoop = \stream, initState, stepFn ->
 
     when message is
         ErrorResponse error ->
-            fail (ErrorResponse error)
+            fail (PgErr error)
 
         ParameterStatus _ ->
             Task.succeed (Step state)
@@ -234,14 +263,11 @@ return : a -> Task [Done a] *
 return = \result ->
     Task.succeed (Done result)
 
-unexpected : a -> Task * [UnexpectedMsg a]
+unexpected : a -> Task * [PgProtoErr [UnexpectedMsg a]]
 unexpected = \msg ->
-    fail (UnexpectedMsg msg)
+    fail (PgProtoErr (UnexpectedMsg msg))
 
 send : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
 send = \bytes, stream, callback ->
     Tcp.write bytes stream |> await callback
 
-try : Result a err, (a -> Task b err) -> Task b err
-try = \result, callback ->
-    Task.fromResult result |> await callback

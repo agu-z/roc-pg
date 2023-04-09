@@ -115,13 +115,19 @@ describeStatement = \{ name ? "" } ->
         cStr name,
     ]
 
-execute : { portal ? Str } -> List U8
-execute = \{ portal ? "" } ->
+execute : { portal ? Str, limit ? [None, Limit I32] } -> List U8
+execute = \{ portal ? "", limit ? None } ->
+    limitOrZero =
+        when limit is
+            None ->
+                0
+
+            Limit lim ->
+                lim
+
     message 'E' [
         cStr portal,
-
-        # No row limit
-        i32 0,
+        i32 limitOrZero,
     ]
 
 sync : List U8

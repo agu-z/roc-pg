@@ -25,20 +25,15 @@ task =
 
     _ <- Stdout.line "Connected!" |> await
 
-    result <-
+    rows <-
         Pg.Cmd.new
             """
-            select $1 as name, $2 as age 
+            select $1 as name, $2 as age
             union all
             select 'Julio' as name, 23 as age
             """
         |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
-        |> Pg.Client.command client
-        |> await       
-       
-    out <-
-        result
-        |> Pg.Result.decode
+        |> Pg.Cmd.expectN
             (
                 succeed
                     (\name -> \age ->
@@ -47,13 +42,12 @@ task =
                             "\(name): \(ageStr)"
                     )
                 |> apply (Pg.Result.str "name")
-                |> apply (Pg.Result.i32 "age")
+                |> apply (Pg.Result.u8 "age")
             )
-        |> Result.map (\rows -> Str.joinWith rows "\n")
-        |> Task.fromResult
+        |> Pg.Client.execute client
         |> await
 
-    Stdout.line out
+    Stdout.line (Str.joinWith rows "\n")
 
 main : Task {} []
 main =
@@ -62,10 +56,13 @@ main =
             Ok _ ->
                 Process.exit 0
 
-            Err (ErrorResponse err) ->
+            Err (TcpPerformErr (PgErr err)) ->
                 _ <- Stderr.line (Pg.Client.errorToStr err) |> await
                 Process.exit 2
 
-            Err _ ->
+            Err err ->
+                dbg
+                    err
+
                 _ <- Stderr.line "Something went wrong" |> await
                 Process.exit 1

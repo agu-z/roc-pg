@@ -37,6 +37,7 @@ Message : [
     RowDescription (List RowField),
     ParameterDescription,
     DataRow (List (List U8)),
+    PortalSuspended,
     CommandComplete Str,
     EmptyQueryResponse,
 ]
@@ -80,6 +81,9 @@ message = \msgType ->
 
         'D' ->
             dataRow
+
+        's' ->
+            succeed PortalSuspended
 
         'C' ->
             commandComplete

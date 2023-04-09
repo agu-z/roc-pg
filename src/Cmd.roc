@@ -1,9 +1,13 @@
 interface Cmd exposes
     [
         Cmd,
-        getState,
-        unprepared,
+        fromSql,
         prepared,
+        unwrap,
+        withLimit,
+        decode,
+        withDecode,
+        map,
         bind,
         Binding,
         makeBinding,
@@ -11,39 +15,75 @@ interface Cmd exposes
     ] imports [
         Protocol.Frontend.{ FormatCode },
         Protocol.Backend.{ RowField },
+        Pg.Result.{ CmdResult },
     ]
 
-Cmd := {
-    state : State,
+Cmd a err := {
+    kind : Kind,
     bindings : List Binding,
+    limit : [None, Limit I32],
+    decode : CmdResult -> Result a err,
 }
 
-State : [
-    Unprepared Str,
-    Prepared
+Kind : [
+    SqlCmd Str,
+    PreparedCmd
         {
             name : Str,
             fields : List RowField,
         },
 ]
 
-getState : Cmd -> State
-getState = \@Cmd { state } ->
-    state
+fromSql : Str -> Cmd CmdResult []
+fromSql = \sql ->
+    new (SqlCmd sql)
 
-bind : Cmd, List Binding -> Cmd
-bind = \@Cmd { state }, bindings ->
-    @Cmd { state, bindings }
-
-unprepared : Str -> Cmd
-unprepared = \sql ->
-    @Cmd { state: Unprepared sql, bindings: [] }
-
-prepared : { name : Str, fields : List RowField } -> Cmd
+prepared : { name : Str, fields : List RowField } -> Cmd CmdResult []
 prepared = \prep ->
-    @Cmd { state: Prepared prep, bindings: [] }
+    new (PreparedCmd prep)
 
-# Bindings
+new : Kind -> Cmd CmdResult []
+new = \kind ->
+    @Cmd {
+        kind,
+        limit: None,
+        bindings: [],
+        decode: Ok,
+    }
+
+unwrap : Cmd * * -> { kind : Kind, limit : [None, Limit I32] }
+unwrap = \@Cmd { kind, limit } ->
+    { kind, limit }
+
+withLimit : Cmd a err, I32 -> Cmd a err
+withLimit = \@Cmd cmd, limit ->
+    @Cmd { cmd & limit: Limit limit }
+
+decode : CmdResult, Cmd a err -> Result a err
+decode = \r, @Cmd cmd ->
+    cmd.decode r
+
+withDecode : Cmd CmdResult [], (CmdResult -> Result a err) -> Cmd a err
+withDecode = \@Cmd cmd, fn ->
+    @Cmd {
+        kind: cmd.kind,
+        limit: cmd.limit,
+        bindings: cmd.bindings,
+        decode: fn,
+    }
+
+map : Cmd a err, (a -> b) -> Cmd b err
+map = \@Cmd cmd, fn ->
+    @Cmd {
+        kind: cmd.kind,
+        limit: cmd.limit,
+        bindings: cmd.bindings,
+        decode: \r -> cmd.decode r |> Result.map fn,
+    }
+
+bind : Cmd a err, List Binding -> Cmd a err
+bind = \@Cmd cmd, bindings ->
+    @Cmd { cmd & bindings }
 
 Binding := [
     Null,
@@ -53,7 +93,7 @@ Binding := [
 
 makeBinding = @Binding
 
-encodeBindings : Cmd
+encodeBindings : Cmd a err
     -> {
         formatCodes : List FormatCode,
         paramValues : List [Null, Value (List U8)],

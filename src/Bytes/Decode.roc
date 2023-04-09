@@ -37,7 +37,7 @@ decode = \bytes, @Decode decoder ->
 
 # Unsigned Integers
 
-u8 : Decode U8 [NotEnoughBytes]
+u8 : Decode U8 [UnexpectedEnd]
 u8 =
     bytes <- @Decode
 
@@ -46,9 +46,9 @@ u8 =
             Ok { decoded: byte, remaining: List.drop bytes 1 }
 
         _ ->
-            Err NotEnoughBytes
+            Err UnexpectedEnd
 
-u16 : Decode U16 [NotEnoughBytes]
+u16 : Decode U16 [UnexpectedEnd]
 u16 =
     bytes <- @Decode
 
@@ -61,9 +61,9 @@ u16 =
             Ok { decoded: value, remaining: List.drop bytes 2 }
 
         _ ->
-            Err NotEnoughBytes
+            Err UnexpectedEnd
 
-u32 : Decode U32 [NotEnoughBytes]
+u32 : Decode U32 [UnexpectedEnd]
 u32 =
     bytes <- @Decode
 
@@ -78,9 +78,9 @@ u32 =
             Ok { decoded: value, remaining: List.drop bytes 4 }
 
         _ ->
-            Err NotEnoughBytes
+            Err UnexpectedEnd
 
-u64 : Decode U64 [NotEnoughBytes]
+u64 : Decode U64 [UnexpectedEnd]
 u64 =
     bytes <- @Decode
 
@@ -99,27 +99,27 @@ u64 =
             Ok { decoded: value, remaining: List.drop bytes 8 }
 
         _ ->
-            Err NotEnoughBytes
+            Err UnexpectedEnd
 
 # Signed Integers
 
-i8 : Decode I8 [NotEnoughBytes]
+i8 : Decode I8 [UnexpectedEnd]
 i8 =
     map u8 Num.toI8
 
-i16 : Decode I16 [NotEnoughBytes]
+i16 : Decode I16 [UnexpectedEnd]
 i16 =
     map u16 Num.toI16
 
-i32 : Decode I32 [NotEnoughBytes]
+i32 : Decode I32 [UnexpectedEnd]
 i32 =
     map u32 Num.toI32
 
-i64 : Decode I64 [NotEnoughBytes]
+i64 : Decode I64 [UnexpectedEnd]
 i64 =
     map u64 Num.toI64
 
-take : Nat, (List U8 -> value) -> Decode value [NotEnoughBytes]
+take : Nat, (List U8 -> value) -> Decode value [UnexpectedEnd]
 take = \count, callback ->
     bytes <- @Decode
     { before, others } = List.split bytes count
@@ -127,7 +127,7 @@ take = \count, callback ->
     if List.len before == count then
         Ok { decoded: callback before, remaining: others }
     else
-        Err NotEnoughBytes
+        Err UnexpectedEnd
 
 # Strings
 
