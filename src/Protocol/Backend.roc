@@ -40,6 +40,7 @@ Message : [
     PortalSuspended,
     CommandComplete Str,
     EmptyQueryResponse,
+    CloseComplete,
 ]
 
 header : Decode { msgType : U8, len : I32 } _
@@ -90,6 +91,9 @@ message = \msgType ->
 
         'I' ->
             succeed EmptyQueryResponse
+
+        '3' ->
+            succeed CloseComplete
 
         _ ->
             fail (UnrecognizedBackendMessage msgType)

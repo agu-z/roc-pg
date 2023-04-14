@@ -18,7 +18,7 @@ interface Pg.Client
         pf.Task.{ Task, await, fail },
         pf.Tcp,
         Cmd,
-        Batch
+        Batch,
     ]
 
 Client := {
@@ -95,7 +95,35 @@ command : Cmd a err,
             TcpWriteErr _,
         ]
 command = \cmd, @Client { stream } ->
-    init = initCmd cmd
+    { kind, limit, bindings } = Cmd.params cmd
+    { formatCodes, paramValues } = Cmd.encodeBindings bindings
+
+    init =
+        when kind is
+            SqlCmd sql ->
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.parse { sql },
+                        Protocol.Frontend.bind { formatCodes, paramValues },
+                        Protocol.Frontend.describePortal {},
+                        Protocol.Frontend.execute { limit },
+                    ],
+                    fields: [],
+                }
+
+            PreparedCmd prepared ->
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.bind {
+                            formatCodes,
+                            paramValues,
+                            preparedStatement: prepared.name,
+                        },
+                        Protocol.Frontend.execute { limit },
+                    ],
+                    fields: prepared.fields,
+                }
+
     _ <- sendWithSync init.messages stream
 
     result <- readCmdResult init.fields stream |> await
@@ -108,35 +136,6 @@ command = \cmd, @Client { stream } ->
     _ <- readReadyForQuery stream |> await
 
     Task.succeed decoded
-
-initCmd = \cmd ->
-    { kind, limit } = Cmd.unwrap cmd
-    { formatCodes, paramValues } = Cmd.encodeBindings cmd
-
-    when kind is
-        SqlCmd sql ->
-            {
-                messages: Bytes.Encode.sequence [
-                    Protocol.Frontend.parse { sql },
-                    Protocol.Frontend.bind { formatCodes, paramValues },
-                    Protocol.Frontend.describePortal {},
-                    Protocol.Frontend.execute { limit },
-                ],
-                fields: [],
-            }
-
-        PreparedCmd prepared ->
-            {
-                messages: Bytes.Encode.sequence [
-                    Protocol.Frontend.bind {
-                        formatCodes,
-                        paramValues,
-                        preparedStatement: prepared.name,
-                    },
-                    Protocol.Frontend.execute { limit },
-                ],
-                fields: prepared.fields,
-            }
 
 readCmdResult = \initFields, stream ->
     msg, state <- messageLoop stream {
@@ -164,6 +163,9 @@ readReadyForQuery = \stream ->
     msg, {} <- messageLoop stream {}
 
     when msg is
+        CloseComplete -> 
+            next {}
+
         ReadyForQuery _ ->
             return {}
 
@@ -217,48 +219,127 @@ batch : Batch a err,
             TcpUnexpectedEOF,
             TcpWriteErr _,
         ]
-batch = \bch, @Client { stream } ->
-    { commands, decode: batchDecode } = Batch.unwrap bch
+batch = \cmdBatch, @Client { stream } ->
+    { commands, seenSql, decode: batchDecode } = Batch.params cmdBatch
 
-    inits = commands |> List.map initCmd
+    reusedIndexes =
+        seenSql
+        |> Dict.walk (Set.empty {}) \set, _, { index, reused } ->
+            if reused then
+                set |> Set.insert index
+            else
+                set
 
-    _ <-
-        inits
-        |> List.map .messages
+    inits = commands |> List.mapWithIndex (initBatchCmd reusedIndexes)
+
+    commandMessages = inits |> List.map .messages |> Bytes.Encode.sequence
+    closeMessages =
+        reusedIndexes
+        |> Set.toList
+        |> List.map \ix ->
+            Protocol.Frontend.closeStatement { name: Batch.reuseName ix }
         |> Bytes.Encode.sequence
-        |> sendWithSync stream
 
-    results <-
-        inits
-        |> List.map \init -> readCmdResult init.fields stream
-        |> sequenceTasks
-        |> await
+    messages = commandMessages |> List.concat closeMessages
+    _ <- sendWithSync messages stream
 
-    {} <- readReadyForQuery stream |> await
+    { remaining, results } <- Task.loop {
+            remaining: inits,
+            results: List.withCapacity (List.len commands),
+        }
 
-    when batchDecode results is
-        Ok { value } ->
-            Task.succeed value
-
-        Err (ExpectErr err) ->
-            Task.fail (PgExpectErr err)
-
-        Err MissingCmdResult ->
-            Task.fail (PgProtoErr MissingCmdResult)
-
-sequenceTasks : List (Task a err) -> Task (List a) err
-sequenceTasks = \all ->
-    { tasks, done } <- Task.loop { tasks: all, done: List.withCapacity (List.len all) }
-
-    when tasks is
+    when remaining is
         [] ->
-            Task.succeed (Done done)
+            when batchDecode results is
+                Ok { value } ->
+                    _ <- readReadyForQuery stream |> await
+
+                    return value
+
+                Err MissingCmdResult ->
+                    # TODO: better name
+                    Task.fail (PgProtoErr MissingCmdResult)
+
+                Err (ExpectErr err) ->
+                    Task.fail (PgExpectErr err)
 
         [first, ..] ->
-            Task.map first \result ->
-                Step {
-                    tasks: List.dropFirst tasks,
-                    done: done |> List.append result,
+            fields <- await
+                    (
+                        when first.fields is
+                            Describe ->
+                                Task.succeed []
+
+                            ReuseFrom index ->
+                                when List.get results index is
+                                    Ok result ->
+                                        Task.succeed (Pg.Result.fields result)
+
+                                    Err OutOfBounds ->
+                                        # TODO: better name
+                                        Task.fail (PgProtoErr ResultOutOfBounds)
+
+                            Known fields ->
+                                Task.succeed fields
+                    )
+
+            result <- readCmdResult fields stream |> await
+
+            next {
+                remaining: remaining |> List.dropFirst,
+                results: results |> List.append result,
+            }
+
+initBatchCmd : Set Nat -> (Batch.BatchedCmd, Nat -> { messages : List U8, fields : [Describe, ReuseFrom Nat, Known (List Pg.Result.RowField)] })
+initBatchCmd = \reusedIndexes -> \cmd, cmdIndex ->
+        { formatCodes, paramValues } = Cmd.encodeBindings cmd.bindings
+
+        when cmd.kind is
+            SqlCmd sql ->
+                name =
+                    if Set.contains reusedIndexes cmdIndex then
+                        Batch.reuseName cmdIndex
+                    else
+                        ""
+
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.parse { sql, name },
+                        Protocol.Frontend.bind {
+                            formatCodes,
+                            paramValues,
+                            preparedStatement: name,
+                        },
+                        Protocol.Frontend.describePortal {},
+                        Protocol.Frontend.execute { limit: cmd.limit },
+                    ],
+                    fields: Describe,
+                }
+
+            ReuseSql index ->
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.bind {
+                            formatCodes,
+                            paramValues,
+                            preparedStatement: Batch.reuseName index,
+                        },
+                        Protocol.Frontend.execute { limit: cmd.limit },
+                    ],
+                    fields: ReuseFrom index,
+                }
+
+            PreparedCmd prepared ->
+                {
+                    messages: Bytes.Encode.sequence [
+                        Protocol.Frontend.bind {
+                            formatCodes,
+                            paramValues,
+                            preparedStatement: prepared.name,
+                        },
+                        Protocol.Frontend.execute { limit: cmd.limit },
+                    ],
+                    fields: Known prepared.fields,
                 }
 
 Error : Protocol.Backend.Error

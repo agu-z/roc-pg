@@ -9,6 +9,7 @@ interface Protocol.Frontend
         describePortal,
         describeStatement,
         execute,
+        closeStatement,
         sync,
     ]
     imports [
@@ -128,6 +129,13 @@ execute = \{ portal ? "", limit ? None } ->
     message 'E' [
         cStr portal,
         i32 limitOrZero,
+    ]
+
+closeStatement : { name : Str } -> List U8
+closeStatement = \{ name } ->
+    message 'C' [
+        u8 'S',
+        cStr name,
     ]
 
 sync : List U8

@@ -1,9 +1,12 @@
 interface Cmd exposes
     [
         Cmd,
+        Params,
+        Limit,
+        Kind,
         fromSql,
         prepared,
-        unwrap,
+        params,
         withLimit,
         decode,
         withDecode,
@@ -18,21 +21,24 @@ interface Cmd exposes
         Pg.Result.{ CmdResult },
     ]
 
-Cmd a err := {
-    kind : Kind,
-    bindings : List Binding,
-    limit : [None, Limit I32],
-    decode : CmdResult -> Result a err,
-}
+Cmd a err := Params { decode : CmdResult -> Result a err } []
 
-Kind : [
+Limit : [None, Limit I32]
+
+Params p k : {
+    kind : Kind k,
+    bindings : List Binding,
+    limit : Limit,
+}p
+
+Kind k : [
     SqlCmd Str,
     PreparedCmd
         {
             name : Str,
             fields : List RowField,
         },
-]
+]k
 
 fromSql : Str -> Cmd CmdResult []
 fromSql = \sql ->
@@ -42,7 +48,7 @@ prepared : { name : Str, fields : List RowField } -> Cmd CmdResult []
 prepared = \prep ->
     new (PreparedCmd prep)
 
-new : Kind -> Cmd CmdResult []
+new : Kind [] -> Cmd CmdResult []
 new = \kind ->
     @Cmd {
         kind,
@@ -51,9 +57,9 @@ new = \kind ->
         decode: Ok,
     }
 
-unwrap : Cmd * * -> { kind : Kind, limit : [None, Limit I32] }
-unwrap = \@Cmd { kind, limit } ->
-    { kind, limit }
+params : Cmd a err -> Params {} []
+params = \@Cmd { kind, bindings, limit } ->
+    { kind, bindings, limit }
 
 withLimit : Cmd a err, I32 -> Cmd a err
 withLimit = \@Cmd cmd, limit ->
@@ -93,12 +99,12 @@ Binding := [
 
 makeBinding = @Binding
 
-encodeBindings : Cmd a err
+encodeBindings : List Binding
     -> {
         formatCodes : List FormatCode,
         paramValues : List [Null, Value (List U8)],
     }
-encodeBindings = \@Cmd { bindings } ->
+encodeBindings = \bindings ->
     empty = {
         formatCodes: [],
         paramValues: [],

@@ -26,8 +26,8 @@ task =
 
     _ <- Stdout.line "Connected!" |> await
 
-    result <-
-        Pg.Batch.succeed (\hi -> \fortyTwo -> { hi, fortyTwo })
+    resultWith <-
+        Pg.Batch.succeed (\hi -> \eleven -> \thirtyOne -> { hi, fortyTwo: eleven + thirtyOne })
         |> Pg.Batch.with
             (
                 Pg.Cmd.new "select 'hi' as value"
@@ -35,15 +35,35 @@ task =
             )
         |> Pg.Batch.with
             (
-                Pg.Cmd.new "select 42 as value"
+                Pg.Cmd.new "select $1::int as value"
+                |> Pg.Cmd.bind [Pg.Cmd.u8 11]
+                |> Pg.Cmd.expect1 (Pg.Result.u8 "value")
+            )
+        |> Pg.Batch.with
+            (
+                Pg.Cmd.new "select $1::int as value"
+                |> Pg.Cmd.bind [Pg.Cmd.u8 31]
                 |> Pg.Cmd.expect1 (Pg.Result.u8 "value")
             )
         |> Pg.Client.batch client
         |> await
 
-    str42 = Num.toStr result.fortyTwo
+    str42 = Num.toStr resultWith.fortyTwo
+    _ <- Stdout.line "\(resultWith.hi) \(str42)" |> await
 
-    Stdout.line "\(result.hi) \(str42)"
+    resultSeq <-
+        List.range { start: At 0, end: At 20 }
+        |> List.map \num ->
+            Pg.Cmd.new "select $1::int as value"
+            |> Pg.Cmd.bind [Pg.Cmd.u8 num]
+            |> Pg.Cmd.expect1 (Pg.Result.u8 "value")
+        |> Pg.Batch.sequence
+        |> Pg.Client.batch client
+        |> await
+
+    resultSeqStr = resultSeq |> List.map Num.toStr |> Str.joinWith ", "
+
+    Stdout.line resultSeqStr
 
 main : Task {} []
 main =

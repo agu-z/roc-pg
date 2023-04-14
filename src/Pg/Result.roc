@@ -4,6 +4,7 @@ interface Pg.Result
         RowField,
         create,
         len,
+        fields,
         decode,
         Decode,
         str,
@@ -34,6 +35,9 @@ CmdResult := {
 }
 
 create = @CmdResult
+
+fields : CmdResult -> List RowField
+fields = \@CmdResult result -> result.fields
 
 len : CmdResult -> Nat
 len = \@CmdResult result ->
@@ -88,9 +92,9 @@ dec = decoder Str.toDec
 nat = decoder Str.toNat
 
 decoder = \fn -> \name ->
-        fields <- @Decode
+        rowFields <- @Decode
 
-        when List.findFirstIndex fields \f -> f.name == name is
+        when List.findFirstIndex rowFields \f -> f.name == name is
             Ok index ->
                 row <- Ok
 
@@ -110,10 +114,10 @@ decoder = \fn -> \name ->
                 Err (FieldNotFound name)
 
 map2 = \@Decode a, @Decode b, cb ->
-    fields <- @Decode
+    rowFields <- @Decode
 
-    decodeA <- Result.try (a fields)
-    decodeB <- Result.try (b fields)
+    decodeA <- Result.try (a rowFields)
+    decodeB <- Result.try (b rowFields)
 
     row <- Ok
 
