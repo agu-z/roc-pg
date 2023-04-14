@@ -1,7 +1,8 @@
 interface Pg.Client
     exposes [
         withConnect,
-        execute,
+        command,
+        batch,
         prepare,
         Error,
         errorToStr,
@@ -13,9 +14,11 @@ interface Pg.Client
         Bytes.Decode.{ decode },
         Pg.Result.{ CmdResult },
         Pg.Cmd.{ Cmd, Unprepared },
+        Pg.Batch.{ Batch },
         pf.Task.{ Task, await, fail },
         pf.Tcp,
         Cmd,
+        Batch
     ]
 
 Client := {
@@ -53,8 +56,7 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
                     fail PasswordRequired
 
                 Password pwd ->
-                    _ <- Protocol.Frontend.passwordMessage pwd
-                        |> send stream
+                    _ <- Protocol.Frontend.passwordMessage pwd |> send stream
 
                     next state
 
@@ -80,7 +82,7 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
         _ ->
             unexpected msg
 
-execute : Cmd a err,
+command : Cmd a err,
     Client
     -> Task
         a
@@ -92,42 +94,53 @@ execute : Cmd a err,
             TcpUnexpectedEOF,
             TcpWriteErr _,
         ]
-execute = \cmd, @Client { stream } ->
+command = \cmd, @Client { stream } ->
+    init = initCmd cmd
+    _ <- sendWithSync init.messages stream
+
+    result <- readCmdResult init.fields stream |> await
+
+    decoded <- Cmd.decode result cmd
+        |> Result.mapErr PgExpectErr
+        |> Task.fromResult
+        |> await
+
+    _ <- readReadyForQuery stream |> await
+
+    Task.succeed decoded
+
+initCmd = \cmd ->
     { kind, limit } = Cmd.unwrap cmd
     { formatCodes, paramValues } = Cmd.encodeBindings cmd
 
-    init =
-        when kind is
-            SqlCmd sql ->
-                {
-                    messages: Bytes.Encode.sequence [
-                        Protocol.Frontend.parse { sql },
-                        Protocol.Frontend.bind { formatCodes, paramValues },
-                        Protocol.Frontend.describePortal {},
-                        Protocol.Frontend.execute { limit },
-                        Protocol.Frontend.sync,
-                    ],
-                    fields: [],
-                }
+    when kind is
+        SqlCmd sql ->
+            {
+                messages: Bytes.Encode.sequence [
+                    Protocol.Frontend.parse { sql },
+                    Protocol.Frontend.bind { formatCodes, paramValues },
+                    Protocol.Frontend.describePortal {},
+                    Protocol.Frontend.execute { limit },
+                ],
+                fields: [],
+            }
 
-            PreparedCmd prepared ->
-                {
-                    messages: Bytes.Encode.sequence [
-                        Protocol.Frontend.bind {
-                            formatCodes,
-                            paramValues,
-                            preparedStatement: prepared.name,
-                        },
-                        Protocol.Frontend.execute { limit },
-                        Protocol.Frontend.sync,
-                    ],
-                    fields: prepared.fields,
-                }
+        PreparedCmd prepared ->
+            {
+                messages: Bytes.Encode.sequence [
+                    Protocol.Frontend.bind {
+                        formatCodes,
+                        paramValues,
+                        preparedStatement: prepared.name,
+                    },
+                    Protocol.Frontend.execute { limit },
+                ],
+                fields: prepared.fields,
+            }
 
-    _ <- send init.messages stream
-
+readCmdResult = \initFields, stream ->
     msg, state <- messageLoop stream {
-            fields: init.fields,
+            fields: initFields,
             rows: [],
         }
 
@@ -141,15 +154,18 @@ execute = \cmd, @Client { stream } ->
         DataRow row ->
             next { state & rows: List.append state.rows row }
 
-        PortalSuspended | CommandComplete _ | EmptyQueryResponse ->
-            next state
+        CommandComplete _ | EmptyQueryResponse | PortalSuspended ->
+            return (Pg.Result.create state)
 
+        _ ->
+            unexpected msg
+
+readReadyForQuery = \stream ->
+    msg, {} <- messageLoop stream {}
+
+    when msg is
         ReadyForQuery _ ->
-            Pg.Result.create state
-            |> Cmd.decode cmd
-            |> Result.mapErr PgExpectErr
-            |> Task.fromResult
-            |> Task.map Done
+            return {}
 
         _ ->
             unexpected msg
@@ -188,6 +204,62 @@ prepare = \sql, { name, client } ->
 
         _ ->
             unexpected msg
+
+batch : Batch a err,
+    Client
+    -> Task
+        a
+        [
+            PgExpectErr err,
+            PgErr Error,
+            PgProtoErr _,
+            TcpReadErr _,
+            TcpUnexpectedEOF,
+            TcpWriteErr _,
+        ]
+batch = \bch, @Client { stream } ->
+    { commands, decode: batchDecode } = Batch.unwrap bch
+
+    inits = commands |> List.map initCmd
+
+    _ <-
+        inits
+        |> List.map .messages
+        |> Bytes.Encode.sequence
+        |> sendWithSync stream
+
+    results <-
+        inits
+        |> List.map \init -> readCmdResult init.fields stream
+        |> sequenceTasks
+        |> await
+
+    {} <- readReadyForQuery stream |> await
+
+    when batchDecode results is
+        Ok { value } ->
+            Task.succeed value
+
+        Err (ExpectErr err) ->
+            Task.fail (PgExpectErr err)
+
+        Err MissingCmdResult ->
+            Task.fail (PgProtoErr MissingCmdResult)
+
+sequenceTasks : List (Task a err) -> Task (List a) err
+sequenceTasks = \all ->
+    { tasks, done } <- Task.loop { tasks: all, done: List.withCapacity (List.len all) }
+
+    when tasks is
+        [] ->
+            Task.succeed (Done done)
+
+        [first, ..] ->
+            Task.map first \result ->
+                Step {
+                    tasks: List.dropFirst tasks,
+                    done: done |> List.append result,
+                }
 
 Error : Protocol.Backend.Error
 
@@ -271,3 +343,10 @@ send : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
 send = \bytes, stream, callback ->
     Tcp.write bytes stream |> await callback
 
+sendWithSync : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
+sendWithSync = \bytes, stream, callback ->
+    Bytes.Encode.sequence [
+        bytes,
+        Protocol.Frontend.sync,
+    ]
+    |> send stream callback

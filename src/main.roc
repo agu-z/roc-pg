@@ -1,3 +1,3 @@
 package "pg"
-    exposes [Pg.Client]
+    exposes [Pg.Client, Pg.Cmd, Pg.Batch, Pg.Result]
     packages {}

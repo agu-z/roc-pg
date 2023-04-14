@@ -44,7 +44,7 @@ task =
                 |> apply (Pg.Result.str "name")
                 |> apply (Pg.Result.u8 "age")
             )
-        |> Pg.Client.execute client
+        |> Pg.Client.command client
         |> await
 
     Stdout.line (Str.joinWith rows "\n")

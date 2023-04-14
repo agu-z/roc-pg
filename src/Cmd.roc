@@ -63,7 +63,7 @@ decode : CmdResult, Cmd a err -> Result a err
 decode = \r, @Cmd cmd ->
     cmd.decode r
 
-withDecode : Cmd CmdResult [], (CmdResult -> Result a err) -> Cmd a err
+withDecode : Cmd * *, (CmdResult -> Result a err) -> Cmd a err
 withDecode = \@Cmd cmd, fn ->
     @Cmd {
         kind: cmd.kind,
