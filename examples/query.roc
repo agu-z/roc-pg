@@ -10,7 +10,7 @@ app "query"
         pf.Stderr,
         pg.Pg.Cmd,
         pg.Pg.Client,
-        pg.Pg.Result.{ succeed, apply },
+        pg.Pg.Result,
     ]
     provides [main] to pf
 
@@ -35,14 +35,14 @@ task =
         |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
         |> Pg.Cmd.expectN
             (
-                succeed
+                Pg.Result.succeed
                     (\name -> \age ->
                             ageStr = Num.toStr age
 
                             "\(name): \(ageStr)"
                     )
-                |> apply (Pg.Result.str "name")
-                |> apply (Pg.Result.u8 "age")
+                |> Pg.Result.with (Pg.Result.str "name")
+                |> Pg.Result.with (Pg.Result.u8 "age")
             )
         |> Pg.Client.command client
         |> await

@@ -20,8 +20,8 @@ task =
     Pg.Cmd.new "select name, price from products"
     |> Pg.Cmd.expectN
         (Pg.Result.succeed (\name -> \price -> { name, price })
-            |> Pg.Result.apply (Pg.Result.str "name")
-            |> Pg.Result.apply (Pg.Result.u32 "price")
+            |> Pg.Result.with (Pg.Result.str "name")
+            |> Pg.Result.with (Pg.Result.u32 "price")
         )
     |> Pg.Client.command client
 ```
@@ -36,8 +36,8 @@ Pg.Cmd.new "select name, price from products where id = $1"
 |> Pg.Cmd.bind [ Pg.Cmd.u32 productId ]
 |> Pg.Cmd.expect1
     (Pg.Result.succeed (\name -> \price -> { name, price })
-        |> Pg.Result.apply (Pg.Result.str "name")
-        |> Pg.Result.apply (Pg.Result.u32 "price")
+        |> Pg.Result.with (Pg.Result.str "name")
+        |> Pg.Result.with (Pg.Result.u32 "price")
     )
 |> Pg.Client.command client
 ```
@@ -83,8 +83,8 @@ Pg.Batch.succeed (\product -> \user -> { product, user })
       |> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
       |> Pg.Cmd.expect1 (
           Pg.Result.succeed (\name -> \phone -> { name, phone })
-          |> Pg.Result.apply (Pg.Result.str "name")
-          |> Pg.Result.apply (Pg.Result.str "phone")
+          |> Pg.Result.with (Pg.Result.str "name")
+          |> Pg.Result.with (Pg.Result.str "phone")
       )
     )
 |> Pg.Client.batch client
