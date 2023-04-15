@@ -50,14 +50,14 @@ Prepared statements
 </summary>
 
 ```elm
-selectProduct <-
-    "select name from products where id = $1"
-    |> Pg.Client.prepare { client, name: "selectProduct" }
+selectUser <-
+    "select email from users where id = $1"
+    |> Pg.Client.prepare { client, name: "selectUser" }
     |> await
 
-selectProduct
-|> Pg.Cmd.bind [ Pg.Cmd.u32 productId ]
-|> Pg.Cmd.expect1 (Pg.Result.str "name")
+selectUser
+|> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
+|> Pg.Cmd.expect1 (Pg.Result.str "email")
 |> Pg.Client.command client
 
 ```
@@ -70,27 +70,32 @@ Batch commands in a single roundtrip (applicative)
 </summary>
 
 ```elm
-Pg.Batch.succeed (\productName -> \user -> { productName, user })
+Pg.Batch.succeed (\email -> \products -> { email, products })
 |> Pg.Batch.with
     (
-      selectProduct
-      |> Pg.Cmd.bind [ Pg.Cmd.u32 productId ]
-      |> Pg.Cmd.expect1 (Pg.Result.str "name")
+        selectUser
+        |> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
+        |> Pg.Cmd.expect1 (Pg.Result.str "email")
     )
 |> Pg.Batch.with
     (
-      Pg.Cmd.new "select name, phone from user where id = $1"
-      |> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
-      |> Pg.Cmd.expect1 (
-          Pg.Result.succeed (\name -> \phone -> { name, phone })
-          |> Pg.Result.with (Pg.Result.str "name")
-          |> Pg.Result.with (Pg.Result.str "phone")
+      Pg.Cmd.new
+        """
+        select name, price from products
+        inner join orders on orders.product_id = products.id
+        where orders.id = $1
+        """
+      |> Pg.Cmd.bind [ Pg.Cmd.u32 orderId ]
+      |> Pg.Cmd.expectN
+          (Pg.Result.succeed (\name -> \price -> { name, price })
+              |> Pg.Result.with (Pg.Result.str "name")
+              |> Pg.Result.with (Pg.Result.u32 "price")
+          )
       )
-    )
 |> Pg.Client.batch client
 ```
 
-`selectProduct` refers to the prepared statement in the previous example
+Note: `selectUser` referes to prepared statement in the previous example
 
 </details>
 
@@ -109,6 +114,8 @@ productsToUpdate
 |> Pg.Batch.sequence
 |> Pg.Client.batch client
 ```
+
+Note: `roc-pg` automatically reuses statements in a batch by only parsing (and describing) once per unique SQL string. This also works with applicative batches.
 
 </details>
 
