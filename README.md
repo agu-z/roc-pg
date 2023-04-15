@@ -135,6 +135,7 @@ I'd like this to become a stable PostgreSQL interface for Roc eventually, but no
   - [ ] MD5 password \*
   - [ ] SASL / SCRAM-SHA-256 \*
 - [x] Prepared statements
+- [ ] Close prepared statements
 - [x] Pipelining
   - [x] Applicative batches
   - [x] Sequence list of commands expecting same type
