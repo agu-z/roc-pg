@@ -105,9 +105,11 @@ encodeBindings : List Binding
         paramValues : List [Null, Value (List U8)],
     }
 encodeBindings = \bindings ->
+    count = List.len bindings
+
     empty = {
-        formatCodes: [],
-        paramValues: [],
+        formatCodes: List.withCapacity count,
+        paramValues: List.withCapacity count,
     }
 
     List.walk bindings empty \state, binding ->
