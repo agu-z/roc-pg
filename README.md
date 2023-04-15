@@ -106,8 +106,8 @@ Batch commands in a single roundtrip (list)
 
 ```elm
 updateCmd = \product ->
-    Pg.Cmd.new "update products set price = $1 where id = $2"
-    |> Pg.Cmd.bind [ Pg.Cmd.u32 product.newPrice, Pg.Cmd.u32 product.id ]
+    Pg.Cmd.new "update products set desc = $1 where id = $2"
+    |> Pg.Cmd.bind [ Pg.Cmd.str product.desc, Pg.Cmd.u32 product.id ]
 
 productsToUpdate
 |> List.map updateCmd
