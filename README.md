@@ -79,19 +79,19 @@ Pg.Batch.succeed (\email -> \products -> { email, products })
     )
 |> Pg.Batch.with
     (
-      Pg.Cmd.new
-        """
-        select name, price from products
-        inner join orders on orders.product_id = products.id
-        where orders.id = $1
-        """
-      |> Pg.Cmd.bind [ Pg.Cmd.u32 orderId ]
-      |> Pg.Cmd.expectN
-          (Pg.Result.succeed (\name -> \price -> { name, price })
-              |> Pg.Result.with (Pg.Result.str "name")
-              |> Pg.Result.with (Pg.Result.u32 "price")
-          )
-      )
+        Pg.Cmd.new
+            """
+            select name, price from products
+            inner join orders on orders.product_id = products.id
+            where orders.id = $1
+            """
+        |> Pg.Cmd.bind [ Pg.Cmd.u32 orderId ]
+        |> Pg.Cmd.expectN
+            (Pg.Result.succeed (\name -> \price -> { name, price })
+                |> Pg.Result.with (Pg.Result.str "name")
+                |> Pg.Result.with (Pg.Result.u32 "price")
+            )
+    )
 |> Pg.Client.batch client
 ```
 
