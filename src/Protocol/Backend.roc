@@ -345,15 +345,16 @@ dataRow =
     |> map DataRow
 
 fixedList = \count, itemDecode ->
-    loop [] \collected ->
-        item <- map itemDecode
+    collected <- loop (List.withCapacity (Num.toNat count))
 
-        added = List.append collected item
+    item <- map itemDecode
 
-        if List.len added == Num.toNat count then
-            Done added
-        else
-            Loop added
+    added = List.append collected item
+
+    if List.len added == Num.toNat count then
+        Done added
+    else
+        Loop added
 
 commandComplete : Decode Message _
 commandComplete =
