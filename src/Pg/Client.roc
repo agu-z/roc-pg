@@ -82,6 +82,8 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
         _ ->
             unexpected msg
 
+# Single command
+
 command : Cmd a err,
     Client
     -> Task
@@ -137,6 +139,162 @@ command = \cmd, @Client { stream } ->
 
     Task.succeed decoded
 
+# Batches
+
+batch : Batch a err,
+    Client
+    -> Task
+        a
+        [
+            PgExpectErr err,
+            PgErr Error,
+            PgProtoErr _,
+            TcpReadErr _,
+            TcpUnexpectedEOF,
+            TcpWriteErr _,
+        ]
+batch = \cmdBatch, @Client { stream } ->
+    { commands, seenSql, decode: batchDecode } = Batch.params cmdBatch
+
+    reusedIndexes =
+        seenSql
+        |> Dict.walk (Set.empty {}) \set, _, { index, reused } ->
+            if reused then
+                set |> Set.insert index
+            else
+                set
+
+    inits =
+        commands
+        |> List.mapWithIndex (\cmd, ix -> initBatchedCmd reusedIndexes cmd ix)
+
+    commandMessages =
+        inits
+        |> List.map .messages
+        |> Bytes.Encode.sequence
+
+    closeMessages =
+        reusedIndexes
+        |> Set.toList
+        |> List.map \ix ->
+            Protocol.Frontend.closeStatement { name: Batch.reuseName ix }
+        |> Bytes.Encode.sequence
+
+    messages = commandMessages |> List.concat closeMessages
+    _ <- sendWithSync messages stream
+
+    Task.loop
+        {
+            remaining: inits,
+            results: List.withCapacity (List.len commands),
+        }
+        (\state -> batchReadStep batchDecode stream state)
+
+initBatchedCmd : Set Nat,
+    Batch.BatchedCmd,
+    Nat
+    -> {
+        messages : List U8,
+        fields : [
+            Describe,
+            ReuseFrom Nat,
+            Known (List Pg.Result.RowField),
+        ],
+    }
+initBatchedCmd = \reusedIndexes, cmd, cmdIndex ->
+    { formatCodes, paramValues } = Cmd.encodeBindings cmd.bindings
+
+    when cmd.kind is
+        SqlCmd sql ->
+            name =
+                if Set.contains reusedIndexes cmdIndex then
+                    Batch.reuseName cmdIndex
+                else
+                    ""
+
+            {
+                messages: Bytes.Encode.sequence [
+                    Protocol.Frontend.parse { sql, name },
+                    Protocol.Frontend.bind {
+                        formatCodes,
+                        paramValues,
+                        preparedStatement: name,
+                    },
+                    Protocol.Frontend.describePortal {},
+                    Protocol.Frontend.execute { limit: cmd.limit },
+                ],
+                fields: Describe,
+            }
+
+        ReuseSql index ->
+            {
+                messages: Bytes.Encode.sequence [
+                    Protocol.Frontend.bind {
+                        formatCodes,
+                        paramValues,
+                        preparedStatement: Batch.reuseName index,
+                    },
+                    Protocol.Frontend.execute { limit: cmd.limit },
+                ],
+                fields: ReuseFrom index,
+            }
+
+        PreparedCmd prepared ->
+            {
+                messages: Bytes.Encode.sequence [
+                    Protocol.Frontend.bind {
+                        formatCodes,
+                        paramValues,
+                        preparedStatement: prepared.name,
+                    },
+                    Protocol.Frontend.execute { limit: cmd.limit },
+                ],
+                fields: Known prepared.fields,
+            }
+
+batchReadStep = \batchDecode, stream, { remaining, results } ->
+    when remaining is
+        [] ->
+            when batchDecode results is
+                Ok { value } ->
+                    _ <- readReadyForQuery stream |> await
+
+                    return value
+
+                Err (MissingCmdResult index) ->
+                    Task.fail (PgProtoErr (MissingBatchedCmdResult index))
+
+                Err (ExpectErr err) ->
+                    Task.fail (PgExpectErr err)
+
+        [first, ..] ->
+            fields <- await (batchedCmdFields results first.fields)
+            result <- readCmdResult fields stream |> await
+
+            next {
+                remaining: remaining |> List.dropFirst,
+                results: results |> List.append result,
+            }
+
+batchedCmdFields = \results, fieldsMethod ->
+    when fieldsMethod is
+        Describe ->
+            Task.succeed []
+
+        ReuseFrom index ->
+            when List.get results index is
+                Ok result ->
+                    Task.succeed (Pg.Result.fields result)
+
+                Err OutOfBounds ->
+                    # TODO: better name
+                    Task.fail (PgProtoErr ResultOutOfBounds)
+
+        Known fields ->
+            Task.succeed fields
+
+# Execute helpers
+
 readCmdResult = \initFields, stream ->
     msg, state <- messageLoop stream {
             fields: initFields,
@@ -163,7 +321,7 @@ readReadyForQuery = \stream ->
     msg, {} <- messageLoop stream {}
 
     when msg is
-        CloseComplete -> 
+        CloseComplete ->
             next {}
 
         ReadyForQuery _ ->
@@ -171,6 +329,8 @@ readReadyForQuery = \stream ->
 
         _ ->
             unexpected msg
+
+# Prepared Statements
 
 prepare : Str,{ name : Str, client : Client }
     -> Task
@@ -207,140 +367,7 @@ prepare = \sql, { name, client } ->
         _ ->
             unexpected msg
 
-batch : Batch a err,
-    Client
-    -> Task
-        a
-        [
-            PgExpectErr err,
-            PgErr Error,
-            PgProtoErr _,
-            TcpReadErr _,
-            TcpUnexpectedEOF,
-            TcpWriteErr _,
-        ]
-batch = \cmdBatch, @Client { stream } ->
-    { commands, seenSql, decode: batchDecode } = Batch.params cmdBatch
-
-    reusedIndexes =
-        seenSql
-        |> Dict.walk (Set.empty {}) \set, _, { index, reused } ->
-            if reused then
-                set |> Set.insert index
-            else
-                set
-
-    inits = commands |> List.mapWithIndex (initBatchCmd reusedIndexes)
-
-    commandMessages = inits |> List.map .messages |> Bytes.Encode.sequence
-    closeMessages =
-        reusedIndexes
-        |> Set.toList
-        |> List.map \ix ->
-            Protocol.Frontend.closeStatement { name: Batch.reuseName ix }
-        |> Bytes.Encode.sequence
-
-    messages = commandMessages |> List.concat closeMessages
-    _ <- sendWithSync messages stream
-
-    { remaining, results } <- Task.loop {
-            remaining: inits,
-            results: List.withCapacity (List.len commands),
-        }
-
-    when remaining is
-        [] ->
-            when batchDecode results is
-                Ok { value } ->
-                    _ <- readReadyForQuery stream |> await
-
-                    return value
-
-                Err MissingCmdResult ->
-                    # TODO: better name
-                    Task.fail (PgProtoErr MissingCmdResult)
-
-                Err (ExpectErr err) ->
-                    Task.fail (PgExpectErr err)
-
-        [first, ..] ->
-            fields <- await
-                    (
-                        when first.fields is
-                            Describe ->
-                                Task.succeed []
-
-                            ReuseFrom index ->
-                                when List.get results index is
-                                    Ok result ->
-                                        Task.succeed (Pg.Result.fields result)
-
-                                    Err OutOfBounds ->
-                                        # TODO: better name
-                                        Task.fail (PgProtoErr ResultOutOfBounds)
-
-                            Known fields ->
-                                Task.succeed fields
-                    )
-
-            result <- readCmdResult fields stream |> await
-
-            next {
-                remaining: remaining |> List.dropFirst,
-                results: results |> List.append result,
-            }
-
-initBatchCmd : Set Nat -> (Batch.BatchedCmd, Nat -> { messages : List U8, fields : [Describe, ReuseFrom Nat, Known (List Pg.Result.RowField)] })
-initBatchCmd = \reusedIndexes -> \cmd, cmdIndex ->
-        { formatCodes, paramValues } = Cmd.encodeBindings cmd.bindings
-
-        when cmd.kind is
-            SqlCmd sql ->
-                name =
-                    if Set.contains reusedIndexes cmdIndex then
-                        Batch.reuseName cmdIndex
-                    else
-                        ""
-
-                {
-                    messages: Bytes.Encode.sequence [
-                        Protocol.Frontend.parse { sql, name },
-                        Protocol.Frontend.bind {
-                            formatCodes,
-                            paramValues,
-                            preparedStatement: name,
-                        },
-                        Protocol.Frontend.describePortal {},
-                        Protocol.Frontend.execute { limit: cmd.limit },
-                    ],
-                    fields: Describe,
-                }
-
-            ReuseSql index ->
-                {
-                    messages: Bytes.Encode.sequence [
-                        Protocol.Frontend.bind {
-                            formatCodes,
-                            paramValues,
-                            preparedStatement: Batch.reuseName index,
-                        },
-                        Protocol.Frontend.execute { limit: cmd.limit },
-                    ],
-                    fields: ReuseFrom index,
-                }
-
-            PreparedCmd prepared ->
-                {
-                    messages: Bytes.Encode.sequence [
-                        Protocol.Frontend.bind {
-                            formatCodes,
-                            paramValues,
-                            preparedStatement: prepared.name,
-                        },
-                        Protocol.Frontend.execute { limit: cmd.limit },
-                    ],
-                    fields: Known prepared.fields,
-                }
+# Errors
 
 Error : Protocol.Backend.Error
 

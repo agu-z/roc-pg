@@ -13,23 +13,33 @@ interface Batch
         Pg.Result.{ CmdResult },
     ]
 
-Batch a err := {
+Batch a err := Params {
+        decode : List CmdResult
+        ->
+        Result
+            {
+                value : a,
+                rest : List CmdResult,
+            }
+            [
+                MissingCmdResult Nat,
+                ExpectErr err,
+            ],
+    }
+
+Params a : {
     commands : List BatchedCmd,
-    seenSql : Dict Str { index : Nat, reused : Bool },
-    decode : List CmdResult
-    ->
-    Result
-        {
-            value : a,
-            rest : List CmdResult,
-        }
-        [
-            MissingCmdResult,
-            ExpectErr err,
-        ],
-}
+    seenSql : SeenSql,
+}a
+
+SeenSql : Dict Str { index : Nat, reused : Bool }
 
 BatchedCmd : Cmd.Params {} [ReuseSql Nat]
+
+reuseName : Nat -> Str
+reuseName = \index ->
+    indexStr = Num.toStr index
+    "b[\(indexStr)]"
 
 succeed : a -> Batch a err
 succeed = \value ->
@@ -41,7 +51,7 @@ succeed = \value ->
 
 with : Batch (a -> b) err, Cmd a err -> Batch b err
 with = \@Batch batch, cmd ->
-    { seenSql, newCmd } = addCmd batch cmd
+    { seenSql, newCmd, newIndex } = addCmd batch cmd
     commands = batch.commands |> List.append newCmd
 
     decode = \results ->
@@ -59,48 +69,9 @@ with = \@Batch batch, cmd ->
                 }
 
             _ ->
-                Err MissingCmdResult
+                Err (MissingCmdResult newIndex)
 
     @Batch { commands, seenSql, decode }
-
-addCmd = \batch, cmd ->
-    cmdParams = Cmd.params cmd
-
-    when cmdParams.kind is
-        SqlCmd sql ->
-            when Dict.get batch.seenSql sql is
-                Err KeyNotFound ->
-                    entry = {
-                        index: List.len batch.commands,
-                        reused: Bool.false,
-                    }
-                    seenSql = batch.seenSql |> Dict.insert sql entry
-                    newCmd = SqlCmd sql |> batchCmd cmdParams
-
-                    { seenSql, newCmd }
-
-                Ok { index, reused } ->
-                    seenSql =
-                        if reused then
-                            batch.seenSql
-                        else
-                            entry = { index, reused: Bool.true }
-                            batch.seenSql |> Dict.insert sql entry
-
-                    newCmd = ReuseSql index |> batchCmd cmdParams
-
-                    { seenSql, newCmd }
-
-        PreparedCmd prep ->
-            newCmd = PreparedCmd prep |> batchCmd cmdParams
-
-            { seenSql: batch.seenSql, newCmd }
-
-batchCmd = \kind, cmdParams -> {
-    kind,
-    bindings: cmdParams.bindings,
-    limit: cmdParams.limit,
-}
 
 sequence : List (Cmd a err) -> Batch (List a) err
 sequence = \cmds ->
@@ -133,15 +104,54 @@ sequence = \cmds ->
         decode,
     }
 
+smallest : Num a, Num a -> Num a
 smallest = \a, b ->
     if a < b then
         a
     else
         b
 
-params = \@Batch batch -> batch
+addCmd : Params *, Cmd * * -> { seenSql : SeenSql, newCmd : BatchedCmd, newIndex : Nat }
+addCmd = \batch, cmd ->
+    cmdParams = Cmd.params cmd
+    newIndex = List.len batch.commands
 
-reuseName : Nat -> Str
-reuseName = \index ->
-    indexStr = Num.toStr index
-    "b[\(indexStr)]"
+    when cmdParams.kind is
+        SqlCmd sql ->
+            when Dict.get batch.seenSql sql is
+                Err KeyNotFound ->
+                    entry = {
+                        index: newIndex,
+                        reused: Bool.false,
+                    }
+                    seenSql = batch.seenSql |> Dict.insert sql entry
+                    newCmd = SqlCmd sql |> batchedCmd cmdParams
+
+                    { seenSql, newCmd, newIndex }
+
+                Ok { index, reused } ->
+                    seenSql =
+                        if reused then
+                            batch.seenSql
+                        else
+                            entry = { index, reused: Bool.true }
+                            batch.seenSql |> Dict.insert sql entry
+
+                    newCmd = ReuseSql index |> batchedCmd cmdParams
+
+                    { seenSql, newCmd, newIndex }
+
+        PreparedCmd prep ->
+            newCmd = PreparedCmd prep |> batchedCmd cmdParams
+
+            { seenSql: batch.seenSql, newCmd, newIndex }
+
+batchedCmd : Cmd.Kind [ReuseSql Nat], Cmd.Params {} [] -> BatchedCmd
+batchedCmd = \kind, cmdParams -> {
+    kind,
+    bindings: cmdParams.bindings,
+    limit: cmdParams.limit,
+}
+
+params : Batch a err -> Params _
+params = \@Batch batch -> batch
