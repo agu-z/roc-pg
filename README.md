@@ -70,7 +70,7 @@ Batch commands in a single roundtrip (applicative)
 </summary>
 
 ```elm
-Pg.Batch.succeed (\product -> \user -> { product, user })
+Pg.Batch.succeed (\productName -> \user -> { productName, user })
 |> Pg.Batch.with
     (
       selectProduct
