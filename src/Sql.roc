@@ -30,7 +30,6 @@ toSql = \query ->
     selectSql = exprToSql query.clauses.select
     tableSql = tableToSql query.from
 
-
     "select \(selectSql) from \(tableSql)"
     |> addCluse "where" query.clauses.where exprToSql
 
@@ -48,29 +47,36 @@ addCluse = \str, name, clause, toSqlFn ->
 Option a : [None, Some a]
 
 Clauses : {
-    where : Option Expr,
-    select : Expr,
+    where : Option (Expr [Bool]),
+    select : Expr {},
 }
 
-select : Expr -> Clauses
+select : Expr * -> Clauses
 select = \expr -> {
     where: None,
-    select: expr,
+    select: untyped expr,
 }
 
-where : Clauses, Expr -> Clauses
+where : Clauses, Expr [Bool] -> Clauses
 where = \clauses, expr ->
     { clauses & where: Some expr }
 
 # Expr
 
-Expr : [
+Expr type : {
+    type : type,
+    sql : SqlExpr,
+}
+
+SqlExpr : [
     Identifier Str Str,
 ]
 
-exprToSql : Expr -> Str
-exprToSql = \expr ->
-    when expr is
+untyped = \{ sql } -> { sql, type: {} }
+
+exprToSql : Expr * -> Str
+exprToSql = \{ sql } ->
+    when sql is
         Identifier t f ->
             "\(t).\(f)"
 
@@ -80,9 +86,15 @@ usersTable = {
     schema: "public",
     name: "users",
     fields: \alias -> {
-        name: Identifier alias "name",
-        active: Identifier alias "active",
+        name: typedId alias "name" Text,
+        active: typedId alias "active" Bool,
     },
+}
+
+typedId : Str, Str, type -> Expr type
+typedId = \table, column, type -> {
+    type,
+    sql: Identifier table column,
 }
 
 simpleSelect =
