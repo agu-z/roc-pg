@@ -152,19 +152,19 @@ u32 = \_ -> {
     sql: [Param {}],
 }
 
-eq : Expr [Int], Expr [Int] -> Expr [Bool]
-eq = cmp "="
+eq : Expr a, Expr a -> Expr [Bool]
+eq = \a, b -> cmp a "=" b
 
 gt : Expr [Int], Expr [Int] -> Expr [Bool]
-gt = cmp ">"
+gt = \a, b -> cmp a ">" b
 
-cmp : Str -> (Expr a, Expr a -> Expr [Bool])
-cmp = \operator -> \a, b -> {
-        type: Bool,
-        sql: a.sql
-        |> List.append (Raw " \(operator) ")
-        |> List.concat b.sql,
-    }
+cmp : Expr a, Str, Expr a -> Expr [Bool]
+cmp = \a, op, b -> {
+    type: Bool,
+    sql: a.sql
+    |> List.append (Raw " \(op) ")
+    |> List.concat b.sql,
+}
 
 # Tests
 
