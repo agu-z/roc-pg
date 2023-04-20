@@ -1,18 +1,15 @@
-interface Sql exposes []
-    imports [
-        Pg.Cmd.{ Binding },
-    ]
+interface Sql exposes [] imports []
 
 Sql : List Part
 
 Part : [
-    Param Binding,
+    Param {},
     Raw Str,
 ]
 
 Compiled : {
     sql : Str,
-    params : List Binding,
+    params : List {},
 }
 
 compileSql : Sql -> Compiled
@@ -20,9 +17,8 @@ compileSql = \sql ->
     sql
     |> List.walk
         {
-            params: [],
-            # Fix capacity
-            sql: Str.withCapacity (List.len sql * 10),
+            params: List.withCapacity 8,
+            sql: Str.withCapacity (List.len sql * 12),
         }
         addPart
 
@@ -69,6 +65,7 @@ compile = \query ->
     tableSql = tableToSql query.from
 
     [Raw "select "]
+    |> List.reserve 16
     |> List.concat selectSql
     |> List.append (Raw " from ")
     |> List.concat tableSql
@@ -123,7 +120,7 @@ identifier = \table, column, type -> {
 u8 : U8 -> Expr [Int]
 u8 = \_ -> {
     type: Int,
-    sql: [ Param (Pg.Cmd.u8 value) ],
+    sql: [Param {}],
 }
 
 gt : Expr [Int], Expr [Int] -> Expr [Bool]
@@ -153,7 +150,12 @@ testSimple =
     users <- from usersTable
     select users.name
 
-expect compile testSimple == { sql: "select users.name from public.users as users", params: [] }
+expect
+    compile testSimple
+    == {
+        sql: "select users.name from public.users as users",
+        params: [],
+    }
 
 testWhere =
     users <- from usersTable
@@ -161,7 +163,12 @@ testWhere =
     select users.name
     |> where users.active
 
-expect compile testWhere == { sql: "select users.name from public.users as users where users.active", params: [] }
+expect
+    compile testWhere
+    == {
+        sql: "select users.name from public.users as users where users.active",
+        params: [],
+    }
 
 testExpr =
     users <- from usersTable
@@ -169,4 +176,9 @@ testExpr =
     select users.name
     |> where (users.age |> gt (u8 18))
 
-expect compile testExpr == { sql: "select users.name from public.users as users where users.age > $1", params: [Pg.Cmd.u8 18] }
+expect
+    compile testExpr
+    == {
+        sql: "select users.name from public.users as users where users.age > $1",
+        params: [{}],
+    }
