@@ -1,4 +1,42 @@
-interface Sql exposes [] imports []
+interface Sql exposes []
+    imports [
+        Pg.Cmd.{ Binding },
+    ]
+
+Sql : List Part
+
+Part : [
+    Param Binding,
+    Raw Str,
+]
+
+Compiled : {
+    sql : Str,
+    params : List Binding,
+}
+
+compileSql : Sql -> Compiled
+compileSql = \sql ->
+    sql
+    |> List.walk
+        {
+            params: [],
+            # Fix capacity
+            sql: Str.withCapacity (List.len sql * 10),
+        }
+        addPart
+
+addPart : Compiled, Part -> Compiled
+addPart = \{ params, sql }, part ->
+    when part is
+        Param param ->
+            newParams = params |> List.append param
+            binding = Num.toStr (List.len newParams)
+
+            { sql: "\(sql)$\(binding)", params: newParams }
+
+        Raw raw ->
+            { sql: Str.concat sql raw, params }
 
 # Table
 
@@ -8,9 +46,9 @@ Table a : {
     fields : Str -> a,
 }
 
-tableToSql : Table * -> Str
+tableToSql : Table * -> Sql
 tableToSql = \table ->
-    "\(table.schema).\(table.name) as \(table.name)"
+    [Raw "\(table.schema).\(table.name) as \(table.name)"]
 
 # Query
 
@@ -25,22 +63,27 @@ from = \table, callback -> {
     clauses: callback (table.fields table.name),
 }
 
-toSql : Query * -> Str
-toSql = \query ->
-    selectSql = exprToSql query.clauses.select
+compile : Query * -> Compiled
+compile = \query ->
+    selectSql = query.clauses.select.sql
     tableSql = tableToSql query.from
 
-    "select \(selectSql) from \(tableSql)"
-    |> addCluse "where" query.clauses.where exprToSql
+    [Raw "select "]
+    |> List.concat selectSql
+    |> List.append (Raw " from ")
+    |> List.concat tableSql
+    |> addCluse "where" query.clauses.where .sql
+    |> compileSql
 
-addCluse = \str, name, clause, toSqlFn ->
+addCluse = \sql, name, clause, toSqlFn ->
     when clause is
         Some value ->
-            clauseSql = toSqlFn value
-            "\(str) \(name) \(clauseSql)"
+            sql
+            |> List.append (Raw " \(name) ")
+            |> List.concat (toSqlFn value)
 
         None ->
-            str
+            sql
 
 # Clauses
 
@@ -65,20 +108,34 @@ where = \clauses, expr ->
 
 Expr type : {
     type : type,
-    sql : SqlExpr,
+    sql : Sql,
 }
 
-SqlExpr : [
-    Identifier Str Str,
-]
-
+untyped : Expr * -> Expr {}
 untyped = \{ sql } -> { sql, type: {} }
 
-exprToSql : Expr * -> Str
-exprToSql = \{ sql } ->
-    when sql is
-        Identifier t f ->
-            "\(t).\(f)"
+identifier : Str, Str, type -> Expr type
+identifier = \table, column, type -> {
+    type,
+    sql: [Raw "\(table).\(column)"],
+}
+
+u8 : U8 -> Expr [Int]
+u8 = \_ -> {
+    type: Int,
+    sql: [ Param (Pg.Cmd.u8 value) ],
+}
+
+gt : Expr [Int], Expr [Int] -> Expr [Bool]
+gt = cmp ">"
+
+cmp : Str -> (Expr *, Expr * -> Expr [Bool])
+cmp = \operator -> \a, b -> {
+        type: Bool,
+        sql: a.sql
+        |> List.append (Raw " \(operator) ")
+        |> List.concat b.sql,
+    }
 
 # Tests
 
@@ -86,27 +143,30 @@ usersTable = {
     schema: "public",
     name: "users",
     fields: \alias -> {
-        name: typedId alias "name" Text,
-        active: typedId alias "active" Bool,
+        name: identifier alias "name" Text,
+        active: identifier alias "active" Bool,
+        age: identifier alias "age" Int,
     },
 }
 
-typedId : Str, Str, type -> Expr type
-typedId = \table, column, type -> {
-    type,
-    sql: Identifier table column,
-}
-
-simpleSelect =
+testSimple =
     users <- from usersTable
     select users.name
 
-expect toSql simpleSelect == "select users.name from public.users as users"
+expect compile testSimple == { sql: "select users.name from public.users as users", params: [] }
 
-selectWithWhere =
+testWhere =
     users <- from usersTable
 
     select users.name
     |> where users.active
 
-expect toSql selectWithWhere == "select users.name from public.users as users where users.active"
+expect compile testWhere == { sql: "select users.name from public.users as users where users.active", params: [] }
+
+testExpr =
+    users <- from usersTable
+
+    select users.name
+    |> where (users.age |> gt (u8 18))
+
+expect compile testExpr == { sql: "select users.name from public.users as users where users.age > $1", params: [Pg.Cmd.u8 18] }
