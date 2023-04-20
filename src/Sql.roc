@@ -42,33 +42,42 @@ Table a : {
     fields : Str -> a,
 }
 
-tableToSql : Table * -> Sql
-tableToSql = \table ->
-    [Raw "\(table.schema).\(table.name) as \(table.name)"]
-
 # Query
 
-Query a : {
-    from : Table a,
+Query : {
+    from : Sql,
     clauses : Clauses,
 }
 
-from : Table a, (a -> Clauses) -> Query a
-from = \table, callback -> {
-    from: table,
-    clauses: callback (table.fields table.name),
-}
+from : Table a, (a -> Clauses) -> Query
+from = \table, callback -> 
+    alias = findAlias table.name
 
-compile : Query * -> Compiled
+    {
+        from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
+        clauses: callback (table.fields alias),
+    }
+
+findAlias = \name ->
+    # TODO: Conflict check
+    
+    when name |> Str.graphemes |> List.first is 
+        Ok initial ->
+            initial
+
+        Err ListWasEmpty ->
+            ""
+    
+
+compile : Query -> Compiled
 compile = \query ->
     selectSql = query.clauses.select.sql
-    tableSql = tableToSql query.from
 
     [Raw "select "]
     |> List.reserve 16
     |> List.concat selectSql
-    |> List.append (Raw " from ")
-    |> List.concat tableSql
+    |> List.concat query.from
+    |> List.concat (List.join query.clauses.joins)
     |> addClause "where" query.clauses.where .sql
     |> compileSql
 
@@ -87,12 +96,14 @@ addClause = \sql, name, clause, toSqlFn ->
 Option a : [None, Some a]
 
 Clauses : {
+    joins : List Sql,
     where : Option (Expr [Bool]),
     select : Expr {},
 }
 
 select : Expr * -> Clauses
 select = \expr -> {
+    joins: List.withCapacity 4,
     where: None,
     select: untyped expr,
 }
@@ -100,6 +111,18 @@ select = \expr -> {
 where : Clauses, Expr [Bool] -> Clauses
 where = \clauses, expr ->
     { clauses & where: Some expr }
+
+join : Table a, (a -> Expr [Bool]), (a -> Clauses) -> Clauses
+join = \table, on, callback ->
+    alias = findAlias table.name
+    fields = table.fields alias
+    clauses = callback fields
+    joinSql =
+        on fields
+        |> .sql
+        |> List.prepend (Raw " join \(table.schema).\(table.name) as \(alias) on ")
+
+    { clauses & joins: clauses.joins |> List.append joinSql }
 
 # Expr
 
@@ -123,10 +146,19 @@ u8 = \_ -> {
     sql: [Param {}],
 }
 
+u32 : U32 -> Expr [Int]
+u32 = \_ -> {
+    type: Int,
+    sql: [Param {}],
+}
+
+eq : Expr [Int], Expr [Int] -> Expr [Bool]
+eq = cmp "="
+
 gt : Expr [Int], Expr [Int] -> Expr [Bool]
 gt = cmp ">"
 
-cmp : Str -> (Expr *, Expr * -> Expr [Bool])
+cmp : Str -> (Expr a, Expr a -> Expr [Bool])
 cmp = \operator -> \a, b -> {
         type: Bool,
         sql: a.sql
@@ -143,42 +175,75 @@ usersTable = {
         name: identifier alias "name" Text,
         active: identifier alias "active" Bool,
         age: identifier alias "age" Int,
+        organizationId: identifier alias "organization_id" Int,
     },
 }
 
-testSimple =
-    users <- from usersTable
-    select users.name
+orgTable = {
+    schema: "public",
+    name: "organizations",
+    fields: \alias -> {
+        id: identifier alias "id" Int,
+        name: identifier alias "name" Text,
+    },
+}
 
 expect
-    compile testSimple
+    query =
+        users <- from usersTable
+        select users.name
+
+    compile query
     == {
-        sql: "select users.name from public.users as users",
+        sql: "select u.name from public.users as u",
         params: [],
     }
 
-testWhere =
-    users <- from usersTable
-
-    select users.name
-    |> where users.active
-
 expect
-    compile testWhere
+    query =
+        users <- from usersTable
+
+        select users.name
+        |> where users.active
+
+    compile query
     == {
-        sql: "select users.name from public.users as users where users.active",
+        sql: "select u.name from public.users as u where u.active",
         params: [],
     }
 
-testExpr =
-    users <- from usersTable
-
-    select users.name
-    |> where (users.age |> gt (u8 18))
-
 expect
-    compile testExpr
+    query =
+        users <- from usersTable
+
+        select users.name
+        |> where (users.age |> gt (u8 18))
+
+    compile query
     == {
-        sql: "select users.name from public.users as users where users.age > $1",
+        sql: "select u.name from public.users as u where u.age > $1",
         params: [{}],
     }
+
+expect
+    query =
+        users <- from usersTable
+        org <- join orgTable \o -> o.id |> eq users.organizationId
+
+        select org.name
+        |> where (org.id |> eq (u32 1))
+
+    compile query
+    == {
+        sql:
+        """
+        select o.name
+        from public.users as u
+        join public.organizations as o on o.id = u.organization_id
+        where o.id = $1
+        """
+        |> Str.split "\n"
+        |> Str.joinWith " ",
+        params: [{}],
+    }
+
