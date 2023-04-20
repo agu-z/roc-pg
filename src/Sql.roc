@@ -69,10 +69,10 @@ compile = \query ->
     |> List.concat selectSql
     |> List.append (Raw " from ")
     |> List.concat tableSql
-    |> addCluse "where" query.clauses.where .sql
+    |> addClause "where" query.clauses.where .sql
     |> compileSql
 
-addCluse = \sql, name, clause, toSqlFn ->
+addClause = \sql, name, clause, toSqlFn ->
     when clause is
         Some value ->
             sql
