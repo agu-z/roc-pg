@@ -34,7 +34,12 @@ addPart = \{ params, sql }, part ->
         Raw raw ->
             { sql: Str.concat sql raw, params }
 
-# Table
+Command := 
+    # Only select for now
+    {
+        from : Sql,
+        clauses : SelectClauses,
+    }
 
 Table a : {
     schema : Str,
@@ -42,87 +47,107 @@ Table a : {
     fields : Str -> a,
 }
 
-# Query
+from : Table a, (a -> Select) -> Command
+from = \table, next ->
+    alias = initial table.name
+    usedAliases = Dict.withCapacity 4 |> Dict.insert alias 1
 
-Query : {
-    from : Sql,
-    clauses : Clauses,
-}
+    @Select toClauses = next (table.fields alias)
 
-from : Table a, (a -> Clauses) -> Query
-from = \table, callback -> 
-    alias = findAlias table.name
-
-    {
+    @Command {
         from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
-        clauses: callback (table.fields alias),
+        clauses: toClauses usedAliases,
     }
 
-findAlias = \name ->
-    # TODO: Conflict check
-    
-    when name |> Str.graphemes |> List.first is 
-        Ok initial ->
-            initial
+initial = \name ->
+    when name |> Str.graphemes |> List.first is
+        Ok char ->
+            char
 
         Err ListWasEmpty ->
             ""
-    
 
-compile : Query -> Compiled
-compile = \query ->
-    selectSql = query.clauses.select.sql
-
+compile : Command -> Compiled
+compile = \@Command query ->
     [Raw "select "]
     |> List.reserve 16
-    |> List.concat selectSql
+    |> List.concat query.clauses.select
     |> List.concat query.from
     |> List.concat (List.join query.clauses.joins)
-    |> addClause "where" query.clauses.where .sql
+    |> List.concat query.clauses.where
+    |> List.concat query.clauses.limit
     |> compileSql
-
-addClause = \sql, name, clause, toSqlFn ->
-    when clause is
-        Some value ->
-            sql
-            |> List.append (Raw " \(name) ")
-            |> List.concat (toSqlFn value)
-
-        None ->
-            sql
 
 # Clauses
 
-Option a : [None, Some a]
+Select := Dict Str U8 -> SelectClauses
 
-Clauses : {
+SelectClauses : {
     joins : List Sql,
-    where : Option (Expr [Bool]),
-    select : Expr {},
+    select : Sql,
+    where : Sql,
+    limit : Sql,
 }
 
-select : Expr * -> Clauses
-select = \expr -> {
-    joins: List.withCapacity 4,
-    where: None,
-    select: untyped expr,
-}
+join : Table a, (a -> Expr [Bool]), (a -> Select) -> Select
+join = \table, on, next -> @Select \aliases -> joinHelp table on next aliases
 
-where : Clauses, Expr [Bool] -> Clauses
-where = \clauses, expr ->
-    { clauses & where: Some expr }
+joinHelp = \table, on, next, aliases ->
+    { alias, newAliases } = joinAlias table.name aliases
 
-join : Table a, (a -> Expr [Bool]), (a -> Clauses) -> Clauses
-join = \table, on, callback ->
-    alias = findAlias table.name
     fields = table.fields alias
-    clauses = callback fields
+    @Select toClauses = next fields
+    clauses = toClauses newAliases
     joinSql =
         on fields
         |> .sql
         |> List.prepend (Raw " join \(table.schema).\(table.name) as \(alias) on ")
 
-    { clauses & joins: clauses.joins |> List.append joinSql }
+    { clauses & joins: clauses.joins |> List.prepend joinSql }
+
+
+joinAlias : Str, Dict Str U8 -> { alias : Str, newAliases : Dict Str U8 }
+joinAlias = \name, aliases ->
+    alias = initial name
+
+    when Dict.get aliases alias is
+        Ok count ->
+            strCount = Num.toStr count
+            {
+                alias: "\(alias)_\(strCount)",
+                newAliases: Dict.insert aliases alias (count + 1),
+            }
+
+        Err KeyNotFound ->
+            {
+                alias,
+                newAliases: Dict.insert aliases alias 1,
+            }
+
+select : Expr * -> Select
+select = \expr ->
+    @Select \_ ->  {
+        joins: List.withCapacity 4,
+        where: [],
+        select: expr.sql,
+        limit: [],
+    }
+
+where : Select, Expr [Bool] -> Select
+where =
+    clauses, expr <- updateClauses
+    { clauses & where: List.prepend expr.sql (Raw " where ") }
+
+limit : Select, Nat -> Select
+limit =
+    clauses, _ <- updateClauses
+    { clauses & limit: [Raw " limit ", Param {}] }
+
+updateClauses = \fn -> 
+    \next, arg -> 
+        @Select \aliases -> 
+            @Select toClauses = next
+            fn (toClauses aliases) arg
 
 # Expr
 
@@ -130,9 +155,6 @@ Expr type : {
     type : type,
     sql : Sql,
 }
-
-untyped : Expr * -> Expr {}
-untyped = \{ sql } -> { sql, type: {} }
 
 identifier : Str, Str, type -> Expr type
 identifier = \table, column, type -> {
@@ -142,12 +164,6 @@ identifier = \table, column, type -> {
 
 u8 : U8 -> Expr [Int]
 u8 = \_ -> {
-    type: Int,
-    sql: [Param {}],
-}
-
-u32 : U32 -> Expr [Int]
-u32 = \_ -> {
     type: Int,
     sql: [Param {}],
 }
@@ -189,58 +205,70 @@ orgTable = {
 }
 
 expect
-    query =
-        users <- from usersTable
-        select users.name
+    out = compile
+        (
+            users <- from usersTable
+            select users.name
+        )
 
-    compile query
+    out
     == {
         sql: "select u.name from public.users as u",
         params: [],
     }
 
 expect
-    query =
-        users <- from usersTable
+    out = compile
+        (
+            users <- from usersTable
 
-        select users.name
-        |> where users.active
+            select users.name
+            |> where users.active
+        )
 
-    compile query
+    out
     == {
         sql: "select u.name from public.users as u where u.active",
         params: [],
     }
 
 expect
-    query =
-        users <- from usersTable
+    out = compile
+        (
+            users <- from usersTable
 
-        select users.name
-        |> where (users.age |> gt (u8 18))
+            select users.name
+            |> where (users.age |> gt (u8 18))
+        )
 
-    compile query
+    out
     == {
         sql: "select u.name from public.users as u where u.age > $1",
         params: [{}],
     }
 
 expect
-    query =
-        users <- from usersTable
-        org <- join orgTable \o -> o.id |> eq users.organizationId
+    out = compile
+        (
+            users <- from usersTable
+            org <- join orgTable \o -> o.id |> eq users.organizationId
+            org2 <- join orgTable \o -> o.id |> eq users.organizationId
 
-        select org.name
-        |> where (org.id |> eq (u32 1))
+            select org.name
+            |> where (org.id |> eq org2.id)
+            |> limit 10
+        )
 
-    compile query
+    out
     == {
         sql:
         """
         select o.name
         from public.users as u
         join public.organizations as o on o.id = u.organization_id
-        where o.id = $1
+        join public.organizations as o_1 on o_1.id = u.organization_id
+        where o.id = o_1.id
+        limit $1
         """
         |> Str.split "\n"
         |> Str.joinWith " ",
