@@ -13,7 +13,6 @@ interface Cmd exposes
         map,
         bind,
         Binding,
-        makeBinding,
         encodeBindings,
     ] imports [
         Protocol.Frontend.{ FormatCode },
@@ -91,13 +90,11 @@ bind : Cmd a err, List Binding -> Cmd a err
 bind = \@Cmd cmd, bindings ->
     @Cmd { cmd & bindings }
 
-Binding := [
+Binding : [
     Null,
     Text Str,
     Binary (List U8),
 ]
-
-makeBinding = @Binding
 
 encodeBindings : List Binding
     -> {
@@ -120,7 +117,7 @@ encodeBindings = \bindings ->
             paramValues: state.paramValues |> List.append value,
         }
 
-encodeSingle = \@Binding binding ->
+encodeSingle = \binding ->
     when binding is
         Null ->
             {
