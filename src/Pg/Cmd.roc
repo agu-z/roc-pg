@@ -21,10 +21,11 @@ interface Pg.Cmd
         i128,
         f32,
         f64,
+        nat,
         bytes,
     ]
     imports [
-        Cmd.{ makeBinding },
+        Cmd,
         pg.Pg.Result.{ CmdResult },
     ]
 
@@ -56,17 +57,18 @@ map = Cmd.map
 
 # Bindings
 
-Binding : Cmd.Binding
+Binding := Cmd.Binding has [Eq]
 
 bind : Cmd a err, List Binding -> Cmd a err
-bind = Cmd.bind
+bind = \cmd, bindings -> 
+    Cmd.bind cmd (bindings |> List.map \@Binding binding -> binding)
 
 null : Binding
-null = makeBinding Null
+null = @Binding Null
 
 str : Str -> Binding
 str = \value ->
-    makeBinding (Text value)
+    @Binding (Text value)
 
 u8 = num
 u16 = num
@@ -80,12 +82,13 @@ i64 = num
 i128 = num
 f32 = num
 f64 = num
+nat = num
 
 num : Num * -> Binding
 num = \value ->
-    makeBinding (Text (Num.toStr value))
+    @Binding (Text (Num.toStr value))
 
 bytes : List U8 -> Binding
 bytes = \value ->
-    makeBinding (Binary value)
+    @Binding (Binary value)
 
