@@ -1,4 +1,13 @@
-interface Sql exposes [] imports []
+interface Sql
+    exposes [
+        from,
+        select,
+        compile,
+        identifier,
+    ]
+    imports [
+        Sql.Decode.{Decode},
+    ]
 
 Sql : List Part
 
@@ -34,25 +43,25 @@ addPart = \{ params, sql }, part ->
         Raw raw ->
             { sql: Str.concat sql raw, params }
 
-Command := 
+Command a :=
     # Only select for now
     {
         from : Sql,
-        clauses : SelectClauses,
+        clauses : SelectClauses a,
     }
 
-Table a : {
+Table table : {
     schema : Str,
     name : Str,
-    fields : Str -> a,
+    fields : Str -> table,
 }
 
-from : Table a, (a -> Select) -> Command
+from : Table table, (table -> Select a) -> Command a
 from = \table, next ->
     alias = initial table.name
     usedAliases = Dict.withCapacity 4 |> Dict.insert alias 1
 
-    @Select toClauses = next (table.fields alias)
+    (@Select toClauses) = next (table.fields alias)
 
     @Command {
         from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
@@ -67,7 +76,7 @@ initial = \name ->
         Err ListWasEmpty ->
             ""
 
-compile : Command -> Compiled
+compile : Command a -> Compiled
 compile = \@Command query ->
     [Raw "select "]
     |> List.reserve 16
@@ -80,23 +89,24 @@ compile = \@Command query ->
 
 # Clauses
 
-Select := Dict Str U8 -> SelectClauses
+Select a := Dict Str U8 -> SelectClauses a
 
-SelectClauses : {
+SelectClauses a : {
     joins : List Sql,
     select : Sql,
+    decode : Decode a,
     where : Sql,
     limit : Sql,
 }
 
-join : Table a, (a -> Expr [Bool]), (a -> Select) -> Select
+join : Table table, (table -> Expr Bool), (table -> Select a) -> Select a
 join = \table, on, next -> @Select \aliases -> joinHelp table on next aliases
 
 joinHelp = \table, on, next, aliases ->
     { alias, newAliases } = joinAlias table.name aliases
 
     fields = table.fields alias
-    @Select toClauses = next fields
+    (@Select toClauses) = next fields
     clauses = toClauses newAliases
     joinSql =
         on fields
@@ -104,7 +114,6 @@ joinHelp = \table, on, next, aliases ->
         |> List.prepend (Raw " join \(table.schema).\(table.name) as \(alias) on ")
 
     { clauses & joins: clauses.joins |> List.prepend joinSql }
-
 
 joinAlias : Str, Dict Str U8 -> { alias : Str, newAliases : Dict Str U8 }
 joinAlias = \name, aliases ->
@@ -124,63 +133,74 @@ joinAlias = \name, aliases ->
                 newAliases: Dict.insert aliases alias 1,
             }
 
-select : Expr * -> Select
+select : Expr a -> Select a
 select = \expr ->
-    @Select \_ ->  {
+    @Select \_ -> {
         joins: List.withCapacity 4,
         where: [],
         select: expr.sql,
+        decode: expr.decode,
         limit: [],
     }
 
-where : Select, Expr [Bool] -> Select
+# We have to use _ here because of a type checker bug
+
+where : Select _, Expr Bool -> Select _
 where =
     clauses, expr <- updateClauses
     { clauses & where: List.prepend expr.sql (Raw " where ") }
 
-limit : Select, Nat -> Select
+limit : Select _, Nat -> Select _
 limit =
     clauses, _ <- updateClauses
     { clauses & limit: [Raw " limit ", Param {}] }
 
-updateClauses = \fn -> 
-    \next, arg -> 
-        @Select \aliases -> 
-            @Select toClauses = next
+updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
+updateClauses = \fn ->
+    \next, arg ->
+        @Select \aliases ->
+            (@Select toClauses) = next
             fn (toClauses aliases) arg
 
 # Expr
 
-Expr type : {
-    type : type,
+Expr a : {
     sql : Sql,
+    decode : Decode a,
 }
 
-identifier : Str, Str, type -> Expr type
-identifier = \table, column, type -> {
-    type,
+identifier : Str, Str, Decode a -> Expr a
+identifier = \table, column, decode -> {
     sql: [Raw "\(table).\(column)"],
+    decode,
 }
 
-u8 : U8 -> Expr [Int]
+u8 : U8 -> Expr U8
 u8 = \_ -> {
-    type: Int,
     sql: [Param {}],
+    decode: Sql.Decode.decodeU8,
 }
 
-eq : Expr a, Expr a -> Expr [Bool]
+eq : Expr a, Expr a -> Expr Bool
 eq = \a, b -> cmp a "=" b
 
-gt : Expr [Int], Expr [Int] -> Expr [Bool]
+gt : Expr (Num a), Expr (Num a) -> Expr Bool
 gt = \a, b -> cmp a ">" b
 
-cmp : Expr a, Str, Expr a -> Expr [Bool]
+cmp : Expr a, Str, Expr a -> Expr Bool
 cmp = \a, op, b -> {
-    type: Bool,
     sql: a.sql
     |> List.append (Raw " \(op) ")
     |> List.concat b.sql,
+    decode: Sql.Decode.decodeBool,
 }
+
+#
+
+# Selection a : {
+#     columns: List Sql,
+#     decode: Pg.Result.Decode a {}
+# }
 
 # Tests
 
@@ -188,10 +208,10 @@ usersTable = {
     schema: "public",
     name: "users",
     fields: \alias -> {
-        name: identifier alias "name" Text,
-        active: identifier alias "active" Bool,
-        age: identifier alias "age" Int,
-        organizationId: identifier alias "organization_id" Int,
+        name: identifier alias "name" Sql.Decode.decodeText,
+        active: identifier alias "active" Sql.Decode.decodeBool,
+        age: identifier alias "age" Sql.Decode.decodeU8,
+        organizationId: identifier alias "organization_id" Sql.Decode.decodeU32,
     },
 }
 
@@ -199,8 +219,8 @@ orgTable = {
     schema: "public",
     name: "organizations",
     fields: \alias -> {
-        id: identifier alias "id" Int,
-        name: identifier alias "name" Text,
+        id: identifier alias "id" Sql.Decode.decodeU32,
+        name: identifier alias "name" Sql.Decode.decodeText,
     },
 }
 
@@ -218,15 +238,15 @@ expect
     }
 
 expect
-    out = compile
-        (
-            users <- from usersTable
+    out : Command Str
+    out =
 
-            select users.name
-            |> where users.active
-        )
+        users <- from usersTable
 
-    out
+        select users.name
+        |> where users.active
+
+    compile out
     == {
         sql: "select u.name from public.users as u where u.active",
         params: [],
