@@ -4,21 +4,28 @@ interface Sql
         select,
         compile,
         identifier,
+        where,
+        join,
+        eq,
+        u8,
+        gt,
+        limit,
     ]
     imports [
-        Sql.Decode.{Decode},
+        pg.Pg.Cmd.{ Binding },
+        Sql.Decode.{ Decode },
     ]
 
 Sql : List Part
 
 Part : [
-    Param {},
+    Param Binding,
     Raw Str,
 ]
 
 Compiled : {
     sql : Str,
-    params : List {},
+    params : List Binding,
 }
 
 compileSql : Sql -> Compiled
@@ -152,8 +159,8 @@ where =
 
 limit : Select _, Nat -> Select _
 limit =
-    clauses, _ <- updateClauses
-    { clauses & limit: [Raw " limit ", Param {}] }
+    clauses, max <- updateClauses
+    { clauses & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
 
 updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
 updateClauses = \fn ->
@@ -176,8 +183,8 @@ identifier = \table, column, decode -> {
 }
 
 u8 : U8 -> Expr U8
-u8 = \_ -> {
-    sql: [Param {}],
+u8 = \val -> {
+    sql: [Param (Pg.Cmd.u8 val)],
     decode: Sql.Decode.decodeU8,
 }
 
@@ -201,6 +208,7 @@ cmp = \a, op, b -> {
 #     columns: List Sql,
 #     decode: Pg.Result.Decode a {}
 # }
+
 
 # Tests
 
@@ -264,7 +272,7 @@ expect
     out
     == {
         sql: "select u.name from public.users as u where u.age > $1",
-        params: [{}],
+        params: [Pg.Cmd.u8 18],
     }
 
 expect
@@ -292,6 +300,6 @@ expect
         """
         |> Str.split "\n"
         |> Str.joinWith " ",
-        params: [{}],
+        params: [Pg.Cmd.nat 10],
     }
 

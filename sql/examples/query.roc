@@ -18,6 +18,7 @@ app "query"
     provides [main] to pf
 
 task =
+
     client <- Pg.Client.withConnect {
             host: "localhost",
             port: 5432,
