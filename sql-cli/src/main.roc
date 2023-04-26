@@ -12,49 +12,45 @@ app "roc-sql"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, select, where, eq, into, with, str, rowArray },
+        sql.Sql.{ from, select, where, eq, and, into, with, str, rowArray },
         Schema,
     ]
     provides [main] to pf
 
 generate = \client ->
-    query = 
-        tables <- from Schema.tables
-
-        into (\name -> \columns -> { name, columns })
-        |> with tables.name
-        |> rowArray
-            (
-                columns <- from Schema.columns
-
-                selection =
-                    into (\name -> \dataType -> { name, dataType })
-                    |> with columns.name
-                    |> with columns.dataType
-
-                select selection
-                |> where (columns.tableName |> eq tables.name)
-            )
-        |> select
-        |> where (tables.schema |> eq (str "public"))
-
     tables <-
-        Sql.all query
+        Sql.all tablesQuery
         |> Pg.Client.command client
         |> await
 
     tables
     |> List.map \table ->
-        colCount = 
-            table.columns 
-            |> List.map .name 
+        colCount =
+            table.columns
+            |> List.map .name
             |> Str.joinWith ", "
 
         "\(table.name)(\(colCount))"
     |> Str.joinWith "\n"
     |> Stdout.line
 
+tablesQuery =
+    tables <- from Schema.tables
 
+    into \name -> \columns -> { name, columns }
+    |> with tables.name
+    |> rowArray (columnsQuery tables)
+    |> select
+    |> where (tables.schema |> eq (str "public"))
+
+columnsQuery = \tables ->
+    columns <- from Schema.columns
+
+    into \name -> \dataType -> { name, dataType }
+    |> with columns.name
+    |> with columns.dataType
+    |> select
+    |> where (eq columns.tableName tables.name |> and (eq columns.schema tables.schema))
 
 main : Task {} []
 main =

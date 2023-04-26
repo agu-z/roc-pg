@@ -10,6 +10,7 @@ interface Sql
         u8,
         str,
         gt,
+        and,
         not,
         limit,
         all,
@@ -159,7 +160,7 @@ select = \selection ->
 # We have to use _ here because of a type checker bug
 
 where : Select a, Expr Bool -> Select a
-where = 
+where =
     clauses, (@Expr expr) <- updateClauses
     { clauses & where: List.prepend expr.sql (Raw " where ") }
 
@@ -214,12 +215,12 @@ rowArray = \sel, @Query query ->
 
     wrapped =
         [Raw "("]
-        |> List.concat sql 
+        |> List.concat sql
         |> List.append (Raw ")")
 
-    @Selection selection = query.clauses.selection
+    (@Selection selection) = query.clauses.selection
 
-    decode = Sql.Decode.rowArray \items -> 
+    decode = Sql.Decode.rowArray \items ->
         List.mapTry items selection.decode
 
     expr = @Expr { sql: wrapped, decode }
@@ -274,18 +275,21 @@ str = \value -> @Expr {
     }
 
 eq : Expr a, Expr a -> Expr Bool
-eq = \a, b -> cmp a "=" b
+eq = \a, b -> boolOp a "=" b
 
 gt : Expr (Num a), Expr (Num a) -> Expr Bool
-gt = \a, b -> cmp a ">" b
+gt = \a, b -> boolOp a ">" b
 
-cmp : Expr a, Str, Expr a -> Expr Bool
-cmp = \@Expr a, op, @Expr b -> @Expr {
+boolOp : Expr a, Str, Expr a -> Expr Bool
+boolOp = \@Expr a, op, @Expr b -> @Expr {
         sql: a.sql
         |> List.append (Raw " \(op) ")
         |> List.concat b.sql,
         decode: Sql.Decode.bool,
     }
+
+and : Expr Bool, Expr Bool -> Expr Bool
+and = \a, b -> boolOp a "and" b
 
 not : Expr Bool -> Expr Bool
 not = \@Expr a -> @Expr
