@@ -194,26 +194,25 @@ with = \@Selection sel, @Expr expr ->
 
 map : Selection a, (a -> b) -> Selection b
 map = \@Selection sel, fn ->
-    @Selection
-        {   columns: sel.columns,
-            decode: \cells -> cells
-                |> sel.decode
-                |> Result.map fn,
-        }
+    @Selection {
+        columns: sel.columns,
+        decode: \cells -> cells
+            |> sel.decode
+            |> Result.map fn,
+    }
 
 just : Expr a -> Selection a
 just = \@Expr expr ->
-    @Selection
-        {   columns: [expr.sql],
-            decode: \cells -> 
-                value <- cells
-                    |> List.first
-                    |> Result.mapErr \ListWasEmpty -> MissingColumn 0
-                    |> Result.try 
-                
-                Sql.Decode.decode value expr.decode
-        }
+    @Selection {
+        columns: [expr.sql],
+        decode: \cells ->
+            value <- cells
+                |> List.first
+                |> Result.mapErr \ListWasEmpty -> MissingColumn 0
+                |> Result.try
 
+            Sql.Decode.decode value expr.decode,
+    }
 
 # Expr
 
