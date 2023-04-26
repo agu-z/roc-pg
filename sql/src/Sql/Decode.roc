@@ -8,6 +8,7 @@ interface Sql.Decode
         bool,
         u8,
         u32,
+        rowArray,
     ]
     imports []
 
@@ -45,6 +46,29 @@ bool =
 
         _ ->
             Err InvalidBool
+
+rowArray = \cb ->
+    arr <- textFormat
+
+    # TODO: Write a proper parser
+    # This parser is a huge hack for a PoC
+    arr
+    |> Str.graphemes
+    |> List.drop 2
+    |> List.dropLast
+    |> Str.joinWith ""
+    |> Str.split "\",\""
+    |> List.map row
+    |> cb
+
+row = \items ->
+    items
+    |> Str.graphemes
+    |> List.dropFirst
+    |> List.dropLast
+    |> Str.joinWith ""
+    |> Str.split ","
+    |> List.map Str.toUtf8
 
 textFormat : (Str -> Result a DecodeErr) -> Decode a
 textFormat = \fn ->

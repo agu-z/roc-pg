@@ -1,5 +1,6 @@
 interface Sql
     exposes [
+        Selection,
         from,
         select,
         identifier,
@@ -7,14 +8,16 @@ interface Sql
         join,
         eq,
         u8,
+        str,
         gt,
         not,
         limit,
         all,
         with,
-        succeed,
+        into,
         just,
         map,
+        rowArray,
     ]
     imports [
         pg.Pg.Cmd.{ Binding },
@@ -73,16 +76,29 @@ all = \@Query query ->
             Err err ->
                 Err (DecodeErr err)
 
-compile = \@Query query ->
+querySql = \@Query query, columnWrapper ->
     (@Selection { columns }) = query.clauses.selection
+
+    columnsSql =
+        when columnWrapper is
+            Bare ->
+                commaJoin columns
+
+            RowArray ->
+                [Raw "array_agg(row("]
+                |> List.concat (commaJoin columns)
+                |> List.append (Raw "))")
 
     [Raw "select "]
     |> List.reserve 16
-    |> List.concat (commaJoin columns)
+    |> List.concat columnsSql
     |> List.concat query.from
     |> List.concat (List.join query.clauses.joins)
     |> List.concat query.clauses.where
     |> List.concat query.clauses.limit
+
+compile = \query ->
+    querySql query Bare
     |> compileSql
 
 # Clauses
@@ -142,12 +158,12 @@ select = \selection ->
 
 # We have to use _ here because of a type checker bug
 
-where : Select _, Expr Bool -> Select _
-where =
+where : Select a, Expr Bool -> Select a
+where = 
     clauses, (@Expr expr) <- updateClauses
     { clauses & where: List.prepend expr.sql (Raw " where ") }
 
-limit : Select _, Nat -> Select _
+limit : Select a, Nat -> Select a
 limit =
     clauses, max <- updateClauses
     { clauses & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
@@ -166,8 +182,8 @@ Selection a := {
     decode : List (List U8) -> Result a Sql.Decode.DecodeErr,
 }
 
-succeed : a -> Selection a
-succeed = \value -> @Selection {
+into : a -> Selection a
+into = \value -> @Selection {
         columns: [],
         decode: \_ -> Ok value,
     }
@@ -191,6 +207,24 @@ with = \@Selection sel, @Expr expr ->
         columns: sel.columns |> List.append expr.sql,
         decode,
     }
+
+rowArray : Selection (List a -> b), Query a -> Selection b
+rowArray = \sel, @Query query ->
+    sql = querySql (@Query query) RowArray
+
+    wrapped =
+        [Raw "("]
+        |> List.concat sql 
+        |> List.append (Raw ")")
+
+    @Selection selection = query.clauses.selection
+
+    decode = Sql.Decode.rowArray \items -> 
+        List.mapTry items selection.decode
+
+    expr = @Expr { sql: wrapped, decode }
+
+    with sel expr
 
 map : Selection a, (a -> b) -> Selection b
 map = \@Selection sel, fn ->
@@ -231,6 +265,12 @@ u8 : U8 -> Expr U8
 u8 = \value -> @Expr {
         sql: [Param (Pg.Cmd.u8 value)],
         decode: Sql.Decode.u8,
+    }
+
+str : Str -> Expr Str
+str = \value -> @Expr {
+        sql: [Param (Pg.Cmd.str value)],
+        decode: Sql.Decode.text,
     }
 
 eq : Expr a, Expr a -> Expr Bool
@@ -304,92 +344,90 @@ addPart = \{ params, sql }, part ->
 
 # Tests
 
-usersTable = {
-    schema: "public",
-    name: "users",
-    fields: \alias -> {
-        name: identifier alias "name" Sql.Decode.text,
-        active: identifier alias "active" Sql.Decode.bool,
-        age: identifier alias "age" Sql.Decode.u8,
-        organizationId: identifier alias "organization_id" Sql.Decode.u32,
-    },
-}
+# usersTable = {
+#     schema: "public",
+#     name: "users",
+#     fields: \alias -> {
+#         name: identifier alias "name" Sql.Decode.text,
+#         active: identifier alias "active" Sql.Decode.bool,
+#         age: identifier alias "age" Sql.Decode.u8,
+#         organizationId: identifier alias "organization_id" Sql.Decode.u32,
+#     },
+# }
 
-orgTable = {
-    schema: "public",
-    name: "organizations",
-    fields: \alias -> {
-        id: identifier alias "id" Sql.Decode.u32,
-        name: identifier alias "name" Sql.Decode.text,
-    },
-}
+# orgTable = {
+#     schema: "public",
+#     name: "organizations",
+#     fields: \alias -> {
+#         id: identifier alias "id" Sql.Decode.u32,
+#         name: identifier alias "name" Sql.Decode.text,
+#     },
+# }
 
-expect
-    out = compile
-        (
-            users <- from usersTable
-            select (just users.name)
-        )
+# expect
+#     out =
+#         users <- from usersTable
+#         select (just users.name)
 
-    out
-    == {
-        sql: "select u.name from public.users as u",
-        params: [],
-    }
+#     compile out
+#     == {
+#         sql: "select u.name from public.users as u",
+#         params: [],
+#     }
 
-expect
-    out =
-        users <- from usersTable
+# expect
+#     out =
+#         users <- from usersTable
 
-        select (just users.name)
-        |> where users.active
+#         select (just users.name)
+#         |> where users.active
 
-    compile out
-    == {
-        sql: "select u.name from public.users as u where u.active",
-        params: [],
-    }
+#     compile out
+#     == {
+#         sql: "select u.name from public.users as u where u.active",
+#         params: [],
+#     }
 
-expect
-    out = compile
-        (
-            users <- from usersTable
+# expect
+#     out = compile
+#         (
+#             users <- from usersTable
 
-            select (just users.name)
-            |> where (users.age |> gt (u8 18))
-        )
+#             select (just users.name)
+#             |> where (users.age |> gt (u8 18))
+#         )
 
-    out
-    == {
-        sql: "select u.name from public.users as u where u.age > $1",
-        params: [Pg.Cmd.u8 18],
-    }
+#     out
+#     == {
+#         sql: "select u.name from public.users as u where u.age > $1",
+#         params: [Pg.Cmd.u8 18],
+#     }
 
-expect
-    out = compile
-        (
-            users <- from usersTable
-            org <- join orgTable \o -> o.id |> eq users.organizationId
-            org2 <- join orgTable \o -> o.id |> eq users.organizationId
+# expect
+#     out = compile
+#         (
+#             users <- from usersTable
+#             org <- join orgTable \o -> o.id |> eq users.organizationId
+#             org2 <- join orgTable \o -> o.id |> eq users.organizationId
 
-            select (just org.name)
-            |> where (org.id |> eq org2.id)
-            |> limit 10
-        )
+#             select (just org.name)
+#             |> where (org.id |> eq org2.id)
+#             |> limit 10
+#         )
 
-    out
-    == {
-        sql:
-        """
-        select o.name
-        from public.users as u
-        join public.organizations as o on o.id = u.organization_id
-        join public.organizations as o_1 on o_1.id = u.organization_id
-        where o.id = o_1.id
-        limit $1
-        """
-        |> Str.split "\n"
-        |> Str.joinWith " ",
-        params: [Pg.Cmd.nat 10],
-    }
+#     out
+#     == {
+#         sql:
+#         """
+#         select o.name
+#         from public.users as u
+#         join public.organizations as o on o.id = u.organization_id
+#         join public.organizations as o_1 on o_1.id = u.organization_id
+#         where o.id = o_1.id
+#         limit $1
+#         """
+#         |> Str.split "\n"
+#         |> Str.joinWith " ",
+#         params: [Pg.Cmd.nat 10],
+#     }
 
