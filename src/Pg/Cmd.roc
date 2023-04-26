@@ -23,10 +23,11 @@ interface Pg.Cmd
         f64,
         nat,
         bytes,
+        withCustomDecode,
     ]
     imports [
         Cmd,
-        pg.Pg.Result.{ CmdResult },
+        Pg.Result.{ CmdResult },
     ]
 
 Cmd a err : Cmd.Cmd a err
@@ -55,12 +56,15 @@ expect1 = \cmd, decoder ->
 map : Cmd a err, (a -> b) -> Cmd b err
 map = Cmd.map
 
+withCustomDecode : Cmd * *, (CmdResult -> Result a err) -> Cmd a err
+withCustomDecode = Cmd.withDecode
+
 # Bindings
 
 Binding := Cmd.Binding has [Eq]
 
 bind : Cmd a err, List Binding -> Cmd a err
-bind = \cmd, bindings -> 
+bind = \cmd, bindings ->
     Cmd.bind cmd (bindings |> List.map \@Binding binding -> binding)
 
 null : Binding

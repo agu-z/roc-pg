@@ -5,6 +5,7 @@ interface Pg.Result
         create,
         len,
         fields,
+        rows,
         decode,
         Decode,
         str,
@@ -38,6 +39,9 @@ create = @CmdResult
 
 fields : CmdResult -> List RowField
 fields = \@CmdResult result -> result.fields
+
+rows : CmdResult -> List (List (List U8))
+rows = \@CmdResult result -> result.rows
 
 len : CmdResult -> Nat
 len = \@CmdResult result ->
@@ -127,6 +131,6 @@ map2 = \@Decode a, @Decode b, cb ->
     Ok (cb valueA valueB)
 
 succeed = \value ->
-    @Decode (\_ -> Ok (\_ -> Ok value))
+    @Decode \_ -> Ok \_ -> Ok value
 
 with = \a, b -> map2 a b (\fn, val -> fn val)

@@ -1,18 +1,18 @@
 app "query"
     packages {
         pf: "https://github.com/agu-z/roc-basic-cli/releases/download/0.5.0/S8r4wytSGYKi-iMrjaRZxv2Hope_CX7dF6rMdciYja8.tar.gz",
-        pg: "../../src/main.roc",
         sql: "../src/main.roc",
+        pg: "../../src/main.roc",
     }
     imports [
         pf.Task.{ Task, await },
         pf.Process,
         pf.Stdout,
         pf.Stderr,
-        pg.Pg.Cmd,
         pg.Pg.Client,
+        pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql,
+        sql.Sql.{ from, select },
         sql.Sql.Decode,
     ]
     provides [main] to pf
@@ -27,50 +27,43 @@ task =
             database: "aguz",
         }
 
-    _ <- Stdout.line "Connected!" |> await
-
-    usersTable = {
+    productsTable = {
         schema: "public",
-        name: "users",
+        name: "products",
         fields: \alias -> {
-            name: Sql.identifier alias "name" Sql.Decode.decodeText,
-            active: Sql.identifier alias "active" Sql.Decode.decodeBool,
-            age: Sql.identifier alias "age" Sql.Decode.decodeU8,
-            organizationId: Sql.identifier alias "organization_id" Sql.Decode.decodeU32,
+            name: Sql.identifier alias "name" Sql.Decode.text,
+            discount: Sql.identifier alias "discount" Sql.Decode.bool,
         },
     }
 
-    compiled = Sql.compile
-        (
-            users <- Sql.from usersTable
-            Sql.select users.name
-        )
-
-    _ <- Stdout.line compiled.sql |> await
-
-    rows <-
-        Pg.Cmd.new
-            """
-            select $1 as name, $2 as age
-            union all
-            select 'Julio' as name, 23 as age
-            """
-        |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
-        |> Pg.Cmd.expectN
+    result <-
+        Sql.all
             (
-                Pg.Result.succeed
-                    (\name -> \age ->
-                            ageStr = Num.toStr age
+                products <- from productsTable
 
-                            "\(name): \(ageStr)"
+                select
+                    (
+                        Sql.succeed (\name -> \discount -> { name, discount })
+                        |> Sql.with products.name
+                        |> Sql.with products.discount
                     )
-                |> Pg.Result.with (Pg.Result.str "name")
-                |> Pg.Result.with (Pg.Result.u8 "age")
             )
         |> Pg.Client.command client
         |> await
 
-    Stdout.line (Str.joinWith rows "\n")
+    products =
+        result
+        |> List.map \product ->
+            sale =
+                if product.discount then
+                    " (SALE)"
+                else
+                    ""
+
+            "- \(product.name)\(sale)"
+        |> Str.joinWith "\n"
+
+    Stdout.line "Products:\n\n\(products)"
 
 main : Task {} []
 main =
