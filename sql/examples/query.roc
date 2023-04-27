@@ -12,7 +12,7 @@ app "query"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, select, just, join, into, eq, str, column, with, where, limit, orderBy },
+        sql.Sql.{ from, select, where, join, into, eq, str, column, with, limit, orderBy },
         Public,
     ]
     provides [main] to pf
@@ -21,6 +21,7 @@ customerQuery =
     customers <- from Public.customer
     addr <- join Public.address \a -> a.addressId |> eq customers.addressId
     cities <- join Public.city \c -> c.cityId |> eq addr.cityId
+    country <- join Public.country \c -> c.countryId |> eq cities.countryId
 
     fullName =
         customers.firstName
@@ -34,7 +35,9 @@ customerQuery =
 
     select selection
     |> orderBy [Asc fullName]
+    |> where (country.country |> eq (str "United States")) 
     |> limit 10
+
 
 Address : {
     addr : Str,
@@ -42,6 +45,7 @@ Address : {
     phone : Str,
 }
 
+selectAddress : _ -> Sql.Selection Address
 selectAddress = \table ->
     into \addr -> \district -> \phone -> { addr, district, phone }
     |> column table.address
