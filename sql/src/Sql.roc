@@ -1,19 +1,23 @@
 interface Sql
     exposes [
-        Selection,
+        all,
+        compile,
         from,
         select,
         identifier,
         where,
         join,
+        limit,
+        orderBy,
         eq,
         u8,
         str,
+        concat,
         gt,
         and,
         not,
-        limit,
-        all,
+        Selection,
+        column,
         with,
         into,
         just,
@@ -36,7 +40,7 @@ Query a :=
 Table table : {
     schema : Str,
     name : Str,
-    fields : Str -> table,
+    columns : Str -> table,
 }
 
 from : Table table, (table -> Select a) -> Query a
@@ -44,7 +48,7 @@ from = \table, next ->
     alias = initial table.name
     usedAliases = Dict.withCapacity 4 |> Dict.insert alias 1
 
-    (@Select toClauses) = next (table.fields alias)
+    (@Select toClauses) = next (table.columns alias)
 
     @Query {
         from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
@@ -96,6 +100,7 @@ querySql = \@Query query, columnWrapper ->
     |> List.concat query.from
     |> List.concat (List.join query.clauses.joins)
     |> List.concat query.clauses.where
+    |> List.concat query.clauses.orderBy
     |> List.concat query.clauses.limit
 
 compile = \query ->
@@ -110,6 +115,7 @@ SelectClauses a : {
     joins : List Sql,
     selection : Selection a,
     where : Sql,
+    orderBy : Sql,
     limit : Sql,
 }
 
@@ -119,11 +125,11 @@ join = \table, on, next -> @Select \aliases -> joinHelp table on next aliases
 joinHelp = \table, on, next, aliases ->
     { alias, newAliases } = joinAlias table.name aliases
 
-    fields = table.fields alias
-    (@Select toClauses) = next fields
+    columns = table.columns alias
+    (@Select toClauses) = next columns
     clauses = toClauses newAliases
 
-    (@Expr { sql: onSql }) = on fields
+    (@Expr { sql: onSql }) = on columns
 
     joinSql =
         List.prepend onSql (Raw " join \(table.schema).\(table.name) as \(alias) on ")
@@ -155,6 +161,7 @@ select = \selection ->
         selection: selection,
         where: [],
         limit: [],
+        orderBy: [],
     }
 
 # We have to use _ here because of a type checker bug
@@ -168,6 +175,24 @@ limit : Select a, Nat -> Select a
 limit =
     clauses, max <- updateClauses
     { clauses & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
+
+orderBy : Select a, List [Asc (Expr *), Desc (Expr *)] -> Select a
+orderBy =
+    clauses, order <- updateClauses
+
+    sql =
+        order
+        |> List.map \dir ->
+            when dir is
+                Asc (@Expr expr) ->
+                    expr.sql |> List.append (Raw " asc")
+
+                Desc (@Expr expr) ->
+                    expr.sql |> List.append (Raw " desc")
+        |> commaJoin
+        |> List.prepend (Raw " order by ")
+
+    { clauses & orderBy: sql }
 
 updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
 updateClauses = \fn ->
@@ -189,8 +214,8 @@ into = \value -> @Selection {
         decode: \_ -> Ok value,
     }
 
-with : Selection (a -> b), Expr a -> Selection b
-with = \@Selection sel, @Expr expr ->
+column : Selection (a -> b), Expr a -> Selection b
+column = \@Selection sel, @Expr expr ->
     index = List.len sel.columns
 
     decode = \cells ->
@@ -206,6 +231,23 @@ with = \@Selection sel, @Expr expr ->
 
     @Selection {
         columns: sel.columns |> List.append expr.sql,
+        decode,
+    }
+
+with : Selection (a -> b), Selection a -> Selection b
+with = \@Selection fnSel, @Selection aSel ->
+    count = List.len fnSel.columns
+
+    decode = \cells ->
+        fn <- fnSel.decode cells |> Result.try
+        a <- cells
+            |> List.drop count
+            |> aSel.decode
+            |> Result.map
+        fn a
+
+    @Selection {
+        columns: fnSel.columns |> List.concat aSel.columns,
         decode,
     }
 
@@ -225,7 +267,7 @@ rowArray = \sel, @Query query ->
 
     expr = @Expr { sql: wrapped, decode }
 
-    with sel expr
+    column sel expr
 
 map : Selection a, (a -> b) -> Selection b
 map = \@Selection sel, fn ->
@@ -257,21 +299,29 @@ Expr a := {
 }
 
 identifier : Str, Str, Decode a -> Expr a
-identifier = \table, column, decode -> @Expr {
-        sql: [Raw "\(table).\(column)"],
+identifier = \table, col, decode -> @Expr {
+        sql: [Raw "\(table).\(col)"],
         decode,
     }
 
-u8 : U8 -> Expr U8
+u8 : U8 -> Expr I16
 u8 = \value -> @Expr {
         sql: [Param (Pg.Cmd.u8 value)],
-        decode: Sql.Decode.u8,
+        decode: Sql.Decode.i16,
     }
 
 str : Str -> Expr Str
 str = \value -> @Expr {
         sql: [Param (Pg.Cmd.str value)],
-        decode: Sql.Decode.text,
+        decode: Sql.Decode.str,
+    }
+
+concat : Expr Str, Expr Str -> Expr Str
+concat = \@Expr a, @Expr b -> @Expr {
+        sql: a.sql
+        |> List.append (Raw " || ")
+        |> List.concat b.sql,
+        decode: Sql.Decode.str,
     }
 
 eq : Expr a, Expr a -> Expr Bool
@@ -338,8 +388,26 @@ addPart : Compiled, Part -> Compiled
 addPart = \{ params, sql }, part ->
     when part is
         Param param ->
-            newParams = params |> List.append param
-            binding = Num.toStr (List.len newParams)
+            paramCount = List.len params
+
+            { newParams, index } =
+                # TODO: Use a dict
+                indexResult = params |> List.findFirstIndex \p -> p == param
+
+                when indexResult is
+                    Ok existingIndex ->
+                        {
+                            newParams: params,
+                            index: existingIndex,
+                        }
+
+                    Err NotFound ->
+                        {
+                            newParams: params |> List.append param,
+                            index: paramCount,
+                        }
+
+            binding = Num.toStr (index + 1)
 
             { sql: "\(sql)$\(binding)", params: newParams }
 
@@ -351,7 +419,7 @@ addPart = \{ params, sql }, part ->
 # usersTable = {
 #     schema: "public",
 #     name: "users",
-#     fields: \alias -> {
+#     columns: \alias -> {
 #         name: identifier alias "name" Sql.Decode.text,
 #         active: identifier alias "active" Sql.Decode.bool,
 #         age: identifier alias "age" Sql.Decode.u8,
@@ -362,7 +430,7 @@ addPart = \{ params, sql }, part ->
 # orgTable = {
 #     schema: "public",
 #     name: "organizations",
-#     fields: \alias -> {
+#     columns: \alias -> {
 #         id: identifier alias "id" Sql.Decode.u32,
 #         name: identifier alias "name" Sql.Decode.text,
 #     },

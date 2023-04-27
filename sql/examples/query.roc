@@ -12,58 +12,68 @@ app "query"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, select },
-        sql.Sql.Decode,
+        sql.Sql.{ from, select, just, join, into, eq, str, column, with, where, limit, orderBy },
+        Public,
     ]
     provides [main] to pf
 
-task =
+customerQuery =
+    customers <- from Public.customer
+    addr <- join Public.address \a -> a.addressId |> eq customers.addressId
+    cities <- join Public.city \c -> c.cityId |> eq addr.cityId
 
+    fullName =
+        customers.firstName
+        |> Sql.concat (str " ")
+        |> Sql.concat customers.lastName
+
+    selection =
+        into \name -> \address -> { name, address }
+        |> column fullName
+        |> with (selectAddress addr)
+
+    select selection
+    |> orderBy [Asc fullName]
+    |> limit 10
+
+Address : {
+    addr : Str,
+    district : Str,
+    phone : Str,
+}
+
+selectAddress = \table ->
+    into \addr -> \district -> \phone -> { addr, district, phone }
+    |> column table.address
+    |> column table.district
+    |> column table.phone
+
+addressToStr = \{ addr, district, phone } ->
+    "\(addr), \(district). Phone: \(phone)"
+
+task =
     client <- Pg.Client.withConnect {
             host: "localhost",
             port: 5432,
-            user: "aguz",
-            auth: Password "the_password",
-            database: "aguz",
+            user: "postgres",
+            database: "pagalia",
         }
 
-    productsTable = {
-        schema: "public",
-        name: "products",
-        fields: \alias -> {
-            name: Sql.identifier alias "name" Sql.Decode.text,
-            discount: Sql.identifier alias "discount" Sql.Decode.bool,
-        },
-    }
-
-    result <-
-        Sql.all
-            (
-                products <- from productsTable
-
-                select
-                    (
-                        Sql.succeed (\name -> \discount -> { name, discount })
-                        |> Sql.with products.name
-                        |> Sql.with products.discount
-                    )
-            )
+    customers <-
+        Sql.all customerQuery
         |> Pg.Client.command client
         |> await
 
-    products =
-        result
-        |> List.map \product ->
-            sale =
-                if product.discount then
-                    " (SALE)"
-                else
-                    ""
+    sqlStr = (Sql.compile customerQuery).sql
 
-            "- \(product.name)\(sale)"
-        |> Str.joinWith "\n"
+    _ <- Stdout.line "\(sqlStr)\n" |> await
 
-    Stdout.line "Products:\n\n\(products)"
+    customers
+    |> List.map \c ->
+        addrStr = addressToStr c.address
+        "\(c.name) | \(addrStr)"
+    |> Str.joinWith "\n"
+    |> Stdout.line
 
 main : Task {} []
 main =

@@ -4,10 +4,15 @@ interface Sql.Decode
         Decode,
         DecodeErr,
         succeed,
-        text,
+        i16,
+        i32,
+        i64,
+        f32,
+        f64,
+        dec,
+        str,
         bool,
-        u8,
-        u32,
+        unsupported,
         rowArray,
     ]
     imports []
@@ -28,11 +33,19 @@ decode = \bytes, @Decode fn ->
 succeed : a -> Decode a
 succeed = \value -> @Decode \_ -> Ok value
 
-u8 = textFormat Str.toU8
+i16 = textFormat Str.toI16
 
-u32 = textFormat Str.toU32
+i32 = textFormat Str.toI32
 
-text = textFormat Ok
+i64 = textFormat Str.toI64
+
+f32 = textFormat Str.toF32
+
+f64 = textFormat Str.toF64
+
+dec = textFormat Str.toDec
+
+str = textFormat Ok
 
 bool =
     bytes <- @Decode
@@ -46,6 +59,8 @@ bool =
 
         _ ->
             Err InvalidBool
+
+unsupported = @Decode \bytes -> Ok (Unsupported bytes)
 
 rowArray = \cb ->
     arr <- textFormat
@@ -75,8 +90,8 @@ textFormat = \fn ->
     bytes <- @Decode
 
     when Str.fromUtf8 bytes is
-        Ok str ->
-            fn str
+        Ok text ->
+            fn text
 
         Err (BadUtf8 _ _) ->
             Err InvalidUtf8

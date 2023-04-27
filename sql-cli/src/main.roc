@@ -12,58 +12,51 @@ app "roc-sql"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, select, where, eq, and, into, with, str, rowArray },
+        sql.Sql.{ from, select, where, eq, and, into, column, str, rowArray },
         Schema,
+        Generate,
     ]
     provides [main] to pf
 
-generate = \client ->
+task : Task {} _
+task =
+    client <- Pg.Client.withConnect {
+            host: "localhost",
+            port: 5432,
+            user: "postgres",
+            database: "pagalia",
+        }
+
+    schemaName = "public"
+
     tables <-
-        Sql.all tablesQuery
+        Sql.all (tablesQuery schemaName)
         |> Pg.Client.command client
         |> await
 
-    tables
-    |> List.map \table ->
-        colCount =
-            table.columns
-            |> List.map .name
-            |> Str.joinWith ", "
+    Stdout.line (Generate.module schemaName tables)
 
-        "\(table.name)(\(colCount))"
-    |> Str.joinWith "\n"
-    |> Stdout.line
-
-tablesQuery =
+tablesQuery = \schemaName ->
     tables <- from Schema.tables
 
-    into \name -> \columns -> { name, columns }
-    |> with tables.name
+    into \name -> \schema -> \columns -> { name, schema, columns }
+    |> column tables.name
+    |> column tables.schema
     |> rowArray (columnsQuery tables)
     |> select
-    |> where (tables.schema |> eq (str "public"))
+    |> where (tables.schema |> eq (str schemaName))
 
 columnsQuery = \tables ->
     columns <- from Schema.columns
 
     into \name -> \dataType -> { name, dataType }
-    |> with columns.name
-    |> with columns.dataType
+    |> column columns.name
+    |> column columns.dataType
     |> select
     |> where (eq columns.tableName tables.name |> and (eq columns.schema tables.schema))
 
 main : Task {} []
 main =
-    task =
-        Pg.Client.withConnect
-            {
-                host: "localhost",
-                port: 5432,
-                user: "postgres",
-                database: "pagalia",
-            }
-            generate
-
     Task.attempt task \result ->
         when result is
             Ok _ ->
