@@ -11,6 +11,9 @@ interface Sql
         orderBy,
         eq,
         u8,
+        i16,
+        i32,
+        i64,
         str,
         concat,
         gt,
@@ -308,6 +311,24 @@ u8 : U8 -> Expr I16
 u8 = \value -> @Expr {
         sql: [Param (Pg.Cmd.u8 value)],
         decode: Sql.Decode.i16,
+    }
+
+i16 : I16 -> Expr I16
+i16 = \value -> @Expr {
+        sql: [Param (Pg.Cmd.i16 value)],
+        decode: Sql.Decode.i16,
+    }
+
+i32 : I32 -> Expr I32
+i32 = \value -> @Expr {
+        sql: [Param (Pg.Cmd.i32 value)],
+        decode: Sql.Decode.i32,
+    }
+
+i64 : I64 -> Expr I64
+i64 = \value -> @Expr {
+        sql: [Param (Pg.Cmd.i64 value)],
+        decode: Sql.Decode.i64,
     }
 
 str : Str -> Expr Str

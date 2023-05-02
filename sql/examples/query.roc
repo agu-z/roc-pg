@@ -35,9 +35,8 @@ customerQuery =
 
     select selection
     |> orderBy [Asc fullName]
-    |> where (country.country |> eq (str "United States")) 
+    |> where (country.country |> eq (str "United States"))
     |> limit 10
-
 
 Address : {
     addr : Str,

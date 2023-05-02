@@ -140,7 +140,7 @@ language = {
     name: "language",
     columns: \alias -> {
         languageId: identifier alias "language_id" Sql.Decode.i32,
-        name: identifier alias "name" Sql.Decode.unsupported,
+        name: identifier alias "name" Sql.Decode.str,
         lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
     },
 }

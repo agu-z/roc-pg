@@ -80,7 +80,7 @@ decoderName = \sqlType ->
         "numeric" ->
             "dec"
 
-        "text" | "character varying" ->
+        "text" | "character varying" | "character" ->
             "str"
 
         "boolean" ->
