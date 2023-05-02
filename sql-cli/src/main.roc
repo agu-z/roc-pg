@@ -49,9 +49,10 @@ tablesQuery = \schemaName ->
 columnsQuery = \tables ->
     columns <- from Schema.columns
 
-    into \name -> \dataType -> { name, dataType }
+    into \name -> \dataType -> \isNullable -> { name, dataType, isNullable }
     |> column columns.name
     |> column columns.dataType
+    |> column (columns.isNullable |> eq (str "YES"))
     |> select
     |> where (eq columns.tableName tables.name |> and (eq columns.schema tables.schema))
 

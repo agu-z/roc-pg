@@ -13,6 +13,7 @@ app "query"
         pg.Pg.Cmd,
         pg.Pg.Result,
         sql.Sql.{ from, select, where, join, into, eq, str, column, with, limit, orderBy },
+        sql.Sql.Decode.{ Nullable },
         Public,
     ]
     provides [main] to pf
@@ -42,17 +43,26 @@ Address : {
     addr : Str,
     district : Str,
     phone : Str,
+    postalCode : Nullable Str,
 }
 
 selectAddress : _ -> Sql.Selection Address
 selectAddress = \table ->
-    into \addr -> \district -> \phone -> { addr, district, phone }
+    into \addr -> \district -> \phone -> \postalCode -> { addr, district, phone, postalCode }
     |> column table.address
     |> column table.district
     |> column table.phone
+    |> column table.postalCode
 
-addressToStr = \{ addr, district, phone } ->
-    "\(addr), \(district). Phone: \(phone)"
+addressToStr = \{ addr, district, phone, postalCode } ->
+    postalCodeStr =
+        when postalCode is
+            Present code ->
+                code
+
+            Null ->
+                ""
+    "\(addr), \(district) \(postalCodeStr). Phone: \(phone)"
 
 task =
     client <- Pg.Client.withConnect {

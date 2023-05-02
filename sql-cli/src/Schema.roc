@@ -19,5 +19,6 @@ columns = {
         schema: Sql.identifier alias "table_schema" Sql.Decode.str,
         name: Sql.identifier alias "column_name" Sql.Decode.str,
         dataType: Sql.identifier alias "data_type" Sql.Decode.str,
+        isNullable: Sql.identifier alias "is_nullable" Sql.Decode.str,
     },
 }

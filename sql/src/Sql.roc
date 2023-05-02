@@ -9,14 +9,23 @@ interface Sql
         join,
         limit,
         orderBy,
-        eq,
         u8,
         i16,
         i32,
         i64,
         str,
-        concat,
+        null,
+        present,
+        isNull,
+        isNotNull,
+        isDistinctFrom,
+        isNotDistinctFrom,
+        nullableEq,
+        nullableNeq,
+        eq,
+        neq,
         gt,
+        concat,
         and,
         not,
         Selection,
@@ -30,7 +39,7 @@ interface Sql
     imports [
         pg.Pg.Cmd.{ Binding },
         pg.Pg.Result,
-        Sql.Decode.{ Decode },
+        Sql.Decode.{ Nullable, Decode },
     ]
 
 Query a :=
@@ -331,14 +340,54 @@ i64 = \value -> @Expr {
         decode: Sql.Decode.i64,
     }
 
+
 str : Str -> Expr Str
-str = \value -> @Expr {
+str = \value ->
+    @Expr {
         sql: [Param (Pg.Cmd.str value)],
         decode: Sql.Decode.str,
     }
 
+null : Expr (Nullable *)
+null = @Expr {
+    sql: [Raw "null"],
+    decode: Sql.Decode.nullable (Sql.Decode.fail "not null"),
+}
+
+present : Expr a -> Expr (Nullable a)
+present = \@Expr a ->
+    @Expr {
+        sql: a.sql,
+        decode: a.decode |> Sql.Decode.map Present,
+    }
+
+isNull : Expr (Nullable *) -> Expr Bool
+isNull = \@Expr a ->
+    @Expr {
+        sql: a.sql |> List.append (Raw " is null"),
+        decode: Sql.Decode.bool,
+    }
+
+isNotNull : Expr (Nullable *) -> Expr Bool
+isNotNull = \@Expr a ->
+    @Expr {
+        sql: a.sql |> List.append (Raw " is not null"),
+        decode: Sql.Decode.bool,
+    }
+
+isDistinctFrom : Expr (Nullable a), Expr (Nullable a) -> Expr Bool
+isDistinctFrom = \a, b -> boolOp a "is distinct from" b
+
+isNotDistinctFrom : Expr (Nullable a), Expr (Nullable a) -> Expr Bool
+isNotDistinctFrom = \a, b -> boolOp a "is not distinct from" b
+
+nullableEq = isNotDistinctFrom
+
+nullableNeq = isDistinctFrom
+
 concat : Expr Str, Expr Str -> Expr Str
-concat = \@Expr a, @Expr b -> @Expr {
+concat = \@Expr a, @Expr b ->
+    @Expr {
         sql: a.sql
         |> List.append (Raw " || ")
         |> List.concat b.sql,
@@ -348,11 +397,15 @@ concat = \@Expr a, @Expr b -> @Expr {
 eq : Expr a, Expr a -> Expr Bool
 eq = \a, b -> boolOp a "=" b
 
+neq : Expr a, Expr a -> Expr Bool
+neq = \a, b -> boolOp a "<>" b
+
 gt : Expr (Num a), Expr (Num a) -> Expr Bool
 gt = \a, b -> boolOp a ">" b
 
 boolOp : Expr a, Str, Expr a -> Expr Bool
-boolOp = \@Expr a, op, @Expr b -> @Expr {
+boolOp = \@Expr a, op, @Expr b ->
+    @Expr {
         sql: a.sql
         |> List.append (Raw " \(op) ")
         |> List.concat b.sql,

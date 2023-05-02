@@ -54,9 +54,15 @@ tableDef = \table ->
 columnField = \column ->
     fieldName = SanitizeName.def column.name
 
-    decoder = decoderName column.dataType
+    typeDecoder = decoderName column.dataType
 
-    "\(fieldName): identifier alias \"\(column.name)\" Sql.Decode.\(decoder),"
+    decoder =
+        if column.isNullable then
+            "(Sql.Decode.nullable Sql.Decode.\(typeDecoder))"
+        else
+            "Sql.Decode.\(typeDecoder)"
+
+    "\(fieldName): identifier alias \"\(column.name)\" \(decoder),"
     |> indent 2
 
 decoderName : Str -> Str
@@ -113,16 +119,16 @@ expect
             name: "products",
             schema: "public",
             columns: [
-                { name: "name", dataType: "text" },
-                { name: "price", dataType: "numeric" },
+                { name: "name", dataType: "text", isNullable: Bool.false },
+                { name: "price", dataType: "numeric", isNullable: Bool.true },
             ],
         },
         {
             name: "users",
             schema: "public",
             columns: [
-                { name: "id", dataType: "smallint" },
-                { name: "active", dataType: "boolean" },
+                { name: "id", dataType: "smallint", isNullable: Bool.false },
+                { name: "active", dataType: "boolean", isNullable: Bool.false },
             ],
         },
     ]
@@ -146,7 +152,7 @@ expect
             name: "products",
             columns: \\alias -> {
                 name: identifier alias "name" Sql.Decode.str,
-                price: identifier alias "price" Sql.Decode.dec,
+                price: identifier alias "price" (Sql.Decode.nullable Sql.Decode.dec),
             },
         }
 

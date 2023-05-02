@@ -3,7 +3,11 @@ interface Sql.Decode
         decode,
         Decode,
         DecodeErr,
+        map,
         succeed,
+        fail,
+        nullable,
+        Nullable,
         i16,
         i32,
         i64,
@@ -22,16 +26,35 @@ Decode a := List U8 -> Result a DecodeErr
 DecodeErr : [
     InvalidUtf8,
     InvalidNumStr,
-    InvalidBool,
+    InvalidBool (List U8),
     MissingColumn Nat,
+    Error Str,
 ]
 
 decode : List U8, Decode a -> Result a DecodeErr
 decode = \bytes, @Decode fn ->
     fn bytes
 
+map : Decode a, (a -> b) -> Decode b
+map = \@Decode a, toB -> @Decode \bytes -> a bytes |> Result.map toB
+
 succeed : a -> Decode a
 succeed = \value -> @Decode \_ -> Ok value
+
+fail : Str -> Decode a
+fail = \message -> @Decode \_ -> Err (Error message)
+
+Nullable a : [Null, Present a]
+
+nullable : Decode a -> Decode (Nullable a)
+nullable = \@Decode sub ->
+    bytes <- @Decode
+
+    if List.isEmpty bytes then
+        Ok Null
+    else
+        sub bytes
+        |> Result.map Present
 
 i16 = textFormat Str.toI16
 
@@ -58,7 +81,7 @@ bool =
             Ok Bool.false
 
         _ ->
-            Err InvalidBool
+            Err (InvalidBool bytes)
 
 unsupported = @Decode \bytes -> Ok (Unsupported bytes)
 
@@ -70,6 +93,7 @@ rowArray = \cb ->
     arr
     |> Str.graphemes
     |> List.drop 2
+    |> List.dropLast
     |> List.dropLast
     |> Str.joinWith ""
     |> Str.split "\",\""
