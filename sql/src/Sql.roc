@@ -260,8 +260,8 @@ into = \value -> @Selection {
         decode: \_ -> Ok value,
     }
 
-column : Selection (a -> b), Expr * a -> Selection b
-column = \@Selection sel, @Expr expr ->
+column : Expr * a -> (Selection (a -> b) -> Selection b)
+column = \@Expr expr -> \@Selection sel ->
     index = List.len sel.columns
 
     decode = \cells ->
@@ -280,8 +280,8 @@ column = \@Selection sel, @Expr expr ->
         decode,
     }
 
-with : Selection (a -> b), Selection a -> Selection b
-with = \@Selection fnSel, @Selection aSel ->
+with : Selection a -> (Selection (a -> b) -> Selection b)
+with = \@Selection aSel -> \@Selection fnSel ->
     count = List.len fnSel.columns
 
     decode = \cells ->
@@ -297,8 +297,8 @@ with = \@Selection fnSel, @Selection aSel ->
         decode,
     }
 
-rowArray : Selection (List a -> b), Query a -> Selection b
-rowArray = \sel, @Query query ->
+rowArray : Query a -> (Selection (List a -> b) -> Selection b)
+rowArray = \@Query query -> \sel ->
     sql = querySql (@Query query) RowArray
 
     wrapped =
@@ -313,7 +313,7 @@ rowArray = \sel, @Query query ->
 
     expr = @Expr { sql: wrapped, decode }
 
-    column sel expr
+    (column expr) sel
 
 map : Selection a, (a -> b) -> Selection b
 map = \@Selection sel, fn ->

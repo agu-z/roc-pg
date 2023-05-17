@@ -29,30 +29,30 @@ customerQuery =
         |> Sql.concat (str " ")
         |> Sql.concat customers.lastName
 
-    selection =
-        into \name -> \address -> { name, address }
-        |> column fullName
-        |> with (selectAddress addr)
-
-    select selection
+    into {
+        name: <- column fullName,
+        address: <- with (selectAddress addr),
+    }
+    |> select
     |> orderBy [Sql.asc fullName, Sql.desc customers.customerId]
     |> where (country.country |> eq (str "United States"))
     |> limit 10
 
 Address : {
     addr : Str,
-    district : Str,
     phone : Str,
+    district : Str,
     postalCode : Nullable Str,
 }
 
 selectAddress : _ -> Sql.Selection Address
 selectAddress = \table ->
-    into \addr -> \district -> \phone -> \postalCode -> { addr, district, phone, postalCode }
-    |> column table.address
-    |> column table.district
-    |> column table.phone
-    |> column table.postalCode
+    into {
+        addr: <- table.address |> column,
+        phone: <- table.phone |> column,
+        district: <- table.district |> column,
+        postalCode: <- table.postalCode |> column,
+    }
 
 addressToStr = \{ addr, district, phone, postalCode } ->
     postalCodeStr =

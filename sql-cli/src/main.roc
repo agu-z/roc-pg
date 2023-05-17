@@ -39,20 +39,25 @@ task =
 tablesQuery = \schemaName ->
     tables <- from Schema.tables
 
-    into \name -> \schema -> \columns -> { name, schema, columns }
-    |> column tables.name
-    |> column tables.schema
-    |> rowArray (columnsQuery tables)
+    into {
+        name: <- column tables.name,
+        schema: <- column tables.schema,
+        columns: <- rowArray (columnsQuery tables),
+    }
     |> select
     |> where (tables.schema |> eq (str schemaName))
 
 columnsQuery = \tables ->
     columns <- from Schema.columns
 
-    into \name -> \dataType -> \isNullable -> { name, dataType, isNullable }
-    |> column columns.name
-    |> column columns.dataType
-    |> column (columns.isNullable |> eq (str "YES"))
+    into {
+        name: <- column columns.name,
+        dataType: <- column columns.dataType,
+        isNullable: <-
+            columns.isNullable
+            |> eq (str "YES")
+            |> column,
+    }
     |> select
     |> where (eq columns.tableName tables.name |> and (eq columns.schema tables.schema))
 
