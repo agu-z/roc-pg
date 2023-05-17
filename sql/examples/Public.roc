@@ -32,18 +32,19 @@ interface Public
         paymentP2022N01,
     ]
     imports [
-        sql.Sql.{ identifier },
-        sql.Sql.Decode,
+        sql.Sql.{ identifier, Table, Expr, NullableExpr },
+        sql.Sql.Types.{ Nullable },
+        sql.Sql.Types.{ PgI32, PgText },
     ]
 
 inventory = {
     schema: "public",
     name: "inventory",
     columns: \alias -> {
-        inventoryId: identifier alias "inventory_id" Sql.Decode.i32,
-        filmId: identifier alias "film_id" Sql.Decode.i32,
-        storeId: identifier alias "store_id" Sql.Decode.i32,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        inventoryId: identifier alias "inventory_id" Sql.Types.i32,
+        filmId: identifier alias "film_id" Sql.Types.i32,
+        storeId: identifier alias "store_id" Sql.Types.i32,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -51,9 +52,9 @@ filmActor = {
     schema: "public",
     name: "film_actor",
     columns: \alias -> {
-        actorId: identifier alias "actor_id" Sql.Decode.i32,
-        filmId: identifier alias "film_id" Sql.Decode.i32,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        actorId: identifier alias "actor_id" Sql.Types.i32,
+        filmId: identifier alias "film_id" Sql.Types.i32,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -61,14 +62,14 @@ address = {
     schema: "public",
     name: "address",
     columns: \alias -> {
-        addressId: identifier alias "address_id" Sql.Decode.i32,
-        address: identifier alias "address" Sql.Decode.str,
-        address2: identifier alias "address2" (Sql.Decode.nullable Sql.Decode.str),
-        district: identifier alias "district" Sql.Decode.str,
-        cityId: identifier alias "city_id" Sql.Decode.i32,
-        postalCode: identifier alias "postal_code" (Sql.Decode.nullable Sql.Decode.str),
-        phone: identifier alias "phone" Sql.Decode.str,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        addressId: identifier alias "address_id" Sql.Types.i32,
+        address: identifier alias "address" Sql.Types.str,
+        address2: identifier alias "address2" (Sql.Types.nullable Sql.Types.str),
+        district: identifier alias "district" Sql.Types.str,
+        cityId: identifier alias "city_id" Sql.Types.i32,
+        postalCode: identifier alias "postal_code" (Sql.Types.nullable Sql.Types.str),
+        phone: identifier alias "phone" Sql.Types.str,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -76,10 +77,10 @@ city = {
     schema: "public",
     name: "city",
     columns: \alias -> {
-        cityId: identifier alias "city_id" Sql.Decode.i32,
-        city: identifier alias "city" Sql.Decode.str,
-        countryId: identifier alias "country_id" Sql.Decode.i32,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        cityId: identifier alias "city_id" Sql.Types.i32,
+        city: identifier alias "city" Sql.Types.str,
+        countryId: identifier alias "country_id" Sql.Types.i32,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -87,10 +88,10 @@ actorInfo = {
     schema: "public",
     name: "actor_info",
     columns: \alias -> {
-        actorId: identifier alias "actor_id" (Sql.Decode.nullable Sql.Decode.i32),
-        firstName: identifier alias "first_name" (Sql.Decode.nullable Sql.Decode.str),
-        lastName: identifier alias "last_name" (Sql.Decode.nullable Sql.Decode.str),
-        filmInfo: identifier alias "film_info" (Sql.Decode.nullable Sql.Decode.str),
+        actorId: identifier alias "actor_id" (Sql.Types.nullable Sql.Types.i32),
+        firstName: identifier alias "first_name" (Sql.Types.nullable Sql.Types.str),
+        lastName: identifier alias "last_name" (Sql.Types.nullable Sql.Types.str),
+        filmInfo: identifier alias "film_info" (Sql.Types.nullable Sql.Types.str),
     },
 }
 
@@ -98,10 +99,10 @@ actor = {
     schema: "public",
     name: "actor",
     columns: \alias -> {
-        actorId: identifier alias "actor_id" Sql.Decode.i32,
-        firstName: identifier alias "first_name" Sql.Decode.str,
-        lastName: identifier alias "last_name" Sql.Decode.str,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        actorId: identifier alias "actor_id" Sql.Types.i32,
+        firstName: identifier alias "first_name" Sql.Types.str,
+        lastName: identifier alias "last_name" Sql.Types.str,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -109,9 +110,9 @@ filmCategory = {
     schema: "public",
     name: "film_category",
     columns: \alias -> {
-        filmId: identifier alias "film_id" Sql.Decode.i32,
-        categoryId: identifier alias "category_id" Sql.Decode.i32,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        filmId: identifier alias "film_id" Sql.Types.i32,
+        categoryId: identifier alias "category_id" Sql.Types.i32,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -119,9 +120,9 @@ category = {
     schema: "public",
     name: "category",
     columns: \alias -> {
-        categoryId: identifier alias "category_id" Sql.Decode.i32,
-        name: identifier alias "name" Sql.Decode.str,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        categoryId: identifier alias "category_id" Sql.Types.i32,
+        name: identifier alias "name" Sql.Types.str,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -129,9 +130,9 @@ country = {
     schema: "public",
     name: "country",
     columns: \alias -> {
-        countryId: identifier alias "country_id" Sql.Decode.i32,
-        country: identifier alias "country" Sql.Decode.str,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        countryId: identifier alias "country_id" Sql.Types.i32,
+        country: identifier alias "country" Sql.Types.str,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -139,9 +140,9 @@ language = {
     schema: "public",
     name: "language",
     columns: \alias -> {
-        languageId: identifier alias "language_id" Sql.Decode.i32,
-        name: identifier alias "name" Sql.Decode.str,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        languageId: identifier alias "language_id" Sql.Types.i32,
+        name: identifier alias "name" Sql.Types.str,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -149,16 +150,16 @@ customer = {
     schema: "public",
     name: "customer",
     columns: \alias -> {
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        storeId: identifier alias "store_id" Sql.Decode.i32,
-        firstName: identifier alias "first_name" Sql.Decode.str,
-        lastName: identifier alias "last_name" Sql.Decode.str,
-        email: identifier alias "email" (Sql.Decode.nullable Sql.Decode.str),
-        addressId: identifier alias "address_id" Sql.Decode.i32,
-        activebool: identifier alias "activebool" Sql.Decode.bool,
-        createDate: identifier alias "create_date" Sql.Decode.unsupported,
-        lastUpdate: identifier alias "last_update" (Sql.Decode.nullable Sql.Decode.unsupported),
-        active: identifier alias "active" (Sql.Decode.nullable Sql.Decode.i32),
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        storeId: identifier alias "store_id" Sql.Types.i32,
+        firstName: identifier alias "first_name" Sql.Types.str,
+        lastName: identifier alias "last_name" Sql.Types.str,
+        email: identifier alias "email" (Sql.Types.nullable Sql.Types.str),
+        addressId: identifier alias "address_id" Sql.Types.i32,
+        activebool: identifier alias "activebool" Sql.Types.bool,
+        createDate: identifier alias "create_date" Sql.Types.unsupported,
+        lastUpdate: identifier alias "last_update" (Sql.Types.nullable Sql.Types.unsupported),
+        active: identifier alias "active" (Sql.Types.nullable Sql.Types.i32),
     },
 }
 
@@ -166,14 +167,14 @@ filmList = {
     schema: "public",
     name: "film_list",
     columns: \alias -> {
-        fid: identifier alias "fid" (Sql.Decode.nullable Sql.Decode.i32),
-        title: identifier alias "title" (Sql.Decode.nullable Sql.Decode.str),
-        description: identifier alias "description" (Sql.Decode.nullable Sql.Decode.str),
-        category: identifier alias "category" (Sql.Decode.nullable Sql.Decode.str),
-        price: identifier alias "price" (Sql.Decode.nullable Sql.Decode.dec),
-        length: identifier alias "length" (Sql.Decode.nullable Sql.Decode.i16),
-        rating: identifier alias "rating" (Sql.Decode.nullable Sql.Decode.unsupported),
-        actors: identifier alias "actors" (Sql.Decode.nullable Sql.Decode.str),
+        fid: identifier alias "fid" (Sql.Types.nullable Sql.Types.i32),
+        title: identifier alias "title" (Sql.Types.nullable Sql.Types.str),
+        description: identifier alias "description" (Sql.Types.nullable Sql.Types.str),
+        category: identifier alias "category" (Sql.Types.nullable Sql.Types.str),
+        price: identifier alias "price" (Sql.Types.nullable Sql.Types.dec),
+        length: identifier alias "length" (Sql.Types.nullable Sql.Types.i16),
+        rating: identifier alias "rating" (Sql.Types.nullable Sql.Types.unsupported),
+        actors: identifier alias "actors" (Sql.Types.nullable Sql.Types.str),
     },
 }
 
@@ -181,15 +182,15 @@ customerList = {
     schema: "public",
     name: "customer_list",
     columns: \alias -> {
-        id: identifier alias "id" (Sql.Decode.nullable Sql.Decode.i32),
-        name: identifier alias "name" (Sql.Decode.nullable Sql.Decode.str),
-        address: identifier alias "address" (Sql.Decode.nullable Sql.Decode.str),
-        zipcode: identifier alias "\"zip code\"" (Sql.Decode.nullable Sql.Decode.str),
-        phone: identifier alias "phone" (Sql.Decode.nullable Sql.Decode.str),
-        city: identifier alias "city" (Sql.Decode.nullable Sql.Decode.str),
-        country: identifier alias "country" (Sql.Decode.nullable Sql.Decode.str),
-        notes: identifier alias "notes" (Sql.Decode.nullable Sql.Decode.str),
-        sid: identifier alias "sid" (Sql.Decode.nullable Sql.Decode.i32),
+        id: identifier alias "id" (Sql.Types.nullable Sql.Types.i32),
+        name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
+        address: identifier alias "address" (Sql.Types.nullable Sql.Types.str),
+        zipcode: identifier alias "\"zip code\"" (Sql.Types.nullable Sql.Types.str),
+        phone: identifier alias "phone" (Sql.Types.nullable Sql.Types.str),
+        city: identifier alias "city" (Sql.Types.nullable Sql.Types.str),
+        country: identifier alias "country" (Sql.Types.nullable Sql.Types.str),
+        notes: identifier alias "notes" (Sql.Types.nullable Sql.Types.str),
+        sid: identifier alias "sid" (Sql.Types.nullable Sql.Types.i32),
     },
 }
 
@@ -197,14 +198,14 @@ nicerButSlowerFilmList = {
     schema: "public",
     name: "nicer_but_slower_film_list",
     columns: \alias -> {
-        fid: identifier alias "fid" (Sql.Decode.nullable Sql.Decode.i32),
-        title: identifier alias "title" (Sql.Decode.nullable Sql.Decode.str),
-        description: identifier alias "description" (Sql.Decode.nullable Sql.Decode.str),
-        category: identifier alias "category" (Sql.Decode.nullable Sql.Decode.str),
-        price: identifier alias "price" (Sql.Decode.nullable Sql.Decode.dec),
-        length: identifier alias "length" (Sql.Decode.nullable Sql.Decode.i16),
-        rating: identifier alias "rating" (Sql.Decode.nullable Sql.Decode.unsupported),
-        actors: identifier alias "actors" (Sql.Decode.nullable Sql.Decode.str),
+        fid: identifier alias "fid" (Sql.Types.nullable Sql.Types.i32),
+        title: identifier alias "title" (Sql.Types.nullable Sql.Types.str),
+        description: identifier alias "description" (Sql.Types.nullable Sql.Types.str),
+        category: identifier alias "category" (Sql.Types.nullable Sql.Types.str),
+        price: identifier alias "price" (Sql.Types.nullable Sql.Types.dec),
+        length: identifier alias "length" (Sql.Types.nullable Sql.Types.i16),
+        rating: identifier alias "rating" (Sql.Types.nullable Sql.Types.unsupported),
+        actors: identifier alias "actors" (Sql.Types.nullable Sql.Types.str),
     },
 }
 
@@ -212,20 +213,20 @@ film = {
     schema: "public",
     name: "film",
     columns: \alias -> {
-        filmId: identifier alias "film_id" Sql.Decode.i32,
-        title: identifier alias "title" Sql.Decode.str,
-        description: identifier alias "description" (Sql.Decode.nullable Sql.Decode.str),
-        releaseYear: identifier alias "release_year" (Sql.Decode.nullable Sql.Decode.i32),
-        languageId: identifier alias "language_id" Sql.Decode.i32,
-        originalLanguageId: identifier alias "original_language_id" (Sql.Decode.nullable Sql.Decode.i32),
-        rentalDuration: identifier alias "rental_duration" Sql.Decode.i16,
-        rentalRate: identifier alias "rental_rate" Sql.Decode.dec,
-        length: identifier alias "length" (Sql.Decode.nullable Sql.Decode.i16),
-        replacementCost: identifier alias "replacement_cost" Sql.Decode.dec,
-        rating: identifier alias "rating" (Sql.Decode.nullable Sql.Decode.unsupported),
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
-        specialFeatures: identifier alias "special_features" (Sql.Decode.nullable Sql.Decode.unsupported),
-        fulltext: identifier alias "fulltext" Sql.Decode.unsupported,
+        filmId: identifier alias "film_id" Sql.Types.i32,
+        title: identifier alias "title" Sql.Types.str,
+        description: identifier alias "description" (Sql.Types.nullable Sql.Types.str),
+        releaseYear: identifier alias "release_year" (Sql.Types.nullable Sql.Types.i32),
+        languageId: identifier alias "language_id" Sql.Types.i32,
+        originalLanguageId: identifier alias "original_language_id" (Sql.Types.nullable Sql.Types.i32),
+        rentalDuration: identifier alias "rental_duration" Sql.Types.i16,
+        rentalRate: identifier alias "rental_rate" Sql.Types.dec,
+        length: identifier alias "length" (Sql.Types.nullable Sql.Types.i16),
+        replacementCost: identifier alias "replacement_cost" Sql.Types.dec,
+        rating: identifier alias "rating" (Sql.Types.nullable Sql.Types.unsupported),
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
+        specialFeatures: identifier alias "special_features" (Sql.Types.nullable Sql.Types.unsupported),
+        fulltext: identifier alias "fulltext" Sql.Types.unsupported,
     },
 }
 
@@ -233,12 +234,12 @@ payment = {
     schema: "public",
     name: "payment",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -246,13 +247,13 @@ rental = {
     schema: "public",
     name: "rental",
     columns: \alias -> {
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        rentalDate: identifier alias "rental_date" Sql.Decode.unsupported,
-        inventoryId: identifier alias "inventory_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        returnDate: identifier alias "return_date" (Sql.Decode.nullable Sql.Decode.unsupported),
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        rentalDate: identifier alias "rental_date" Sql.Types.unsupported,
+        inventoryId: identifier alias "inventory_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        returnDate: identifier alias "return_date" (Sql.Types.nullable Sql.Types.unsupported),
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -260,12 +261,12 @@ paymentP2022N04 = {
     schema: "public",
     name: "payment_p2022_04",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -273,8 +274,8 @@ salesByFilmCategory = {
     schema: "public",
     name: "sales_by_film_category",
     columns: \alias -> {
-        category: identifier alias "category" (Sql.Decode.nullable Sql.Decode.str),
-        totalSales: identifier alias "total_sales" (Sql.Decode.nullable Sql.Decode.dec),
+        category: identifier alias "category" (Sql.Types.nullable Sql.Types.str),
+        totalSales: identifier alias "total_sales" (Sql.Types.nullable Sql.Types.dec),
     },
 }
 
@@ -282,10 +283,10 @@ store = {
     schema: "public",
     name: "store",
     columns: \alias -> {
-        storeId: identifier alias "store_id" Sql.Decode.i32,
-        managerStaffId: identifier alias "manager_staff_id" Sql.Decode.i32,
-        addressId: identifier alias "address_id" Sql.Decode.i32,
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
+        storeId: identifier alias "store_id" Sql.Types.i32,
+        managerStaffId: identifier alias "manager_staff_id" Sql.Types.i32,
+        addressId: identifier alias "address_id" Sql.Types.i32,
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
     },
 }
 
@@ -293,17 +294,17 @@ staff = {
     schema: "public",
     name: "staff",
     columns: \alias -> {
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        firstName: identifier alias "first_name" Sql.Decode.str,
-        lastName: identifier alias "last_name" Sql.Decode.str,
-        addressId: identifier alias "address_id" Sql.Decode.i32,
-        email: identifier alias "email" (Sql.Decode.nullable Sql.Decode.str),
-        storeId: identifier alias "store_id" Sql.Decode.i32,
-        active: identifier alias "active" Sql.Decode.bool,
-        username: identifier alias "username" Sql.Decode.str,
-        password: identifier alias "password" (Sql.Decode.nullable Sql.Decode.str),
-        lastUpdate: identifier alias "last_update" Sql.Decode.unsupported,
-        picture: identifier alias "picture" (Sql.Decode.nullable Sql.Decode.unsupported),
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        firstName: identifier alias "first_name" Sql.Types.str,
+        lastName: identifier alias "last_name" Sql.Types.str,
+        addressId: identifier alias "address_id" Sql.Types.i32,
+        email: identifier alias "email" (Sql.Types.nullable Sql.Types.str),
+        storeId: identifier alias "store_id" Sql.Types.i32,
+        active: identifier alias "active" Sql.Types.bool,
+        username: identifier alias "username" Sql.Types.str,
+        password: identifier alias "password" (Sql.Types.nullable Sql.Types.str),
+        lastUpdate: identifier alias "last_update" Sql.Types.unsupported,
+        picture: identifier alias "picture" (Sql.Types.nullable Sql.Types.unsupported),
     },
 }
 
@@ -311,9 +312,9 @@ salesByStore = {
     schema: "public",
     name: "sales_by_store",
     columns: \alias -> {
-        store: identifier alias "store" (Sql.Decode.nullable Sql.Decode.str),
-        manager: identifier alias "manager" (Sql.Decode.nullable Sql.Decode.str),
-        totalSales: identifier alias "total_sales" (Sql.Decode.nullable Sql.Decode.dec),
+        store: identifier alias "store" (Sql.Types.nullable Sql.Types.str),
+        manager: identifier alias "manager" (Sql.Types.nullable Sql.Types.str),
+        totalSales: identifier alias "total_sales" (Sql.Types.nullable Sql.Types.dec),
     },
 }
 
@@ -321,14 +322,14 @@ staffList = {
     schema: "public",
     name: "staff_list",
     columns: \alias -> {
-        id: identifier alias "id" (Sql.Decode.nullable Sql.Decode.i32),
-        name: identifier alias "name" (Sql.Decode.nullable Sql.Decode.str),
-        address: identifier alias "address" (Sql.Decode.nullable Sql.Decode.str),
-        zipcode: identifier alias "\"zip code\"" (Sql.Decode.nullable Sql.Decode.str),
-        phone: identifier alias "phone" (Sql.Decode.nullable Sql.Decode.str),
-        city: identifier alias "city" (Sql.Decode.nullable Sql.Decode.str),
-        country: identifier alias "country" (Sql.Decode.nullable Sql.Decode.str),
-        sid: identifier alias "sid" (Sql.Decode.nullable Sql.Decode.i32),
+        id: identifier alias "id" (Sql.Types.nullable Sql.Types.i32),
+        name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
+        address: identifier alias "address" (Sql.Types.nullable Sql.Types.str),
+        zipcode: identifier alias "\"zip code\"" (Sql.Types.nullable Sql.Types.str),
+        phone: identifier alias "phone" (Sql.Types.nullable Sql.Types.str),
+        city: identifier alias "city" (Sql.Types.nullable Sql.Types.str),
+        country: identifier alias "country" (Sql.Types.nullable Sql.Types.str),
+        sid: identifier alias "sid" (Sql.Types.nullable Sql.Types.i32),
     },
 }
 
@@ -336,12 +337,12 @@ paymentP2022N07 = {
     schema: "public",
     name: "payment_p2022_07",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -349,12 +350,12 @@ paymentP2022N02 = {
     schema: "public",
     name: "payment_p2022_02",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -362,12 +363,12 @@ paymentP2022N03 = {
     schema: "public",
     name: "payment_p2022_03",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -375,12 +376,12 @@ paymentP2022N05 = {
     schema: "public",
     name: "payment_p2022_05",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -388,12 +389,12 @@ paymentP2022N06 = {
     schema: "public",
     name: "payment_p2022_06",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }
 
@@ -401,11 +402,11 @@ paymentP2022N01 = {
     schema: "public",
     name: "payment_p2022_01",
     columns: \alias -> {
-        paymentId: identifier alias "payment_id" Sql.Decode.i32,
-        customerId: identifier alias "customer_id" Sql.Decode.i32,
-        staffId: identifier alias "staff_id" Sql.Decode.i32,
-        rentalId: identifier alias "rental_id" Sql.Decode.i32,
-        amount: identifier alias "amount" Sql.Decode.dec,
-        paymentDate: identifier alias "payment_date" Sql.Decode.unsupported,
+        paymentId: identifier alias "payment_id" Sql.Types.i32,
+        customerId: identifier alias "customer_id" Sql.Types.i32,
+        staffId: identifier alias "staff_id" Sql.Types.i32,
+        rentalId: identifier alias "rental_id" Sql.Types.i32,
+        amount: identifier alias "amount" Sql.Types.dec,
+        paymentDate: identifier alias "payment_date" Sql.Types.unsupported,
     },
 }

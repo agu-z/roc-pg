@@ -1,5 +1,8 @@
 interface Sql
     exposes [
+        Table,
+        Expr,
+        NullableExpr,
         all,
         compile,
         from,
@@ -9,7 +12,9 @@ interface Sql
         join,
         limit,
         orderBy,
-        u8,
+        asc,
+        desc,
+        Order,
         i16,
         i32,
         i64,
@@ -22,12 +27,20 @@ interface Sql
         isNotDistinctFrom,
         nullableEq,
         nullableNeq,
+        lt,
+        lte,
         eq,
         neq,
         gt,
+        gte,
         concat,
         and,
+        or,
         not,
+        add,
+        div,
+        sub,
+        mul,
         Selection,
         column,
         with,
@@ -39,7 +52,17 @@ interface Sql
     imports [
         pg.Pg.Cmd.{ Binding },
         pg.Pg.Result,
-        Sql.Decode.{ Nullable, Decode },
+        Sql.Types.{
+            Nullable,
+            Decode,
+            PgI16,
+            PgI32,
+            PgI64,
+            PgNum,
+            PgText,
+            PgBool,
+            PgCmp,
+        },
     ]
 
 Query a :=
@@ -131,7 +154,7 @@ SelectClauses a : {
     limit : Sql,
 }
 
-join : Table table, (table -> Expr Bool), (table -> Select a) -> Select a
+join : Table table, (table -> Expr PgBool *), (table -> Select a) -> Select a
 join = \table, on, next -> @Select \aliases -> joinHelp table on next aliases
 
 joinHelp = \table, on, next, aliases ->
@@ -176,9 +199,7 @@ select = \selection ->
         orderBy: [],
     }
 
-# We have to use _ here because of a type checker bug
-
-where : Select a, Expr Bool -> Select a
+where : Select a, Expr PgBool * -> Select a
 where =
     clauses, (@Expr expr) <- updateClauses
     { clauses & where: List.prepend expr.sql (Raw " where ") }
@@ -188,23 +209,36 @@ limit =
     clauses, max <- updateClauses
     { clauses & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
 
-orderBy : Select a, List [Asc (Expr *), Desc (Expr *)] -> Select a
+
+Order := { sql: Sql, direction: [Asc, Desc] }
+
+asc : Expr (PgCmp *) * -> Order
+asc = \@Expr expr -> @Order { sql: expr.sql, direction: Asc }
+
+desc : Expr (PgCmp *) * -> Order
+desc = \@Expr expr -> @Order { sql: expr.sql, direction: Desc }
+
+orderBy : Select a, List Order -> Select a
 orderBy =
     clauses, order <- updateClauses
 
     sql =
         order
-        |> List.map \dir ->
-            when dir is
-                Asc (@Expr expr) ->
-                    expr.sql |> List.append (Raw " asc")
+        |> List.map \@Order level ->
+            direction = 
+                when level.direction is
+                    Asc ->
+                        " asc"
 
-                Desc (@Expr expr) ->
-                    expr.sql |> List.append (Raw " desc")
+                    Desc ->
+                        " desc"
+
+            level.sql |> List.append (Raw direction)
         |> commaJoin
         |> List.prepend (Raw " order by ")
 
     { clauses & orderBy: sql }
+
 
 updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
 updateClauses = \fn ->
@@ -217,7 +251,7 @@ updateClauses = \fn ->
 
 Selection a := {
     columns : List Sql,
-    decode : List (List U8) -> Result a Sql.Decode.DecodeErr,
+    decode : List (List U8) -> Result a Sql.Types.DecodeErr,
 }
 
 into : a -> Selection a
@@ -226,7 +260,7 @@ into = \value -> @Selection {
         decode: \_ -> Ok value,
     }
 
-column : Selection (a -> b), Expr a -> Selection b
+column : Selection (a -> b), Expr * a -> Selection b
 column = \@Selection sel, @Expr expr ->
     index = List.len sel.columns
 
@@ -237,7 +271,7 @@ column = \@Selection sel, @Expr expr ->
             |> Result.mapErr \OutOfBounds -> MissingColumn index
             |> Result.try
         a <- value
-            |> Sql.Decode.decode expr.decode
+            |> Sql.Types.decode expr.decode
             |> Result.map
         fn a
 
@@ -274,7 +308,7 @@ rowArray = \sel, @Query query ->
 
     (@Selection selection) = query.clauses.selection
 
-    decode = Sql.Decode.rowArray \items ->
+    decode = Sql.Types.rowArray \items ->
         List.mapTry items selection.decode
 
     expr = @Expr { sql: wrapped, decode }
@@ -290,7 +324,7 @@ map = \@Selection sel, fn ->
             |> Result.map fn,
     }
 
-just : Expr a -> Selection a
+just : Expr * a -> Selection a
 just = \@Expr expr ->
     @Selection {
         columns: [expr.sql],
@@ -300,129 +334,173 @@ just = \@Expr expr ->
                 |> Result.mapErr \ListWasEmpty -> MissingColumn 0
                 |> Result.try
 
-            Sql.Decode.decode value expr.decode,
+            Sql.Types.decode value expr.decode,
     }
 
 # Expr
 
-Expr a := {
+Expr pg roc := {
     sql : Sql,
-    decode : Decode a,
+    decode : Decode pg roc,
 }
 
-identifier : Str, Str, Decode a -> Expr a
+NullableExpr pg roc : Expr (Nullable pg) (Nullable roc)
+
+identifier : Str, Str, Decode pg roc -> Expr pg roc
 identifier = \table, col, decode -> @Expr {
         sql: [Raw "\(table).\(col)"],
         decode,
     }
 
-u8 : U8 -> Expr I16
-u8 = \value -> @Expr {
-        sql: [Param (Pg.Cmd.u8 value)],
-        decode: Sql.Decode.i16,
-    }
+# Expr: Literals
 
-i16 : I16 -> Expr I16
+i16 : I16 -> Expr PgI16 I16
 i16 = \value -> @Expr {
         sql: [Param (Pg.Cmd.i16 value)],
-        decode: Sql.Decode.i16,
+        decode: Sql.Types.i16,
     }
 
-i32 : I32 -> Expr I32
+i32 : I32 -> Expr PgI32 I32
 i32 = \value -> @Expr {
         sql: [Param (Pg.Cmd.i32 value)],
-        decode: Sql.Decode.i32,
+        decode: Sql.Types.i32,
     }
 
-i64 : I64 -> Expr I64
+i64 : I64 -> Expr PgI64 I64
 i64 = \value -> @Expr {
         sql: [Param (Pg.Cmd.i64 value)],
-        decode: Sql.Decode.i64,
+        decode: Sql.Types.i64,
     }
 
-
-str : Str -> Expr Str
+str : Str -> Expr PgText Str
 str = \value ->
     @Expr {
         sql: [Param (Pg.Cmd.str value)],
-        decode: Sql.Decode.str,
+        decode: Sql.Types.str,
     }
 
-null : Expr (Nullable *)
+null : NullableExpr * []
 null = @Expr {
     sql: [Raw "null"],
-    decode: Sql.Decode.nullable (Sql.Decode.fail "not null"),
+    decode: Sql.Types.nullable (Sql.Types.fail "not null"),
 }
 
-present : Expr a -> Expr (Nullable a)
+present : Expr pg roc -> NullableExpr pg roc
 present = \@Expr a ->
     @Expr {
         sql: a.sql,
-        decode: a.decode |> Sql.Decode.map Present,
+        decode: Sql.Types.nullable a.decode,
     }
 
-isNull : Expr (Nullable *) -> Expr Bool
+# Expr: Comparison
+
+isNull : NullableExpr * * -> Expr PgBool Bool
 isNull = \@Expr a ->
     @Expr {
         sql: a.sql |> List.append (Raw " is null"),
-        decode: Sql.Decode.bool,
+        decode: Sql.Types.bool,
     }
 
-isNotNull : Expr (Nullable *) -> Expr Bool
+isNotNull : NullableExpr * * -> Expr PgBool Bool
 isNotNull = \@Expr a ->
     @Expr {
         sql: a.sql |> List.append (Raw " is not null"),
-        decode: Sql.Decode.bool,
+        decode: Sql.Types.bool,
     }
 
-isDistinctFrom : Expr (Nullable a), Expr (Nullable a) -> Expr Bool
+isDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr PgBool Bool
 isDistinctFrom = \a, b -> boolOp a "is distinct from" b
 
-isNotDistinctFrom : Expr (Nullable a), Expr (Nullable a) -> Expr Bool
+isNotDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr PgBool Bool
 isNotDistinctFrom = \a, b -> boolOp a "is not distinct from" b
 
 nullableEq = isNotDistinctFrom
 
 nullableNeq = isDistinctFrom
 
-concat : Expr Str, Expr Str -> Expr Str
+concat : Expr PgText *, Expr PgText * -> Expr PgText Str
 concat = \@Expr a, @Expr b ->
     @Expr {
-        sql: a.sql
-        |> List.append (Raw " || ")
-        |> List.concat b.sql,
-        decode: Sql.Decode.str,
+        sql: binOp a.sql "||" b.sql,
+        decode: Sql.Types.str,
     }
 
-eq : Expr a, Expr a -> Expr Bool
+lt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+lt = \a, b -> boolOp a "<" b
+
+lte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+lte = \a, b -> boolOp a "<=" b
+
+eq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
 eq = \a, b -> boolOp a "=" b
 
-neq : Expr a, Expr a -> Expr Bool
+neq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
 neq = \a, b -> boolOp a "<>" b
 
-gt : Expr (Num a), Expr (Num a) -> Expr Bool
+gte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+gte = \a, b -> boolOp a ">=" b
+
+gt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
 gt = \a, b -> boolOp a ">" b
 
-boolOp : Expr a, Str, Expr a -> Expr Bool
+boolOp : Expr pg *, Str, Expr pg * -> Expr PgBool Bool
 boolOp = \@Expr a, op, @Expr b ->
     @Expr {
-        sql: a.sql
-        |> List.append (Raw " \(op) ")
-        |> List.concat b.sql,
-        decode: Sql.Decode.bool,
+        sql: binOp a.sql op b.sql,
+        decode: Sql.Types.bool,
     }
 
-and : Expr Bool, Expr Bool -> Expr Bool
+# Expr: Logical
+
+and : Expr PgBool *, Expr PgBool * -> Expr PgBool Bool
 and = \a, b -> boolOp a "and" b
 
-not : Expr Bool -> Expr Bool
-not = \@Expr a -> @Expr
-        { a &
-            sql: List.withCapacity (List.len a.sql + 2)
-            |> List.append (Raw "not (")
-            |> List.concat a.sql
-            |> List.append (Raw ")"),
-        }
+or : Expr PgBool *, Expr PgBool * -> Expr PgBool Bool
+or = \@Expr a, @Expr b ->
+    @Expr {
+        sql: binOpParens a.sql "or" b.sql,
+        decode: Sql.Types.bool,
+    }
+
+not : Expr PgBool * -> Expr PgBool Bool
+not = \@Expr a -> 
+    @Expr {
+        sql: [Raw "not ("]
+        |> List.reserve (List.len a.sql + 1)
+        |> List.concat a.sql
+        |> List.append (Raw ")"),
+        decode: Sql.Types.bool,
+    }
+
+# Expr: Num
+
+add : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
+add = \@Expr a, @Expr b ->
+    @Expr {
+        sql: binOpParens a.sql "+" b.sql,
+        decode: a.decode,
+    }
+
+sub : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
+sub = \@Expr a, @Expr b ->
+    @Expr {
+        sql: binOpParens a.sql "-" b.sql,
+        decode: a.decode,
+    }
+
+mul : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
+mul = \@Expr a, @Expr b ->
+    @Expr {
+        sql: binOp a.sql "*" b.sql,
+        decode: a.decode,
+    }
+
+div : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
+div = \@Expr a, @Expr b ->
+    @Expr {
+        sql: binOp a.sql "/" b.sql,
+        decode: a.decode,
+    }
 
 # Sql helpers
 
@@ -447,6 +525,20 @@ joinWith = \items, sep ->
 commaJoin : List Sql -> Sql
 commaJoin = \items ->
     joinWith items [Raw ", "]
+
+binOp = \a, op, b ->
+    a
+    |> List.reserve (List.len b + 1)
+    |> List.append (Raw " \(op) ")
+    |> List.concat b
+
+binOpParens = \a, op, b ->
+    [Raw "("]
+    |> List.reserve (List.len a + List.len b + 2)
+    |> List.concat a
+    |> List.append (Raw " \(op) ")
+    |> List.concat b
+    |> List.append (Raw ")")
 
 compileSql : Sql -> Compiled
 compileSql = \sql ->
@@ -494,10 +586,10 @@ addPart = \{ params, sql }, part ->
 #     schema: "public",
 #     name: "users",
 #     columns: \alias -> {
-#         name: identifier alias "name" Sql.Decode.text,
-#         active: identifier alias "active" Sql.Decode.bool,
-#         age: identifier alias "age" Sql.Decode.u8,
-#         organizationId: identifier alias "organization_id" Sql.Decode.u32,
+#         name: identifier alias "name" Sql.Types.text,
+#         active: identifier alias "active" Sql.Types.bool,
+#         age: identifier alias "age" Sql.Types.u8,
+#         organizationId: identifier alias "organization_id" Sql.Types.u32,
 #     },
 # }
 
@@ -505,8 +597,8 @@ addPart = \{ params, sql }, part ->
 #     schema: "public",
 #     name: "organizations",
 #     columns: \alias -> {
-#         id: identifier alias "id" Sql.Decode.u32,
-#         name: identifier alias "name" Sql.Decode.text,
+#         id: identifier alias "id" Sql.Types.u32,
+#         name: identifier alias "name" Sql.Types.text,
 #     },
 # }
 

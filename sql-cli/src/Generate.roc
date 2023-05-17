@@ -27,7 +27,7 @@ module = \schemaName, tables ->
         ] 
         imports [
             sql.Sql.{ identifier },
-            sql.Sql.Decode,
+            sql.Sql.Types,
         ]
 
     \(tableDefs)
@@ -58,9 +58,9 @@ columnField = \column ->
 
     decoder =
         if column.isNullable then
-            "(Sql.Decode.nullable Sql.Decode.\(typeDecoder))"
+            "(Sql.Types.nullable Sql.Types.\(typeDecoder))"
         else
-            "Sql.Decode.\(typeDecoder)"
+            "Sql.Types.\(typeDecoder)"
 
     "\(fieldName): identifier alias \"\(column.name)\" \(decoder),"
     |> indent 2
@@ -144,15 +144,15 @@ expect
             ] 
             imports [
                 sql.Sql.{ identifier },
-                sql.Sql.Decode,
+                sql.Sql.Types,
             ]
 
         products = {
             schema: "public",
             name: "products",
             columns: \\alias -> {
-                name: identifier alias "name" Sql.Decode.str,
-                price: identifier alias "price" (Sql.Decode.nullable Sql.Decode.dec),
+                name: identifier alias "name" Sql.Types.str,
+                price: identifier alias "price" (Sql.Types.nullable Sql.Types.dec),
             },
         }
 
@@ -160,8 +160,8 @@ expect
             schema: "public",
             name: "users",
             columns: \\alias -> {
-                id: identifier alias "id" Sql.Decode.i16,
-                active: identifier alias "active" Sql.Decode.bool,
+                id: identifier alias "id" Sql.Types.i16,
+                active: identifier alias "active" Sql.Types.bool,
             },
         }
         """

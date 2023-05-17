@@ -13,7 +13,7 @@ app "query"
         pg.Pg.Cmd,
         pg.Pg.Result,
         sql.Sql.{ from, select, where, join, into, eq, str, column, with, limit, orderBy },
-        sql.Sql.Decode.{ Nullable },
+        sql.Sql.Types.{ Nullable },
         Public,
     ]
     provides [main] to pf
@@ -35,7 +35,7 @@ customerQuery =
         |> with (selectAddress addr)
 
     select selection
-    |> orderBy [Asc fullName]
+    |> orderBy [Sql.asc fullName, Sql.desc customers.customerId]
     |> where (country.country |> eq (str "United States"))
     |> limit 10
 

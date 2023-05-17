@@ -1,5 +1,4 @@
-interface Sql.Decode
-    exposes [
+interface Sql.Types exposes [
         decode,
         Decode,
         DecodeErr,
@@ -18,10 +17,18 @@ interface Sql.Decode
         bool,
         unsupported,
         rowArray,
+        PgI16,
+        PgI32,
+        PgI64,
+        PgText,
+        PgBool,
+        PgCmp,
     ]
     imports []
 
-Decode a := List U8 -> Result a DecodeErr
+# Decoding
+
+Decode pg a := List U8 -> Result a DecodeErr
 
 DecodeErr : [
     InvalidUtf8,
@@ -31,22 +38,22 @@ DecodeErr : [
     Error Str,
 ]
 
-decode : List U8, Decode a -> Result a DecodeErr
+decode : List U8, Decode pg a -> Result a DecodeErr
 decode = \bytes, @Decode fn ->
     fn bytes
 
-map : Decode a, (a -> b) -> Decode b
+map : Decode pg a, (a -> b) -> Decode pg b
 map = \@Decode a, toB -> @Decode \bytes -> a bytes |> Result.map toB
 
-succeed : a -> Decode a
+succeed : a -> Decode pg a
 succeed = \value -> @Decode \_ -> Ok value
 
-fail : Str -> Decode a
+fail : Str -> Decode pg a
 fail = \message -> @Decode \_ -> Err (Error message)
 
 Nullable a : [Null, Present a]
 
-nullable : Decode a -> Decode (Nullable a)
+nullable : Decode pg a -> Decode (Nullable pg) (Nullable a)
 nullable = \@Decode sub ->
     bytes <- @Decode
 
@@ -56,20 +63,28 @@ nullable = \@Decode sub ->
         sub bytes
         |> Result.map Present
 
+i16 : Decode PgI16 I16
 i16 = textFormat Str.toI16
 
+i32 : Decode PgI32 I32
 i32 = textFormat Str.toI32
 
+i64 : Decode PgI64 I64
 i64 = textFormat Str.toI64
 
+f32 : Decode PgF32 F32
 f32 = textFormat Str.toF32
 
+f64 : Decode PgF64 F64
 f64 = textFormat Str.toF64
 
+dec : Decode (PgNum *) Dec
 dec = textFormat Str.toDec
 
+str : Decode PgText Str
 str = textFormat Ok
 
+bool : Decode PgBool Bool
 bool =
     bytes <- @Decode
 
@@ -109,7 +124,7 @@ row = \items ->
     |> Str.split ","
     |> List.map Str.toUtf8
 
-textFormat : (Str -> Result a DecodeErr) -> Decode a
+textFormat : (Str -> Result a DecodeErr) -> Decode pg a
 textFormat = \fn ->
     bytes <- @Decode
 
@@ -119,3 +134,19 @@ textFormat = \fn ->
 
         Err (BadUtf8 _ _) ->
             Err InvalidUtf8
+
+# Types
+
+PgCmp a : { eq : {} }a
+
+PgNum a : PgCmp { num : {} }a
+
+PgI16 : PgNum { i16 : {} }
+PgI32 : PgNum { i32 : {} }
+PgI64 : PgNum { i64 : {} }
+PgF32 : PgNum { f32 : {} }
+PgF64 : PgNum { f64 : {} }
+
+PgText : PgCmp { text : {} }
+
+PgBool : PgCmp { bool : {} }
