@@ -12,7 +12,7 @@ app "query"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, select, where, join, into, eq, str, column, with, limit, orderBy },
+        sql.Sql.{ from, select, where, join, on, into, eq, str, column, with, limit, orderBy },
         sql.Sql.Types.{ Nullable },
         Public,
     ]
@@ -20,9 +20,9 @@ app "query"
 
 customerQuery =
     customers <- from Public.customer
-    addr <- join Public.address \a -> a.addressId |> eq customers.addressId
-    cities <- join Public.city \c -> c.cityId |> eq addr.cityId
-    country <- join Public.country \c -> c.countryId |> eq cities.countryId
+    addr <- join Public.address (on .addressId customers.addressId)
+    cities <- join Public.city (on .cityId addr.cityId)
+    country <- join Public.country (on .countryId cities.countryId)
 
     fullName =
         customers.firstName

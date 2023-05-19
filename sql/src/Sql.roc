@@ -10,6 +10,7 @@ interface Sql
         identifier,
         where,
         join,
+        on,
         limit,
         orderBy,
         asc,
@@ -155,16 +156,16 @@ SelectClauses a : {
 }
 
 join : Table table, (table -> Expr PgBool *), (table -> Select a) -> Select a
-join = \table, on, next -> @Select \aliases -> joinHelp table on next aliases
+join = \table, onExpr, next -> @Select \aliases -> joinHelp table onExpr next aliases
 
-joinHelp = \table, on, next, aliases ->
+joinHelp = \table, onExpr, next, aliases ->
     { alias, newAliases } = joinAlias table.name aliases
 
     columns = table.columns alias
     (@Select toClauses) = next columns
     clauses = toClauses newAliases
 
-    (@Expr { sql: onSql }) = on columns
+    (@Expr { sql: onSql }) = onExpr columns
 
     joinSql =
         List.prepend onSql (Raw " join \(table.schema).\(table.name) as \(alias) on ")
@@ -188,6 +189,8 @@ joinAlias = \name, aliases ->
                 alias,
                 newAliases: Dict.insert aliases alias 1,
             }
+
+on = \toA, b -> \table -> toA table |> eq b
 
 select : Selection a -> Select a
 select = \selection ->
