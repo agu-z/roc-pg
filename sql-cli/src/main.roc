@@ -9,32 +9,40 @@ app "roc-sql"
         pf.Process,
         pf.Stdout,
         pf.Stderr,
+        pf.Arg,
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
         sql.Sql.{ from, select, where, eq, and, into, column, str, rowArray },
         Schema,
         Generate,
+
     ]
     provides [main] to pf
 
-task : Task {} _
-task =
+Options : {
+    host : Str,
+    port : I64,
+    user : Str,
+    database : Str,
+    schema : Str,
+}
+
+generate : Options -> Task {} _
+generate = \options ->
     client <- Pg.Client.withConnect {
-            host: "localhost",
-            port: 5432,
-            user: "postgres",
-            database: "pagalia",
+            host: options.host,
+            port: Num.toU16 options.port,
+            user: options.user,
+            database: options.database,
         }
 
-    schemaName = "public"
-
     tables <-
-        Sql.all (tablesQuery schemaName)
+        Sql.all (tablesQuery options.schema)
         |> Pg.Client.command client
         |> await
 
-    Stdout.line (Generate.module schemaName tables)
+    Stdout.line (Generate.module options.schema tables)
 
 tablesQuery = \schemaName ->
     tables <- from Schema.tables
@@ -61,20 +69,78 @@ columnsQuery = \tables ->
     |> select
     |> where (eq columns.tableName tables.name |> and (eq columns.schema tables.schema))
 
+argsParser : Arg.NamedParser Options
+argsParser =
+    Arg.succeed {
+        host: <-
+            Arg.strOption {
+                long: "host",
+                short: "h",
+                help: "database server host",
+            }
+            |> applyParser,
+        port: <-
+            Arg.i64Option {
+                long: "port",
+                short: "p",
+                help: "database server port",
+            }
+            |> applyParser,
+        user: <-
+            Arg.strOption {
+                long: "user",
+                short: "U",
+                help: "database user name",
+            }
+            |> applyParser,
+        database: <-
+            Arg.strOption {
+                long: "database",
+                short: "d",
+                help: "database name to connect to",
+            }
+            |> applyParser,
+        schema: <-
+            Arg.strOption {
+                long: "schema",
+                help: "specific schema to generate"
+            }
+            |> applyParser,
+    }
+    |> Arg.program {
+        name: "roc-sql",
+        help: "Generate Roc for your PostgreSQL schema",
+    }
+
+applyParser = \a -> \fn -> Arg.withParser fn a
+
 main : Task {} []
 main =
-    Task.attempt task \result ->
-        when result is
-            Ok _ ->
-                Process.exit 0
+    args <- Arg.list |> await
 
-            Err (TcpPerformErr (PgErr err)) ->
-                _ <- Stderr.line (Pg.Client.errorToStr err) |> await
-                Process.exit 2
+    when Arg.parseFormatted argsParser args is
+        Ok options ->
+            runGenerateTask options
 
-            Err err ->
-                dbg
-                    err
+        Err helpMenu ->
+            {} <- Stdout.line helpMenu |> Task.await
+            Process.exit 1
 
-                _ <- Stderr.line "Something went wrong" |> await
-                Process.exit 1
+runGenerateTask : Options -> Task {} []
+runGenerateTask = \options ->
+    result <- Task.attempt (generate options)
+
+    when result is
+        Ok _ ->
+            Process.exit 0
+
+        Err (TcpPerformErr (PgErr err)) ->
+            _ <- Stderr.line (Pg.Client.errorToStr err) |> await
+            Process.exit 2
+
+        Err err ->
+            dbg
+                err
+
+            _ <- Stderr.line "Something went wrong" |> await
+            Process.exit 1
