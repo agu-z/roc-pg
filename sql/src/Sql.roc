@@ -34,6 +34,7 @@ interface Sql
         neq,
         gt,
         gte,
+        in,
         concat,
         and,
         or,
@@ -205,15 +206,24 @@ select = \selection ->
 where : Select a, Expr PgBool * -> Select a
 where =
     clauses, (@Expr expr) <- updateClauses
-    { clauses & where: List.prepend expr.sql (Raw " where ") }
+
+    newWhere = 
+        if List.isEmpty clauses.where then 
+            List.prepend expr.sql (Raw " where ") 
+        else
+            clauses.where
+            |> List.reserve (List.len expr.sql + 1)
+            |> List.append (Raw " and ")
+            |> List.concat expr.sql
+    
+    { clauses & where: newWhere }
 
 limit : Select a, Nat -> Select a
 limit =
     clauses, max <- updateClauses
     { clauses & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
 
-
-Order := { sql: Sql, direction: [Asc, Desc] }
+Order := { sql : Sql, direction : [Asc, Desc] }
 
 asc : Expr (PgCmp *) * -> Order
 asc = \@Expr expr -> @Order { sql: expr.sql, direction: Asc }
@@ -228,7 +238,7 @@ orderBy =
     sql =
         order
         |> List.map \@Order level ->
-            direction = 
+            direction =
                 when level.direction is
                     Asc ->
                         " asc"
@@ -241,7 +251,6 @@ orderBy =
         |> List.prepend (Raw " order by ")
 
     { clauses & orderBy: sql }
-
 
 updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
 updateClauses = \fn ->
@@ -265,58 +274,58 @@ into = \value -> @Selection {
 
 column : Expr * a -> (Selection (a -> b) -> Selection b)
 column = \@Expr expr -> \@Selection sel ->
-    index = List.len sel.columns
+        index = List.len sel.columns
 
-    decode = \cells ->
-        fn <- sel.decode cells |> Result.try
-        value <- cells
-            |> List.get index
-            |> Result.mapErr \OutOfBounds -> MissingColumn index
-            |> Result.try
-        a <- value
-            |> Sql.Types.decode expr.decode
-            |> Result.map
-        fn a
+        decode = \cells ->
+            fn <- sel.decode cells |> Result.try
+            value <- cells
+                |> List.get index
+                |> Result.mapErr \OutOfBounds -> MissingColumn index
+                |> Result.try
+            a <- value
+                |> Sql.Types.decode expr.decode
+                |> Result.map
+            fn a
 
-    @Selection {
-        columns: sel.columns |> List.append expr.sql,
-        decode,
-    }
+        @Selection {
+            columns: sel.columns |> List.append expr.sql,
+            decode,
+        }
 
 with : Selection a -> (Selection (a -> b) -> Selection b)
 with = \@Selection aSel -> \@Selection fnSel ->
-    count = List.len fnSel.columns
+        count = List.len fnSel.columns
 
-    decode = \cells ->
-        fn <- fnSel.decode cells |> Result.try
-        a <- cells
-            |> List.drop count
-            |> aSel.decode
-            |> Result.map
-        fn a
+        decode = \cells ->
+            fn <- fnSel.decode cells |> Result.try
+            a <- cells
+                |> List.drop count
+                |> aSel.decode
+                |> Result.map
+            fn a
 
-    @Selection {
-        columns: fnSel.columns |> List.concat aSel.columns,
-        decode,
-    }
+        @Selection {
+            columns: fnSel.columns |> List.concat aSel.columns,
+            decode,
+        }
 
 rowArray : Query a -> (Selection (List a -> b) -> Selection b)
 rowArray = \@Query query -> \sel ->
-    sql = querySql (@Query query) RowArray
+        sql = querySql (@Query query) RowArray
 
-    wrapped =
-        [Raw "("]
-        |> List.concat sql
-        |> List.append (Raw ")")
+        wrapped =
+            [Raw "("]
+            |> List.concat sql
+            |> List.append (Raw ")")
 
-    (@Selection selection) = query.clauses.selection
+        (@Selection selection) = query.clauses.selection
 
-    decode = Sql.Types.rowArray \items ->
-        List.mapTry items selection.decode
+        decode = Sql.Types.rowArray \items ->
+            List.mapTry items selection.decode
 
-    expr = @Expr { sql: wrapped, decode }
+        expr = @Expr { sql: wrapped, decode }
 
-    (column expr) sel
+        (column expr) sel
 
 map : Selection a, (a -> b) -> Selection b
 map = \@Selection sel, fn ->
@@ -446,6 +455,29 @@ gte = \a, b -> boolOp a ">=" b
 gt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
 gt = \a, b -> boolOp a ">" b
 
+in : Expr (PgCmp a) *, (item -> Expr (PgCmp a) *), List item -> Expr PgBool Bool
+in = \@Expr needle, toExpr, haystack ->
+    itemToSql = \item ->
+        @Expr { sql } = toExpr item
+        sql
+
+    listItems = 
+        haystack 
+        |> List.map itemToSql
+        |> commaJoin
+
+    inSql =
+        needle.sql
+        |> List.reserve (List.len listItems + 2)
+        |> List.append (Raw " in (")
+        |> List.concat listItems
+        |> List.append (Raw ")")
+
+    @Expr { 
+        sql: inSql,
+        decode: Sql.Types.bool 
+    }
+
 boolOp : Expr pg *, Str, Expr pg * -> Expr PgBool Bool
 boolOp = \@Expr a, op, @Expr b ->
     @Expr {
@@ -466,7 +498,7 @@ or = \@Expr a, @Expr b ->
     }
 
 not : Expr PgBool * -> Expr PgBool Bool
-not = \@Expr a -> 
+not = \@Expr a ->
     @Expr {
         sql: [Raw "not ("]
         |> List.reserve (List.len a.sql + 1)
