@@ -103,7 +103,7 @@ argsParser =
         schema: <-
             Arg.strOption {
                 long: "schema",
-                help: "specific schema to generate"
+                help: "specific schema to generate",
             }
             |> applyParser,
     }

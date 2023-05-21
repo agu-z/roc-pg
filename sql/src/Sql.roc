@@ -4,7 +4,7 @@ interface Sql
         Expr,
         NullableExpr,
         all,
-        compile,
+        compileQuery,
         from,
         select,
         identifier,
@@ -47,8 +47,6 @@ interface Sql
         column,
         with,
         into,
-        just,
-        map,
         rowArray,
     ]
     imports [
@@ -67,68 +65,82 @@ interface Sql
         },
     ]
 
-Query a :=
-    # Only select for now
-    {
-        from : Sql,
-        clauses : SelectClauses a,
-    }
+Env : {
+    aliases : Dict Str U8,
+}
+
+emptyEnv : Env
+emptyEnv = {
+    aliases: Dict.withCapacity 4,
+}
+
+Query a := Env -> { from : Sql, clauses : SelectClauses a }
 
 Table table : {
     schema : Str,
     name : Str,
+    alias : Str,
     columns : Str -> table,
 }
 
 from : Table table, (table -> Select a) -> Query a
 from = \table, next ->
-    alias = initial table.name
-    usedAliases = Dict.withCapacity 4 |> Dict.insert alias 1
+    env <- @Query
 
+    (newEnv, alias) = addAlias env table.alias
     (@Select toClauses) = next (table.columns alias)
 
-    @Query {
+    {
         from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
-        clauses: toClauses usedAliases,
+        clauses: toClauses newEnv,
     }
 
-initial = \name ->
-    when name |> Str.graphemes |> List.first is
-        Ok char ->
-            char
+addAlias : Env, Str -> (Env, Str)
+addAlias = \env, wanted ->
+    when Dict.get env.aliases wanted is
+        Ok count ->
+            strCount = Num.toStr count
 
-        Err ListWasEmpty ->
-            ""
+            newEnv = { env &
+                aliases: env.aliases |> Dict.insert wanted (count + 1),
+            }
+
+            (newEnv, "\(wanted)_\(strCount)")
+
+        Err KeyNotFound ->
+            newEnv = { env &
+                aliases: env.aliases |> Dict.insert wanted 1,
+            }
+
+            (newEnv, wanted)
 
 all : Query a -> Pg.Cmd.Cmd _ _
-all = \@Query query ->
-    { sql, params } = compile (@Query query)
+all = \@Query toQuery ->
+    query = toQuery emptyEnv
+    { sql, params } = querySql query Bare |> compileSql
 
     Pg.Cmd.new sql
     |> Pg.Cmd.bind params
     |> Pg.Cmd.withCustomDecode \result ->
-        (@Selection selection) = query.clauses.selection
-
         cells <- Pg.Result.rows result |> List.mapTry
 
-        when selection.decode cells is
+        when query.clauses.decode cells is
             Ok value ->
                 Ok value
 
             Err err ->
                 Err (DecodeErr err)
 
-querySql = \@Query query, columnWrapper ->
-    (@Selection { columns }) = query.clauses.selection
-
+querySql : { from: _, clauses: SelectClauses a }, [Bare, RowArray] -> Sql
+querySql = \query, columnWrapper ->
     columnsSql =
         when columnWrapper is
             Bare ->
-                commaJoin columns
+                commaJoin query.clauses.columns
 
             RowArray ->
                 [Raw "array_agg(row("]
-                |> List.concat (commaJoin columns)
+                |> List.concat (commaJoin query.clauses.columns)
                 |> List.append (Raw "))")
 
     [Raw "select "]
@@ -140,31 +152,32 @@ querySql = \@Query query, columnWrapper ->
     |> List.concat query.clauses.orderBy
     |> List.concat query.clauses.limit
 
-compile = \query ->
-    querySql query Bare
+compileQuery = \@Query toQuery ->
+    querySql (toQuery emptyEnv) Bare
     |> compileSql
 
 # Clauses
 
-Select a := Dict Str U8 -> SelectClauses a
+Select a := Env -> SelectClauses a
 
 SelectClauses a : {
     joins : List Sql,
-    selection : Selection a,
+    columns: List Sql,
+    decode : List (List U8) -> Result a Sql.Types.DecodeErr,
     where : Sql,
     orderBy : Sql,
     limit : Sql,
 }
 
 join : Table table, (table -> Expr PgBool *), (table -> Select a) -> Select a
-join = \table, onExpr, next -> @Select \aliases -> joinHelp table onExpr next aliases
+join = \table, onExpr, next ->
+    env <- @Select
 
-joinHelp = \table, onExpr, next, aliases ->
-    { alias, newAliases } = joinAlias table.name aliases
-
+    (newEnv, alias) = addAlias env table.alias
     columns = table.columns alias
+
     (@Select toClauses) = next columns
-    clauses = toClauses newAliases
+    clauses = toClauses newEnv
 
     (@Expr { sql: onSql }) = onExpr columns
 
@@ -173,31 +186,17 @@ joinHelp = \table, onExpr, next, aliases ->
 
     { clauses & joins: clauses.joins |> List.prepend joinSql }
 
-joinAlias : Str, Dict Str U8 -> { alias : Str, newAliases : Dict Str U8 }
-joinAlias = \name, aliases ->
-    alias = initial name
-
-    when Dict.get aliases alias is
-        Ok count ->
-            strCount = Num.toStr count
-            {
-                alias: "\(alias)_\(strCount)",
-                newAliases: Dict.insert aliases alias (count + 1),
-            }
-
-        Err KeyNotFound ->
-            {
-                alias,
-                newAliases: Dict.insert aliases alias 1,
-            }
-
 on = \toA, b -> \table -> toA table |> eq b
 
 select : Selection a -> Select a
-select = \selection ->
-    @Select \_ -> {
+select = \@Selection toSelection ->
+    env <- @Select 
+    {columns, decode} = toSelection env
+    
+    {
         joins: List.withCapacity 4,
-        selection: selection,
+        columns,
+        decode,
         where: [],
         limit: [],
         orderBy: [],
@@ -207,15 +206,15 @@ where : Select a, Expr PgBool * -> Select a
 where =
     clauses, (@Expr expr) <- updateClauses
 
-    newWhere = 
-        if List.isEmpty clauses.where then 
-            List.prepend expr.sql (Raw " where ") 
+    newWhere =
+        if List.isEmpty clauses.where then
+            List.prepend expr.sql (Raw " where ")
         else
             clauses.where
             |> List.reserve (List.len expr.sql + 1)
             |> List.append (Raw " and ")
             |> List.concat expr.sql
-    
+
     { clauses & where: newWhere }
 
 limit : Select a, Nat -> Select a
@@ -255,99 +254,96 @@ orderBy =
 updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
 updateClauses = \fn ->
     \next, arg ->
-        @Select \aliases ->
+        @Select \env ->
             (@Select toClauses) = next
-            fn (toClauses aliases) arg
+            fn (toClauses env) arg
 
 # Selection
 
-Selection a := {
+Selection a := Env -> {
     columns : List Sql,
     decode : List (List U8) -> Result a Sql.Types.DecodeErr,
 }
 
+updateSelection = \fn -> \@Selection toSelection ->
+    env <- @Selection
+    fn (toSelection env)
+
 into : a -> Selection a
-into = \value -> @Selection {
+into = \value -> 
+    _ <- @Selection 
+    
+    {
         columns: [],
         decode: \_ -> Ok value,
     }
 
 column : Expr * a -> (Selection (a -> b) -> Selection b)
-column = \@Expr expr -> \@Selection sel ->
-        index = List.len sel.columns
+column = \@Expr expr ->
+    sel <- updateSelection
+    apExprSel expr sel
 
-        decode = \cells ->
-            fn <- sel.decode cells |> Result.try
-            value <- cells
-                |> List.get index
-                |> Result.mapErr \OutOfBounds -> MissingColumn index
-                |> Result.try
-            a <- value
-                |> Sql.Types.decode expr.decode
-                |> Result.map
-            fn a
+apExprSel = \expr, sel ->
+    index = List.len sel.columns
 
-        @Selection {
-            columns: sel.columns |> List.append expr.sql,
-            decode,
-        }
+    decode = \cells ->
+        fn <- sel.decode cells |> Result.try
+        value <- cells
+            |> List.get index
+            |> Result.mapErr \OutOfBounds -> MissingColumn index
+            |> Result.try
+        a <- value
+            |> Sql.Types.decode expr.decode
+            |> Result.map
+        fn a
+
+    {
+        columns: sel.columns |> List.append expr.sql,
+        decode,
+    }
 
 with : Selection a -> (Selection (a -> b) -> Selection b)
-with = \@Selection aSel -> \@Selection fnSel ->
-        count = List.len fnSel.columns
+with = \@Selection toASel -> \@Selection toFnSel ->
+    env <- @Selection
 
-        decode = \cells ->
-            fn <- fnSel.decode cells |> Result.try
-            a <- cells
-                |> List.drop count
-                |> aSel.decode
-                |> Result.map
-            fn a
+    aSel = toASel env
+    fnSel = toFnSel env
 
-        @Selection {
-            columns: fnSel.columns |> List.concat aSel.columns,
-            decode,
-        }
+    count = List.len fnSel.columns
+
+    decode = \cells ->
+        fn <- fnSel.decode cells |> Result.try
+        a <- cells
+            |> List.drop count
+            |> aSel.decode
+            |> Result.map
+        fn a
+
+    {
+        columns: fnSel.columns |> List.concat aSel.columns,
+        decode,
+    }
 
 rowArray : Query a -> (Selection (List a -> b) -> Selection b)
-rowArray = \@Query query -> \sel ->
-        sql = querySql (@Query query) RowArray
+rowArray = \@Query toQuery -> \@Selection toSel ->
+    env <- @Selection
 
-        wrapped =
-            [Raw "("]
-            |> List.concat sql
-            |> List.append (Raw ")")
+    query = toQuery env
 
-        (@Selection selection) = query.clauses.selection
+    sql = querySql query RowArray
 
-        decode = Sql.Types.rowArray \items ->
-            List.mapTry items selection.decode
+    wrapped =
+        [Raw "("]
+        |> List.concat sql
+        |> List.append (Raw ")")
 
-        expr = @Expr { sql: wrapped, decode }
+    decode = Sql.Types.rowArray \items ->
+        List.mapTry items query.clauses.decode
 
-        (column expr) sel
+    expr = { sql: wrapped, decode }
 
-map : Selection a, (a -> b) -> Selection b
-map = \@Selection sel, fn ->
-    @Selection {
-        columns: sel.columns,
-        decode: \cells -> cells
-            |> sel.decode
-            |> Result.map fn,
-    }
+    apExprSel expr (toSel env)
 
-just : Expr * a -> Selection a
-just = \@Expr expr ->
-    @Selection {
-        columns: [expr.sql],
-        decode: \cells ->
-            value <- cells
-                |> List.first
-                |> Result.mapErr \ListWasEmpty -> MissingColumn 0
-                |> Result.try
-
-            Sql.Types.decode value expr.decode,
-    }
 
 # Expr
 
@@ -458,11 +454,11 @@ gt = \a, b -> boolOp a ">" b
 in : Expr (PgCmp a) *, (item -> Expr (PgCmp a) *), List item -> Expr PgBool Bool
 in = \@Expr needle, toExpr, haystack ->
     itemToSql = \item ->
-        @Expr { sql } = toExpr item
+        (@Expr { sql }) = toExpr item
         sql
 
-    listItems = 
-        haystack 
+    listItems =
+        haystack
         |> List.map itemToSql
         |> commaJoin
 
@@ -473,9 +469,9 @@ in = \@Expr needle, toExpr, haystack ->
         |> List.concat listItems
         |> List.append (Raw ")")
 
-    @Expr { 
+    @Expr {
         sql: inSql,
-        decode: Sql.Types.bool 
+        decode: Sql.Types.bool,
     }
 
 boolOp : Expr pg *, Str, Expr pg * -> Expr PgBool Bool

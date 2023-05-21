@@ -5,6 +5,7 @@ interface Schema
 tables = {
     schema: "information_schema",
     name: "tables",
+    alias: "t",
     columns: \alias -> {
         name: Sql.identifier alias "table_name" Sql.Types.str,
         schema: Sql.identifier alias "table_schema" Sql.Types.str,
@@ -14,6 +15,7 @@ tables = {
 columns = {
     schema: "information_schema",
     name: "columns",
+    alias: "c",
     columns: \alias -> {
         tableName: Sql.identifier alias "table_name" Sql.Types.str,
         schema: Sql.identifier alias "table_schema" Sql.Types.str,

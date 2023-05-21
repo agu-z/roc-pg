@@ -77,7 +77,7 @@ task =
         |> Pg.Client.command client
         |> await
 
-    sqlStr = (Sql.compile customerQuery).sql
+    sqlStr = (Sql.compileQuery customerQuery).sql
 
     _ <- Stdout.line "\(sqlStr)\n" |> await
 

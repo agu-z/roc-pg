@@ -41,10 +41,13 @@ tableDef = \table ->
         |> List.map columnField
         |> Str.joinWith "\n"
 
+    alias = SanitizeName.tableAlias table.name
+
     """
     \(defName) = {
         schema: "\(table.schema)",
         name: "\(table.name)",
+        alias: "\(alias)",
         columns: \\alias -> {
     \(columnsRecord)
         },

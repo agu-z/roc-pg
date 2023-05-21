@@ -1,4 +1,4 @@
-interface SanitizeName exposes [module, def] imports []
+interface SanitizeName exposes [module, def, tableAlias] imports []
 
 def : Str -> Str
 def = \name ->
@@ -58,6 +58,33 @@ module = pascalCase
 expect module "product_users" == "ProductUsers"
 expect module "order_Products" == "OrderProducts"
 expect module "123" == "N123"
+
+tableAlias : Str -> Str
+tableAlias = \name ->
+    # TODO: Handle camelCase input
+    name
+    |> Str.split "_"
+    |> List.map \word ->
+        utf8 =
+            word
+            |> Str.toUtf8
+            |> List.keepIf isAlphaNum
+
+        when utf8 is
+            [initial, ..] ->
+                initial
+                |> toLower
+                |> List.single
+                |> Str.fromUtf8
+                |> Result.withDefault ""
+
+            _ ->
+                ""
+    |> Str.joinWith ""
+
+expect tableAlias "Users" == "u"
+expect tableAlias "product_users" == "pu"
+
 
 caseDiff : U8
 caseDiff = 'a' - 'A'
