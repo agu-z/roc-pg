@@ -98,7 +98,14 @@ bool =
         _ ->
             Err (InvalidBool bytes)
 
-unsupported = @Decode \bytes -> Ok (Unsupported bytes)
+unsupported = \typeName ->
+    bytes <- @Decode
+    
+    Unsupported {
+        bytes,
+        typeName
+    }
+    |> Ok
 
 rowArray = \cb ->
     arr <- textFormat

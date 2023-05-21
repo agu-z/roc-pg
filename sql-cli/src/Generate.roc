@@ -57,43 +57,49 @@ tableDef = \table ->
 columnField = \column ->
     fieldName = SanitizeName.def column.name
 
-    typeDecoder = decoderName column.dataType
+    typeDecoder = 
+        when decoderName column.dataType is
+            Ok name ->
+                "Sql.Types.\(name)"
+
+            Err Unsupported ->
+                "(Sql.Types.unsupported \"\(column.dataType)\")"
 
     decoder =
         if column.isNullable then
-            "(Sql.Types.nullable Sql.Types.\(typeDecoder))"
+            "(Sql.Types.nullable \(typeDecoder))"
         else
-            "Sql.Types.\(typeDecoder)"
+            typeDecoder
 
     "\(fieldName): identifier alias \"\(column.name)\" \(decoder),"
     |> indent 2
 
-decoderName : Str -> Str
+decoderName : Str -> Result Str [Unsupported]
 decoderName = \sqlType ->
     when sqlType is
-        "smallint" | "smallserial" ->
-            "i16"
+        "int2" ->
+            Ok "i16"
 
-        "integer" | "serial" | "oid" | "xid" ->
-            "i32"
+        "int4" | "oid" | "xid" ->
+            Ok "i32"
 
-        "bigint" | "bigserial" ->
-            "i64"
+        "int8" ->
+            Ok "i64"
 
-        "real" ->
-            "f32"
+        "float4" ->
+            Ok "f32"
 
-        "double precision" ->
-            "f64"
+        "float8" ->
+            Ok "f64"
 
         "numeric" ->
-            "dec"
+            Ok "dec"
 
-        "text" | "character varying" | "character" | "name" ->
-            "str"
+        "text" | "char" | "name" ->
+            Ok "str"
 
-        "boolean" ->
-            "bool"
+        "bool" ->
+            Ok "bool"
 
         _ ->
             # TODO:
@@ -109,7 +115,7 @@ decoderName = \sqlType ->
             # - json
             # - arrays
             # - composite
-            "unsupported"
+            Err Unsupported
 
 indent : Str, Nat -> Str
 indent = \line, count ->

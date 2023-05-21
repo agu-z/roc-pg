@@ -13,8 +13,8 @@ app "roc-sql"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, select, where, eq, and, into, column, str, rowArray },
-        Schema,
+        sql.Sql.{ from, join, on, select, where, eq, gt, not, into, column, in, str, i16, rowArray },
+        PgCatalog,
         Generate,
 
     ]
@@ -41,33 +41,45 @@ generate = \options ->
         Sql.all (tablesQuery options.schema)
         |> Pg.Client.command client
         |> await
-
+        
     Stdout.line (Generate.module options.schema tables)
 
 tablesQuery = \schemaName ->
-    tables <- from Schema.tables
+    tables <- from PgCatalog.pgClass
+    schema <- join PgCatalog.pgNamespace (on .oid tables.relnamespace)
 
     into {
-        name: <- column tables.name,
-        schema: <- column tables.schema,
+        name: <- column tables.relname,
+        schema: <- column schema.nspname,
         columns: <- rowArray (columnsQuery tables),
     }
     |> select
-    |> where (tables.schema |> eq (str schemaName))
+    |> where (schema.nspname |> eq (str schemaName))
+    |> where
+        (
+            tables.relkind
+            |> in str [
+                "r", # ordinary table
+                "v", # view
+                "m", # materialized view
+                "f", # foreign table
+                "p", # partitioned table
+            ]
+        )
 
 columnsQuery = \tables ->
-    columns <- from Schema.columns
+    columns <- from PgCatalog.pgAttribute
+    typ <- join PgCatalog.pgType (on .oid columns.atttypid)
 
     into {
-        name: <- column columns.name,
-        dataType: <- column columns.dataType,
-        isNullable: <-
-            columns.isNullable
-            |> eq (str "YES")
-            |> column,
+        name: <- column columns.attname,
+        dataType: <- column typ.typname,
+        isNullable: <- column (not columns.attnotnull)
     }
     |> select
-    |> where (eq columns.tableName tables.name |> and (eq columns.schema tables.schema))
+    |> where (tables.oid |> eq columns.attrelid)
+    |> where (not columns.attisdropped)
+    |> where (columns.attnum |> gt (i16 0))
 
 argsParser : Arg.NamedParser Options
 argsParser =
