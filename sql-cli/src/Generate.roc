@@ -74,7 +74,7 @@ decoderName = \sqlType ->
         "smallint" | "smallserial" ->
             "i16"
 
-        "integer" | "serial" ->
+        "integer" | "serial" | "oid" | "xid" ->
             "i32"
 
         "bigint" | "bigserial" ->
@@ -89,7 +89,7 @@ decoderName = \sqlType ->
         "numeric" ->
             "dec"
 
-        "text" | "character varying" | "character" ->
+        "text" | "character varying" | "character" | "name" ->
             "str"
 
         "boolean" ->
