@@ -85,7 +85,6 @@ tableAlias = \name ->
 expect tableAlias "Users" == "u"
 expect tableAlias "product_users" == "pu"
 
-
 caseDiff : U8
 caseDiff = 'a' - 'A'
 

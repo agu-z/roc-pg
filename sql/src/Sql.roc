@@ -131,7 +131,7 @@ all = \@Query toQuery ->
             Err err ->
                 Err (DecodeErr err)
 
-querySql : { from: _, options: SelectOptions a }, [Bare, RowArray] -> Sql
+querySql : { from : _, options : SelectOptions a }, [Bare, RowArray] -> Sql
 querySql = \query, columnWrapper ->
     columnsSql =
         when columnWrapper is
@@ -162,7 +162,7 @@ Select a := Env -> SelectOptions a
 
 SelectOptions a : {
     joins : List Sql,
-    columns: List Sql,
+    columns : List Sql,
     decode : List (List U8) -> Result a Sql.Types.DecodeErr,
     where : Sql,
     orderBy : Sql,
@@ -190,9 +190,9 @@ on = \toA, b -> \table -> toA table |> eq b
 
 select : Selection a -> Select a
 select = \@Selection toSelection ->
-    env <- @Select 
-    {columns, decode} = toSelection env
-    
+    env <- @Select
+    { columns, decode } = toSelection env
+
     {
         joins: List.withCapacity 4,
         columns,
@@ -260,19 +260,20 @@ updateOptions = \fn ->
 
 # Selection
 
-Selection a := Env -> {
-    columns : List Sql,
-    decode : List (List U8) -> Result a Sql.Types.DecodeErr,
-}
+Selection a := Env
+    -> {
+        columns : List Sql,
+        decode : List (List U8) -> Result a Sql.Types.DecodeErr,
+    }
 
 updateSelection = \fn -> \@Selection toSelection ->
-    env <- @Selection
-    fn (toSelection env)
+        env <- @Selection
+        fn (toSelection env)
 
 into : a -> Selection a
-into = \value -> 
-    _ <- @Selection 
-    
+into = \value ->
+    _ <- @Selection
+
     {
         columns: [],
         decode: \_ -> Ok value,
@@ -304,46 +305,45 @@ apExprSel = \expr, sel ->
 
 with : Selection a -> (Selection (a -> b) -> Selection b)
 with = \@Selection toASel -> \@Selection toFnSel ->
-    env <- @Selection
+        env <- @Selection
 
-    aSel = toASel env
-    fnSel = toFnSel env
+        aSel = toASel env
+        fnSel = toFnSel env
 
-    count = List.len fnSel.columns
+        count = List.len fnSel.columns
 
-    decode = \cells ->
-        fn <- fnSel.decode cells |> Result.try
-        a <- cells
-            |> List.drop count
-            |> aSel.decode
-            |> Result.map
-        fn a
+        decode = \cells ->
+            fn <- fnSel.decode cells |> Result.try
+            a <- cells
+                |> List.drop count
+                |> aSel.decode
+                |> Result.map
+            fn a
 
-    {
-        columns: fnSel.columns |> List.concat aSel.columns,
-        decode,
-    }
+        {
+            columns: fnSel.columns |> List.concat aSel.columns,
+            decode,
+        }
 
 rowArray : Query a -> (Selection (List a -> b) -> Selection b)
 rowArray = \@Query toQuery -> \@Selection toSel ->
-    env <- @Selection
+        env <- @Selection
 
-    query = toQuery env
+        query = toQuery env
 
-    sql = querySql query RowArray
+        sql = querySql query RowArray
 
-    wrapped =
-        [Raw "("]
-        |> List.concat sql
-        |> List.append (Raw ")")
+        wrapped =
+            [Raw "("]
+            |> List.concat sql
+            |> List.append (Raw ")")
 
-    decode = Sql.Types.rowArray \items ->
-        List.mapTry items query.options.decode
+        decode = Sql.Types.rowArray \items ->
+            List.mapTry items query.options.decode
 
-    expr = { sql: wrapped, decode }
+        expr = { sql: wrapped, decode }
 
-    apExprSel expr (toSel env)
-
+        apExprSel expr (toSel env)
 
 # Expr
 

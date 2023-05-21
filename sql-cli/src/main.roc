@@ -41,7 +41,7 @@ generate = \options ->
         Sql.all (tablesQuery options.schema)
         |> Pg.Client.command client
         |> await
-        
+
     Stdout.line (Generate.module options.schema tables)
 
 tablesQuery = \schemaName ->
@@ -74,11 +74,11 @@ columnsQuery = \tables ->
     into {
         name: <- column columns.attname,
         dataType: <- column typ.typname,
-        isNullable: <- column (not columns.attnotnull)
+        isNullable: <- column (not columns.attnotnull),
     }
     |> select
-    |> where (tables.oid |> eq columns.attrelid)
-    |> where (not columns.attisdropped)
+    |> where (tables.oid |> eq columns.attrelid) # exclude dropped columns
+    |> where (not columns.attisdropped) # exclude system columns
     |> where (columns.attnum |> gt (i16 0))
 
 argsParser : Arg.NamedParser Options

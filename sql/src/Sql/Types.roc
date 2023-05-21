@@ -100,10 +100,10 @@ bool =
 
 unsupported = \typeName ->
     bytes <- @Decode
-    
+
     Unsupported {
         bytes,
-        typeName
+        typeName,
     }
     |> Ok
 
