@@ -7,7 +7,7 @@ Interface with PostgreSQL databases from pure Roc.
 Connecting and performing a query
 
 ```haskell
-task : Task (List { name: Str, price: U32 }) _
+task : Task (List { name: Str, price: Dec }) _
 task =
     client <- Pg.Client.withConnect {
               host: "localhost",
@@ -21,7 +21,7 @@ task =
     |> Pg.Cmd.expectN
         (Pg.Result.succeed (\name -> \price -> { name, price })
             |> Pg.Result.with (Pg.Result.str "name")
-            |> Pg.Result.with (Pg.Result.u32 "price")
+            |> Pg.Result.with (Pg.Result.dec "price")
         )
     |> Pg.Client.command client
 ```
@@ -37,7 +37,7 @@ Pg.Cmd.new "select name, price from products where id = $1"
 |> Pg.Cmd.expect1
     (Pg.Result.succeed (\name -> \price -> { name, price })
         |> Pg.Result.with (Pg.Result.str "name")
-        |> Pg.Result.with (Pg.Result.u32 "price")
+        |> Pg.Result.with (Pg.Result.dec "price")
     )
 |> Pg.Client.command client
 ```
@@ -89,7 +89,7 @@ Pg.Batch.succeed (\email -> \products -> { email, products })
         |> Pg.Cmd.expectN
             (Pg.Result.succeed (\name -> \price -> { name, price })
                 |> Pg.Result.with (Pg.Result.str "name")
-                |> Pg.Result.with (Pg.Result.u32 "price")
+                |> Pg.Result.with (Pg.Result.dec "price")
             )
     )
 |> Pg.Client.batch client
