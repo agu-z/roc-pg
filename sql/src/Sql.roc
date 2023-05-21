@@ -74,7 +74,7 @@ emptyEnv = {
     aliases: Dict.withCapacity 4,
 }
 
-Query a := Env -> { from : Sql, clauses : SelectClauses a }
+Query a := Env -> { from : Sql, options : SelectOptions a }
 
 Table table : {
     schema : Str,
@@ -88,11 +88,11 @@ from = \table, next ->
     env <- @Query
 
     (newEnv, alias) = addAlias env table.alias
-    (@Select toClauses) = next (table.columns alias)
+    (@Select toOptions) = next (table.columns alias)
 
     {
         from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
-        clauses: toClauses newEnv,
+        options: toOptions newEnv,
     }
 
 addAlias : Env, Str -> (Env, Str)
@@ -124,43 +124,43 @@ all = \@Query toQuery ->
     |> Pg.Cmd.withCustomDecode \result ->
         cells <- Pg.Result.rows result |> List.mapTry
 
-        when query.clauses.decode cells is
+        when query.options.decode cells is
             Ok value ->
                 Ok value
 
             Err err ->
                 Err (DecodeErr err)
 
-querySql : { from: _, clauses: SelectClauses a }, [Bare, RowArray] -> Sql
+querySql : { from: _, options: SelectOptions a }, [Bare, RowArray] -> Sql
 querySql = \query, columnWrapper ->
     columnsSql =
         when columnWrapper is
             Bare ->
-                commaJoin query.clauses.columns
+                commaJoin query.options.columns
 
             RowArray ->
                 [Raw "array_agg(row("]
-                |> List.concat (commaJoin query.clauses.columns)
+                |> List.concat (commaJoin query.options.columns)
                 |> List.append (Raw "))")
 
     [Raw "select "]
     |> List.reserve 16
     |> List.concat columnsSql
     |> List.concat query.from
-    |> List.concat (List.join query.clauses.joins)
-    |> List.concat query.clauses.where
-    |> List.concat query.clauses.orderBy
-    |> List.concat query.clauses.limit
+    |> List.concat (List.join query.options.joins)
+    |> List.concat query.options.where
+    |> List.concat query.options.orderBy
+    |> List.concat query.options.limit
 
 compileQuery = \@Query toQuery ->
     querySql (toQuery emptyEnv) Bare
     |> compileSql
 
-# Clauses
+# Options
 
-Select a := Env -> SelectClauses a
+Select a := Env -> SelectOptions a
 
-SelectClauses a : {
+SelectOptions a : {
     joins : List Sql,
     columns: List Sql,
     decode : List (List U8) -> Result a Sql.Types.DecodeErr,
@@ -176,15 +176,15 @@ join = \table, onExpr, next ->
     (newEnv, alias) = addAlias env table.alias
     columns = table.columns alias
 
-    (@Select toClauses) = next columns
-    clauses = toClauses newEnv
+    (@Select toOptions) = next columns
+    options = toOptions newEnv
 
     (@Expr { sql: onSql }) = onExpr columns
 
     joinSql =
         List.prepend onSql (Raw " join \(table.schema).\(table.name) as \(alias) on ")
 
-    { clauses & joins: clauses.joins |> List.prepend joinSql }
+    { options & joins: options.joins |> List.prepend joinSql }
 
 on = \toA, b -> \table -> toA table |> eq b
 
@@ -204,23 +204,23 @@ select = \@Selection toSelection ->
 
 where : Select a, Expr PgBool * -> Select a
 where =
-    clauses, (@Expr expr) <- updateClauses
+    options, (@Expr expr) <- updateOptions
 
     newWhere =
-        if List.isEmpty clauses.where then
+        if List.isEmpty options.where then
             List.prepend expr.sql (Raw " where ")
         else
-            clauses.where
+            options.where
             |> List.reserve (List.len expr.sql + 1)
             |> List.append (Raw " and ")
             |> List.concat expr.sql
 
-    { clauses & where: newWhere }
+    { options & where: newWhere }
 
 limit : Select a, Nat -> Select a
 limit =
-    clauses, max <- updateClauses
-    { clauses & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
+    options, max <- updateOptions
+    { options & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
 
 Order := { sql : Sql, direction : [Asc, Desc] }
 
@@ -232,7 +232,7 @@ desc = \@Expr expr -> @Order { sql: expr.sql, direction: Desc }
 
 orderBy : Select a, List Order -> Select a
 orderBy =
-    clauses, order <- updateClauses
+    options, order <- updateOptions
 
     sql =
         order
@@ -249,14 +249,14 @@ orderBy =
         |> commaJoin
         |> List.prepend (Raw " order by ")
 
-    { clauses & orderBy: sql }
+    { options & orderBy: sql }
 
-updateClauses : (SelectClauses a, arg -> SelectClauses b) -> (Select a, arg -> Select b)
-updateClauses = \fn ->
+updateOptions : (SelectOptions a, arg -> SelectOptions b) -> (Select a, arg -> Select b)
+updateOptions = \fn ->
     \next, arg ->
         @Select \env ->
-            (@Select toClauses) = next
-            fn (toClauses env) arg
+            (@Select toOptions) = next
+            fn (toOptions env) arg
 
 # Selection
 
@@ -338,7 +338,7 @@ rowArray = \@Query toQuery -> \@Selection toSel ->
         |> List.append (Raw ")")
 
     decode = Sql.Types.rowArray \items ->
-        List.mapTry items query.clauses.decode
+        List.mapTry items query.options.decode
 
     expr = { sql: wrapped, decode }
 
