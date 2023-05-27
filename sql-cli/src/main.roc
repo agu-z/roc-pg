@@ -38,7 +38,7 @@ generate = \options ->
         }
 
     tables <-
-        Sql.all (tablesQuery options.schema)
+        Sql.queryAll (tablesQuery options.schema)
         |> Pg.Client.command client
         |> await
 

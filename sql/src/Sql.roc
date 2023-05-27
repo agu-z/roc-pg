@@ -3,7 +3,8 @@ interface Sql
         Table,
         Expr,
         NullableExpr,
-        all,
+        queryAll,
+        queryOne,
         compileQuery,
         from,
         select,
@@ -114,8 +115,8 @@ addAlias = \env, wanted ->
 
             (newEnv, wanted)
 
-all : Query a -> Pg.Cmd.Cmd _ _
-all = \@Query toQuery ->
+queryAll : Query a -> Pg.Cmd.Cmd _ _
+queryAll = \@Query toQuery ->
     query = toQuery emptyEnv
     { sql, params } = querySql query Bare |> compileSql
 
@@ -124,12 +125,28 @@ all = \@Query toQuery ->
     |> Pg.Cmd.withCustomDecode \result ->
         cells <- Pg.Result.rows result |> List.mapTry
 
-        when query.options.decode cells is
-            Ok value ->
-                Ok value
+        cells
+        |> query.options.decode 
+        |> Result.mapErr DecodeErr
 
-            Err err ->
-                Err (DecodeErr err)
+queryOne : Query a -> Pg.Cmd.Cmd _ _
+queryOne = \@Query toQuery ->
+    query = toQuery emptyEnv
+    { sql, params } = querySql query Bare |> compileSql
+
+    Pg.Cmd.new sql
+    |> Pg.Cmd.bind params
+    |> Pg.Cmd.withCustomDecode \result ->
+        rows = Pg.Result.rows result
+
+        when rows |> List.takeFirst 1 is 
+            [cells] ->
+                cells
+                |> query.options.decode 
+                |> Result.mapErr DecodeErr
+
+            _ ->
+                Err EmptyResult
 
 querySql : { from : _, options : SelectOptions a }, [Bare, RowArray] -> Sql
 querySql = \query, columnWrapper ->

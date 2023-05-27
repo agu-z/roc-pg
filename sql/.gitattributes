@@ -1,2 +1,2 @@
-examples/Public.roc linguist-generated=true
-examples/Public.roc -diff
+examples/VideoRental.roc linguist-generated=true
+examples/VideoRental.roc -diff

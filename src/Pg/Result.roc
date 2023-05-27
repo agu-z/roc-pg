@@ -24,6 +24,7 @@ interface Pg.Result
         dec,
         nat,
         with,
+        apply,
         succeed,
     ]
     imports [Protocol.Backend]
@@ -134,3 +135,5 @@ succeed = \value ->
     @Decode \_ -> Ok \_ -> Ok value
 
 with = \a, b -> map2 a b (\fn, val -> fn val)
+
+apply = \a -> \fn -> with fn a
