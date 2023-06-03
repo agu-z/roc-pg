@@ -1,4 +1,13 @@
-interface SanitizeName exposes [module, def, tableAlias] imports []
+interface Name
+    exposes [
+        module,
+        def,
+        tableAlias,
+        sqlName,
+    ]
+    imports [
+        Keyword,
+    ]
 
 def : Str -> Str
 def = \name ->
@@ -84,6 +93,63 @@ tableAlias = \name ->
 
 expect tableAlias "Users" == "u"
 expect tableAlias "product_users" == "pu"
+
+sqlName : Str -> Str
+sqlName = \value ->
+    if isValidSqlName value then
+        quote value
+    else
+        value
+        |> sqlQuote
+        |> quote
+
+quote : Str -> Str
+quote = \value ->
+    "\"\(value)\""
+
+sqlQuote : Str -> Str
+sqlQuote = \value ->
+    doubled =
+        value
+        |> Str.replaceEach "\"" "\\\"\\\""
+        |> Result.withDefault value
+
+    "\\\"\(doubled)\\\""
+
+expect sqlName "products" == "\"products\""
+expect sqlName "product_orders" == "\"product_orders\""
+expect sqlName "p2" == "\"p2\""
+expect sqlName "2p" == "\"\\\"2p\\\"\""
+expect sqlName "productOrders" == "\"\\\"productOrders\\\"\""
+expect sqlName "where" == "\"\\\"where\\\"\""
+expect sqlName "users_where" == "\"users_where\""
+expect sqlName "class-name" == "\"\\\"class-name\\\"\""
+expect
+    generated = sqlName "User \"Bond\""
+
+    expected =
+        """
+        "\\"User \\"\\"Bond\\"\\"\\""
+        """
+    generated == expected
+
+isValidSqlName : Str -> Bool
+isValidSqlName = \value ->
+    bytes = Str.toUtf8 value
+
+    when bytes is
+        [] ->
+            Bool.false
+
+        [first, ..] ->
+            (isLowerAlpha first || first == '_')
+            && (
+                bytes
+                |> List.dropFirst
+                |> List.all \char ->
+                    isLowerAlpha char || char == '_' || isNumeric char
+            )
+            && !(Keyword.isReserved bytes)
 
 caseDiff : U8
 caseDiff = 'a' - 'A'

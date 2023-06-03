@@ -126,7 +126,7 @@ queryAll = \@Query toQuery ->
         cells <- Pg.Result.rows result |> List.mapTry
 
         cells
-        |> query.options.decode 
+        |> query.options.decode
         |> Result.mapErr DecodeErr
 
 queryOne : Query a -> Pg.Cmd.Cmd _ _
@@ -139,10 +139,10 @@ queryOne = \@Query toQuery ->
     |> Pg.Cmd.withCustomDecode \result ->
         rows = Pg.Result.rows result
 
-        when rows |> List.takeFirst 1 is 
+        when rows |> List.takeFirst 1 is
             [cells] ->
                 cells
-                |> query.options.decode 
+                |> query.options.decode
                 |> Result.mapErr DecodeErr
 
             _ ->

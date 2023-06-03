@@ -14,20 +14,20 @@ app "rental"
         pg.Pg.Client,
         pg.Pg.Result,
         Json,
-        sql.Sql.{select, into, from, column, where, eq, i32, join, on},
-        sql.Sql.Types.{Nullable},
-        VideoRental
+        sql.Sql.{ select, into, from, column, where, eq, i32, join, on },
+        sql.Sql.Types.{ Nullable },
+        VideoRental,
     ]
     provides [main] to pf
 
 printCustomer : I32 -> Task {} [TcpConnectErr _, TcpPerformErr _]
 printCustomer = \customerId ->
     client <- Pg.Client.withConnect {
-        host: "localhost",
-        port: 5432,
-        user: "postgres",
-        database: "video_rental",
-    }
+            host: "localhost",
+            port: 5432,
+            user: "postgres",
+            database: "video_rental",
+        }
 
     query =
         customer <- from VideoRental.customer
@@ -35,7 +35,7 @@ printCustomer = \customerId ->
         store <- join VideoRental.store (on .storeId customer.storeId)
         storeAddr <- join VideoRental.address (on .addressId store.addressId)
 
-        fullName = 
+        fullName =
             customer.firstName
             |> Sql.concat (Sql.str " ")
             |> Sql.concat customer.lastName
@@ -50,13 +50,12 @@ printCustomer = \customerId ->
 
     _ <- logSql query |> await
 
-    data <- 
+    data <-
         Sql.queryOne query
-        |> Pg.Client.command client 
+        |> Pg.Client.command client
         |> await
 
     printJson data
-
 
 Address : {
     line1 : Str,
@@ -72,22 +71,21 @@ selectAddress = \table ->
         postalCode: <- table.postalCode |> column,
     }
 
-
 main : Task {} []
 main =
     args <- Arg.list |> await
 
     argsResult =
-        Arg.i64Option { 
-            long: "customer" 
+        Arg.i64Option {
+            long: "customer",
         }
         |> Arg.program {
-            name: "video-rental"
+            name: "video-rental",
         }
         |> Arg.parseFormatted args
 
     when argsResult is
-        Ok customerId -> 
+        Ok customerId ->
             customerId
             |> Num.toI32
             |> printCustomer
@@ -97,8 +95,7 @@ main =
             _ <- Stdout.line helpMenu |> Task.await
             Process.exit 1
 
-
-handlePgTask : Task {} [TcpConnectErr _, TcpPerformErr _] ->  Task {} []
+handlePgTask : Task {} [TcpConnectErr _, TcpPerformErr _] -> Task {} []
 handlePgTask = \task ->
     result <- Task.attempt task
 
@@ -111,7 +108,9 @@ handlePgTask = \task ->
             Process.exit 2
 
         Err err ->
-            dbg err
+            dbg
+                err
+
             _ <- Stderr.line "Something went wrong" |> await
             Process.exit 3
 
@@ -119,8 +118,7 @@ printJson = \value ->
     Encode.toBytes value Json.json
     |> Str.fromUtf8
     |> Result.withDefault ""
-    |> Stdout.line 
-
+    |> Stdout.line
 
 logSql = \query ->
     sqlStr = (Sql.compileQuery query).sql

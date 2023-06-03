@@ -1,5 +1,5 @@
 package "sql"
-    exposes [Sql]
+    exposes []
     packages {
         pg: "../../src/main.roc",
     }

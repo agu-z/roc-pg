@@ -13,7 +13,7 @@ interface Pg.Client
         Bytes.Encode,
         Bytes.Decode.{ decode },
         Pg.Result.{ CmdResult },
-        Pg.Cmd.{ Cmd, Unprepared },
+        Pg.Cmd.{ Cmd },
         Pg.Batch.{ Batch },
         pf.Task.{ Task, await, fail },
         pf.Tcp,
