@@ -149,18 +149,24 @@ rowChar = \state, byte ->
     when byte is
         _ if state.escaped ->
             { state &
-                curr: state.curr |> List.append byte,
                 escaped: Bool.false,
+                curr: state.curr |> List.append byte,
             }
 
         '"' ->
-            quote =
-                when state.quote is
-                    Pending -> Open
-                    Open -> Closed
-                    Closed -> Closed
+            when state.quote is
+                Pending ->
+                    { state & quote: Open }
 
-            { state & quote }
+                Open ->
+                    { state & quote: Closed }
+
+                Closed ->
+                    { state &
+                        quote: Open,
+                        # reopening means the string contains a literal quote
+                        curr: state.curr |> List.append byte,
+                    }
 
         '\\' ->
             { state & escaped: Bool.true }
@@ -181,7 +187,7 @@ rowChar = \state, byte ->
         _ ->
             { state & curr: state.curr |> List.append byte }
 
-parseRowStr = \input ->
+prs = \input ->
     input
     |> Str.toUtf8
     |> parseRow
@@ -194,22 +200,25 @@ parseRowStr = \input ->
                 |> Result.withDefault ""
                 |> Present
 
-expect parseRowStr "(42)" == [Present "42"]
-expect parseRowStr "(42,hi)" == [Present "42", Present "hi"]
-expect parseRowStr "(42,\" hi\")" == [Present "42", Present " hi"]
-expect parseRowStr "(\"hello world\",hi)" == [Present "hello world", Present "hi"]
-expect parseRowStr "(\"hello \\\"Agus\\\"\",21)" == [Present "hello \"Agus\"", Present "21"]
-expect parseRowStr "(\"line1\\\\line2\")" == [Present "line1\\line2"]
-expect parseRowStr "(\"hi, world!\",\"hello, agus\")" == [Present "hi, world!", Present "hello, agus"]
-expect parseRowStr "(spaces,no quotes)" == [Present "spaces", Present "no quotes"]
-expect parseRowStr "(,prev is null)" == [Null, Present "prev is null"]
-expect parseRowStr "(next is null,)" == [Present "next is null", Null]
-expect parseRowStr "(next is null,,prev is null)" == [Present "next is null", Null, Present "prev is null"]
-expect parseRowStr "()" == [Null]
-expect parseRowStr "(,)" == [Null, Null]
-expect parseRowStr "(,,)" == [Null, Null, Null]
-expect parseRowStr "(\"\")" == [Present ""]
-expect parseRowStr "(\"\",)" == [Present "", Null]
+expect prs "(42)" == [Present "42"]
+expect prs "(42,hi)" == [Present "42", Present "hi"]
+expect prs "(42,\" hi\")" == [Present "42", Present " hi"]
+expect prs "(\"hello world\",hi)" == [Present "hello world", Present "hi"]
+expect prs "(\"hello \\\"Agus\\\"\",21)" == [Present "hello \"Agus\"", Present "21"]
+expect prs "(\"hello \"\"Agus\"\"\",21)" == [Present "hello \"Agus\"", Present "21"]
+expect prs "(\"a\"\"\")" == [Present "a\""]
+expect prs "(\"a\\\\b\")" == [Present "a\\b"]
+expect prs "(\"a\nb\")" == [Present "a\nb"]
+expect prs "(\"hi, world!\",\"hello, agus\")" == [Present "hi, world!", Present "hello, agus"]
+expect prs "(spaces,no quotes)" == [Present "spaces", Present "no quotes"]
+expect prs "(,prev is null)" == [Null, Present "prev is null"]
+expect prs "(next is null,)" == [Present "next is null", Null]
+expect prs "(next is null,,prev is null)" == [Present "next is null", Null, Present "prev is null"]
+expect prs "()" == [Null]
+expect prs "(,)" == [Null, Null]
+expect prs "(,,)" == [Null, Null, Null]
+expect prs "(\"\")" == [Present ""]
+expect prs "(\"\",)" == [Present "", Null]
 
 textFormat : (Str -> Result a DecodeErr) -> Decode pg a
 textFormat = \fn ->
