@@ -131,6 +131,81 @@ row = \items ->
     |> Str.split ","
     |> List.map Str.toUtf8
 
+parseRow = \bytes ->
+    bytes
+    |> List.dropFirst
+    |> List.walk
+        {
+            items: List.withCapacity 6,
+            curr: List.withCapacity 32,
+            quote: Pending,
+            escaped: Bool.false,
+        }
+        rowChar
+    |> .items
+
+rowChar = \state, byte ->
+    when byte is
+        _ if state.escaped ->
+            { state &
+                curr: state.curr |> List.append byte,
+                escaped: Bool.false,
+            }
+
+        '"' ->
+            quote =
+                when state.quote is
+                    Pending -> Open
+                    Open -> Closed
+                    Closed -> Closed
+
+            { state & quote }
+
+        '\\' ->
+            { state & escaped: Bool.true }
+
+        ',' | ')' if state.quote != Open ->
+            item =
+                if List.isEmpty state.curr && state.quote == Pending then
+                    Null
+                else
+                    Present state.curr
+
+            { state &
+                items: state.items |> List.append item,
+                curr: List.withCapacity 32,
+            }
+
+        _ ->
+            { state & curr: state.curr |> List.append byte }
+
+parseRowStr = \input ->
+    input
+    |> Str.toUtf8
+    |> parseRow
+    |> List.map \item ->
+        when item is
+            Null -> Null
+            Present present ->
+                present
+                |> Str.fromUtf8
+                |> Result.withDefault ""
+                |> Present
+
+expect parseRowStr "(42)" == [Present "42"]
+expect parseRowStr "(42,hi)" == [Present "42", Present "hi"]
+expect parseRowStr "(42,\" hi\")" == [Present "42", Present " hi"]
+expect parseRowStr "(\"hello world\",hi)" == [Present "hello world", Present "hi"]
+expect parseRowStr "(\"hello \\\"Agus\\\"\",21)" == [Present "hello \"Agus\"", Present "21"]
+expect parseRowStr "(\"line1\\\\line2\")" == [Present "line1\\line2"]
+expect parseRowStr "(spaces,no quotes)" == [Present "spaces", Present "no quotes"]
+expect parseRowStr "(,prev is null)" == [Null, Present "prev is null"]
+expect parseRowStr "(next is null,)" == [Present "next is null", Null]
+expect parseRowStr "(next is null,,prev is null)" == [Present "next is null", Null, Present "prev is null"]
+expect parseRowStr "()" == [Null]
+expect parseRowStr "(,)" == [Null, Null]
+expect parseRowStr "(,,)" == [Null, Null, Null]
+
 textFormat : (Str -> Result a DecodeErr) -> Decode pg a
 textFormat = \fn ->
     bytes <- @Decode
