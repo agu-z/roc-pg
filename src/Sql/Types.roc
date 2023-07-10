@@ -208,6 +208,8 @@ expect parseRowStr "(next is null,,prev is null)" == [Present "next is null", Nu
 expect parseRowStr "()" == [Null]
 expect parseRowStr "(,)" == [Null, Null]
 expect parseRowStr "(,,)" == [Null, Null, Null]
+expect parseRowStr "(\"\")" == [Present ""]
+expect parseRowStr "(\"\",)" == [Present "", Null]
 
 textFormat : (Str -> Result a DecodeErr) -> Decode pg a
 textFormat = \fn ->
