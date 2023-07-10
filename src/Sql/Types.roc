@@ -145,6 +145,7 @@ parseRow = \bytes ->
     |> .items
 
 rowChar = \state, byte ->
+    # This parser assumes postgres won't respond with malformed syntax
     when byte is
         _ if state.escaped ->
             { state &
@@ -174,6 +175,7 @@ rowChar = \state, byte ->
             { state &
                 items: state.items |> List.append item,
                 curr: List.withCapacity 32,
+                quote: Pending,
             }
 
         _ ->
@@ -198,6 +200,7 @@ expect parseRowStr "(42,\" hi\")" == [Present "42", Present " hi"]
 expect parseRowStr "(\"hello world\",hi)" == [Present "hello world", Present "hi"]
 expect parseRowStr "(\"hello \\\"Agus\\\"\",21)" == [Present "hello \"Agus\"", Present "21"]
 expect parseRowStr "(\"line1\\\\line2\")" == [Present "line1\\line2"]
+expect parseRowStr "(\"hi, world!\",\"hello, agus\")" == [Present "hi, world!", Present "hello, agus"]
 expect parseRowStr "(spaces,no quotes)" == [Present "spaces", Present "no quotes"]
 expect parseRowStr "(,prev is null)" == [Null, Present "prev is null"]
 expect parseRowStr "(next is null,)" == [Present "next is null", Null]
