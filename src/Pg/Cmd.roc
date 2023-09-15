@@ -61,7 +61,7 @@ withCustomDecode = Cmd.withDecode
 
 # Bindings
 
-Binding := Cmd.Binding has [Eq]
+Binding := Cmd.Binding implements [Eq]
 
 bind : Cmd a err, List Binding -> Cmd a err
 bind = \cmd, bindings ->

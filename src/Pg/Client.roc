@@ -388,7 +388,7 @@ errorToStr = \err ->
         |> addField "Position" (err.position |> Result.map Num.toStr)
         |> addField "Internal Position" (err.internalPosition |> Result.map Num.toStr)
         |> addField "Internal Query" err.internalQuery
-        |> addField "Where" err.where
+        |> addField "Where" err.ewhere
         |> addField "Schema" err.schemaName
         |> addField "Table" err.tableName
         |> addField "Data type" err.dataTypeName
