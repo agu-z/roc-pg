@@ -1,8 +1,8 @@
 app "rental"
     packages {
         pf: "https://github.com/roc-lang/basic-cli/releases/download/0.3.2/tE4xS_zLdmmxmHwHih9kHWQ7fsXtJr7W7h3425-eZFk.tar.br",
+        json: "https://github.com/lukewilliamboswell/roc-json/releases/download/v0.3.0/y2bZ-J_3aq28q0NpZPjw0NC6wghUYFooJpH03XzJ3Ls.tar.br",
         pg: "../../src/main.roc",
-        sql: "../src/main.roc",
     }
     imports [
         pf.Task.{ Task, await },
@@ -13,9 +13,9 @@ app "rental"
         pg.Pg.Cmd,
         pg.Pg.Client,
         pg.Pg.Result,
-        Json,
-        sql.Sql.{ select, into, from, column, where, eq, i32, join, on },
-        sql.Sql.Types.{ Nullable },
+        json.Core,
+        pg.Sql.{ select, into, from, column, wher, eq, i32, join, on },
+        pg.Sql.Types.{ Nullable },
         VideoRental,
     ]
     provides [main] to pf
@@ -46,7 +46,7 @@ printCustomer = \customerId ->
             storeAddress: <- selectAddress storeAddr |> Sql.with,
         }
         |> select
-        |> where (customer.customerId |> eq (i32 customerId))
+        |> wher (customer.customerId |> eq (i32 customerId))
 
     _ <- logSql query |> await
 
@@ -115,7 +115,7 @@ handlePgTask = \task ->
             Process.exit 3
 
 printJson = \value ->
-    Encode.toBytes value Json.json
+    Encode.toBytes value Core.json
     |> Str.fromUtf8
     |> Result.withDefault ""
     |> Stdout.line

@@ -112,7 +112,6 @@ sqlQuote = \value ->
     doubled =
         value
         |> Str.replaceEach "\"" "\\\"\\\""
-        |> Result.withDefault value
 
     "\\\"\(doubled)\\\""
 
