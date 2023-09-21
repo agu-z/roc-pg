@@ -150,6 +150,13 @@ I'd like this to become a stable PostgreSQL interface for Roc eventually, but no
 
 \* Requires new platform primitives
 
+
+## Query Builder Experiment
+
+Under [sql-cli](./sql-cli) there's a CLI that will load a database's schema and generate Roc code which can be used with the [Sql module](./src/Sql.roc) to create type-safe queries.
+
+See an [example here](./examples/sql/rental.roc).
+
 ## Resources
 
 - [PostgreSQL Protocol Flow](https://www.postgresql.org/docs/current/protocol-flow.html)

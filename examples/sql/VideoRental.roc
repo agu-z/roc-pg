@@ -31,8 +31,8 @@ interface VideoRental
         paymentP2022N01,
     ]
     imports [
-        sql.Sql.{ identifier },
-        sql.Sql.Types,
+        pg.Sql.{ identifier },
+        pg.Sql.Types,
     ]
 
 inventory = {

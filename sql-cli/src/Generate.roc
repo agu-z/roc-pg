@@ -25,8 +25,8 @@ module = \schemaName, tables ->
     \(exposes)
         ]
         imports [
-            sql.Sql.{ identifier },
-            sql.Sql.Types,
+            pg.Sql.{ identifier },
+            pg.Sql.Types,
         ]
 
     \(tableDefs)

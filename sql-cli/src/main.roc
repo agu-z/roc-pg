@@ -2,7 +2,6 @@ app "roc-sql"
     packages {
         pf: "https://github.com/roc-lang/basic-cli/releases/download/0.3.2/tE4xS_zLdmmxmHwHih9kHWQ7fsXtJr7W7h3425-eZFk.tar.br",
         pg: "../../src/main.roc",
-        sql: "../../sql/src/main.roc",
     }
     imports [
         pf.Task.{ Task, await },
@@ -13,7 +12,7 @@ app "roc-sql"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        sql.Sql.{ from, join, on, select, where, eq, gt, not, into, column, in, str, i16, rowArray },
+        pg.Sql.{ from, join, on, select, wher, eq, gt, not, into, column, in, str, i16, rowArray },
         PgCatalog,
         Generate,
 
@@ -53,8 +52,8 @@ tablesQuery = \schemaName ->
         columns: <- rowArray (columnsQuery tables),
     }
     |> select
-    |> where (schema.nspname |> eq (str schemaName))
-    |> where
+    |> wher (schema.nspname |> eq (str schemaName))
+    |> wher
         (
             tables.relkind
             |> in str [
@@ -76,9 +75,9 @@ columnsQuery = \tables ->
         isNullable: <- column (not columns.attnotnull),
     }
     |> select
-    |> where (tables.oid |> eq columns.attrelid) # exclude dropped columns
-    |> where (not columns.attisdropped) # exclude system columns
-    |> where (columns.attnum |> gt (i16 0))
+    |> wher (tables.oid |> eq columns.attrelid) # exclude dropped columns
+    |> wher (not columns.attisdropped) # exclude system columns
+    |> wher (columns.attnum |> gt (i16 0))
 
 argsParser : Arg.NamedParser Options
 argsParser =
