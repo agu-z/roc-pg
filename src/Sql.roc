@@ -9,7 +9,7 @@ interface Sql
         from,
         select,
         identifier,
-        wher,
+        where,
         join,
         on,
         limit,
@@ -165,7 +165,7 @@ querySql = \query, columnWrapper ->
     |> List.concat columnsSql
     |> List.concat query.from
     |> List.concat (List.join query.options.joins)
-    |> List.concat query.options.wher
+    |> List.concat query.options.where
     |> List.concat query.options.orderBy
     |> List.concat query.options.limit
 
@@ -181,7 +181,7 @@ SelectOptions a : {
     joins : List Sql,
     columns : List Sql,
     decode : List (List U8) -> Result a Sql.Types.DecodeErr,
-    wher : Sql,
+    where : Sql,
     orderBy : Sql,
     limit : Sql,
 }
@@ -214,25 +214,25 @@ select = \@Selection toSelection ->
         joins: List.withCapacity 4,
         columns,
         decode,
-        wher: [],
+        where: [],
         limit: [],
         orderBy: [],
     }
 
-wher : Select a, Expr PgBool * -> Select a
-wher =
+where : Select a, Expr PgBool * -> Select a
+where =
     options, (@Expr expr) <- updateOptions
 
     newWhere =
-        if List.isEmpty options.wher then
+        if List.isEmpty options.where then
             List.prepend expr.sql (Raw " where ")
         else
-            options.wher
+            options.where
             |> List.reserve (List.len expr.sql + 1)
             |> List.append (Raw " and ")
             |> List.concat expr.sql
 
-    { options & wher: newWhere }
+    { options & where: newWhere }
 
 limit : Select a, Nat -> Select a
 limit =

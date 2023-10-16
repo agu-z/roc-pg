@@ -12,7 +12,7 @@ app "roc-sql"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        pg.Sql.{ from, join, on, select, wher, eq, gt, not, into, column, in, str, i16, rowArray },
+        pg.Sql.{ from, join, on, select, where, eq, gt, not, into, column, in, str, i16, rowArray },
         PgCatalog,
         Generate,
 
@@ -52,8 +52,8 @@ tablesQuery = \schemaName ->
         columns: <- rowArray (columnsQuery tables),
     }
     |> select
-    |> wher (schema.nspname |> eq (str schemaName))
-    |> wher
+    |> where (schema.nspname |> eq (str schemaName))
+    |> where
         (
             tables.relkind
             |> in str [
@@ -75,9 +75,9 @@ columnsQuery = \tables ->
         isNullable: <- column (not columns.attnotnull),
     }
     |> select
-    |> wher (tables.oid |> eq columns.attrelid) # exclude dropped columns
-    |> wher (not columns.attisdropped) # exclude system columns
-    |> wher (columns.attnum |> gt (i16 0))
+    |> where (tables.oid |> eq columns.attrelid) # exclude dropped columns
+    |> where (not columns.attisdropped) # exclude system columns
+    |> where (columns.attnum |> gt (i16 0))
 
 argsParser : Arg.NamedParser Options
 argsParser =

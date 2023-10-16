@@ -14,7 +14,7 @@ app "rental"
         pg.Pg.Client,
         pg.Pg.Result,
         json.Core,
-        pg.Sql.{ select, into, from, column, wher, eq, i32, join, on },
+        pg.Sql.{ select, into, from, column, where, eq, i32, join, on },
         pg.Sql.Types.{ Nullable },
         VideoRental,
     ]
@@ -46,7 +46,7 @@ printCustomer = \customerId ->
             storeAddress: <- selectAddress storeAddr |> Sql.with,
         }
         |> select
-        |> wher (customer.customerId |> eq (i32 customerId))
+        |> where (customer.customerId |> eq (i32 customerId))
 
     _ <- logSql query |> await
 
