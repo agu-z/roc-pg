@@ -99,7 +99,7 @@ decoderName = \sqlType ->
         "numeric" ->
             Ok "dec"
 
-        "text" | "char" | "name" ->
+        "text" | "char" | "name" | "bpchar" | "varchar" ->
             Ok "str"
 
         "bool" ->
