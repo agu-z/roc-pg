@@ -24,6 +24,7 @@ interface Pg.Cmd
         nat,
         bytes,
         withCustomDecode,
+        inspect,
     ]
     imports [
         Cmd,
@@ -58,6 +59,42 @@ map = Cmd.map
 
 withCustomDecode : Cmd * *, (CmdResult -> Result a err) -> Cmd a err
 withCustomDecode = Cmd.withDecode
+
+inspect : Cmd a err -> Str
+inspect = \cmd ->
+    { kind, bindings } = Cmd.params cmd
+
+    kindStr = inspectKind kind
+    bindingsStr =
+        bindings
+        |> List.mapWithIndex
+            \val, index ->
+                n = index + 1
+                "$\(Num.toStr n) = \(inspectBinding val)"
+        |> Str.joinWith "\n"
+
+    "\(kindStr)\n\(bindingsStr)"
+
+inspectKind = \kind ->
+    when kind is
+        SqlCmd sql ->
+            "SQL: \(sql)"
+
+        PreparedCmd { name } ->
+            "Prepared: \(name)"
+
+inspectBinding = \binding ->
+    when binding is
+        Null ->
+            "NULL"
+
+        Text text ->
+            text
+
+        Binary bin ->
+            bin
+            |> List.map Num.toStr
+            |> Str.joinWith ","
 
 # Bindings
 
