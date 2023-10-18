@@ -92,17 +92,19 @@ Table table : {
 
 wrap = \wrapper, fn -> wrapper (fn {})
 
-from : Table table, (table -> Select a) -> Query a []
+from : Table table, (table -> Select a err) -> Query a err
 from = \table, next ->
     _ <- wrap @Query
     alias <- addAlias table.alias |> State.bind
-    env <- State.get |> State.map
 
-    (@Select toOptions) = next (table.columns alias)
+    options <- table.columns alias
+        |> next
+        |> unwrapSelect
+        |> State.map
 
     {
         from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
-        options: toOptions env,
+        options,
     }
 
 addAlias : Str -> State Env Str err
@@ -234,7 +236,7 @@ compileQuery = \qs ->
 
 # Options
 
-Select a := Env -> SelectOptions a
+Select a err := State Env (SelectOptions a) err
 
 SelectOptions a : {
     joins : List Sql,
@@ -244,19 +246,21 @@ SelectOptions a : {
     value : a,
 }
 
-join : Table table, (table -> Expr PgBool *), (table -> Select a) -> Select a
+unwrapSelect = \@Select state -> state
+
+join : Table table, (table -> Expr PgBool *), (table -> Select a err) -> Select a err
 join = \table, onExpr, next ->
-    env <- @Select
+    _ <- wrap @Select
 
-    (alias, newEnv) =
-        State.perform (addAlias table.alias) env
-
+    alias <- addAlias table.alias |> State.bind
     columns = table.columns alias
 
-    (@Select toOptions) = next columns
-    options = toOptions newEnv
-
     (@Expr { sql: onSql }) = onExpr columns
+
+    options <-
+        next columns
+        |> unwrapSelect
+        |> State.map
 
     joinSql =
         List.prepend onSql (Raw " join \(table.schema).\(table.name) as \(alias) on ")
@@ -265,11 +269,11 @@ join = \table, onExpr, next ->
 
 on = \toA, b -> \table -> toA table |> eq b
 
-select : a -> Select a
+select : a -> Select a *
 select = \a ->
-    env <- @Select
+    _ <- wrap @Select
 
-    {
+    State.ok {
         joins: List.withCapacity 4,
         where: [],
         limit: [],
@@ -277,7 +281,7 @@ select = \a ->
         value: a,
     }
 
-where : Select a, Expr PgBool * -> Select a
+where : Select a err, Expr PgBool * -> Select a err
 where =
     options, (@Expr expr) <- updateOptions
 
@@ -292,7 +296,7 @@ where =
 
     { options & where: newWhere }
 
-limit : Select a, Nat -> Select a
+limit : Select a err, Nat -> Select a err
 limit =
     options, max <- updateOptions
     { options & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
@@ -305,7 +309,7 @@ asc = \@Expr expr -> @Order { sql: expr.sql, direction: Asc }
 desc : Expr (PgCmp *) * -> Order
 desc = \@Expr expr -> @Order { sql: expr.sql, direction: Desc }
 
-orderBy : Select a, List Order -> Select a
+orderBy : Select a err, List Order -> Select a err
 orderBy =
     options, order <- updateOptions
 
@@ -326,12 +330,10 @@ orderBy =
 
     { options & orderBy: sql }
 
-updateOptions : (SelectOptions a, arg -> SelectOptions b) -> (Select a, arg -> Select b)
+updateOptions : (SelectOptions a, arg -> SelectOptions b) -> (Select a err, arg -> Select b err)
 updateOptions = \fn ->
-    \next, arg ->
-        @Select \env ->
-            (@Select toOptions) = next
-            fn (toOptions env) arg
+    \@Select next, arg ->
+        @Select (State.map next \options -> fn options arg)
 
 # Selection
 
