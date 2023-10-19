@@ -8,6 +8,7 @@ interface State
         put,
         ok,
         err,
+        fromResult,
     ]
     imports []
 
@@ -24,15 +25,15 @@ perform = \state, init ->
 
 bind : State state ok err, (ok -> State state ok2 err) -> State state ok2 err
 bind = \first, next ->
-    @State \s1 ->
-        (o, s2) <- attempt first s1 |> Result.try
-        attempt (next o) s2
+    s1 <- @State
+    (o, s2) <- attempt first s1 |> Result.try
+    attempt (next o) s2
 
 map : State state ok err, (ok -> ok2) -> State state ok2 err
 map = \first, next ->
-    @State \s1 ->
-        (o, s2) <- attempt first s1 |> Result.map
-        (next o, s2)
+    s1 <- @State
+    (o, s2) <- attempt first s1 |> Result.map
+    (next o, s2)
 
 get : State state state err
 get = @State \state -> Ok (state, state)
@@ -45,6 +46,11 @@ ok = \o -> @State \state -> Ok (o, state)
 
 err : err -> State * * err
 err = \e -> @State \_ -> Err e
+
+fromResult : Result ok err -> State * ok err
+fromResult = \result ->
+    state <- @State
+    Result.map result \o -> (o, state)
 
 expect
     next =

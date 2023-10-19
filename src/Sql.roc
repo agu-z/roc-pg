@@ -132,9 +132,9 @@ addAlias = \wanted ->
 
             wanted
 
-queryAll : Query (Selection a) [] -> Pg.Cmd.Cmd _ _
+queryAll : Query (Selection a []) [] -> Pg.Cmd.Cmd _ _
 queryAll = \qs ->
-    query = buildQuery qs emptyEnv Bare
+    query = buildBareQuery qs emptyEnv
     { sql, params } = compileSql query.sql
 
     Pg.Cmd.new sql
@@ -146,9 +146,9 @@ queryAll = \qs ->
         |> query.decode
         |> Result.mapErr DecodeErr
 
-queryOne : Query (Selection a) [] -> Pg.Cmd.Cmd _ _
+queryOne : Query (Selection a []) [] -> Pg.Cmd.Cmd _ _
 queryOne = \qs ->
-    query = buildQuery qs emptyEnv Bare
+    query = buildBareQuery qs emptyEnv
     { sql, params } = compileSql query.sql
 
     Pg.Cmd.new sql
@@ -165,9 +165,9 @@ queryOne = \qs ->
             _ ->
                 Err EmptyResult
 
-querySelection : Selection a -> Pg.Cmd.Cmd _ _
-querySelection = \@Selection toSel ->
-    sel = toSel { aliases: Dict.empty {} }
+querySelection : Selection a [] -> Pg.Cmd.Cmd _ _
+querySelection = \@Selection ss ->
+    (sel, _) = State.perform ss emptyEnv
 
     { sql, params } =
         # TODO: Simplify to no-op cmd
@@ -193,20 +193,27 @@ querySelection = \@Selection toSel ->
             _ ->
                 Err EmptyResult
 
-buildQuery :
-    Query (Selection a) [],
-    Env,
-    [Bare, Row]
+buildBareQuery : Query (Selection a []) [],
+    Env
     -> {
         sql : Sql,
         decode : List (List U8) -> Result a Sql.Types.DecodeErr,
     }
-buildQuery = \@Query qs, initEnv, columnWrapper ->
-    (query, env) = State.perform qs initEnv
+buildBareQuery = \@Query qs, initEnv ->
+    combined =
+        query <- State.bind qs
+        sel <- query.options.value |> unwrapSelection |> State.map
 
-    (@Selection toSel) = query.options.value
-    { columns, decode } = toSel env
+        { query, sel }
 
+    (result, _) = State.perform combined initEnv
+
+    {
+        sql: querySql result.query result.sel.columns Bare,
+        decode: result.sel.decode,
+    }
+
+querySql = \query, columns, columnWrapper ->
     columnsSql =
         when columnWrapper is
             Bare ->
@@ -217,20 +224,17 @@ buildQuery = \@Query qs, initEnv, columnWrapper ->
                 |> List.concat (commaJoin columns)
                 |> List.append (Raw ")")
 
-    sql =
-        [Raw "select "]
-        |> List.reserve 16
-        |> List.concat columnsSql
-        |> List.concat query.from
-        |> List.concat (List.join query.options.joins)
-        |> List.concat query.options.where
-        |> List.concat query.options.orderBy
-        |> List.concat query.options.limit
-
-    { sql, decode }
+    [Raw "select "]
+    |> List.reserve 16
+    |> List.concat columnsSql
+    |> List.concat query.from
+    |> List.concat (List.join query.options.joins)
+    |> List.concat query.options.where
+    |> List.concat query.options.orderBy
+    |> List.concat query.options.limit
 
 compileQuery = \qs ->
-    buildQuery qs emptyEnv Bare
+    buildBareQuery qs emptyEnv
     |> .sql
     |> compileSql
 
@@ -337,29 +341,31 @@ updateOptions = \fn ->
 
 # Selection
 
-Selection a := Env
-    -> {
-        columns : List Sql,
-        decode : List (List U8) -> Result a Sql.Types.DecodeErr,
-    }
+Selection a err := State
+        Env
+        {
+            columns : List Sql,
+            decode : List (List U8) -> Result a Sql.Types.DecodeErr,
+        }
+        err
 
-updateSelection = \fn -> \@Selection toSelection ->
-        env <- @Selection
-        fn (toSelection env)
+unwrapSelection = \@Selection state -> state
 
-into : a -> Selection a
+updateSelection = \@Selection sel, fn -> @Selection (State.map sel \options -> fn options)
+
+into : a -> Selection a err
 into = \value ->
-    _ <- @Selection
+    _ <- wrap @Selection
 
-    {
+    State.ok {
         columns: [],
         decode: \_ -> Ok value,
     }
 
-column : Expr * a -> (Selection (a -> b) -> Selection b)
-column = \@Expr expr ->
-    sel <- updateSelection
-    apExprSel expr sel
+column : Expr * a -> (Selection (a -> b) err -> Selection b err)
+column = \@Expr expr -> \ss ->
+        sel <- updateSelection ss
+        apExprSel expr sel
 
 apExprSel = \expr, sel ->
     index = List.len sel.columns
@@ -380,73 +386,93 @@ apExprSel = \expr, sel ->
         decode,
     }
 
-with : Selection a -> (Selection (a -> b) -> Selection b)
+with : Selection a err -> (Selection (a -> b) err -> Selection b err)
 with = \@Selection toASel -> \@Selection toFnSel ->
-        env <- @Selection
+        _ <- wrap @Selection
 
-        aSel = toASel env
-        fnSel = toFnSel env
+        env <- State.get |> State.bind
 
-        count = List.len fnSel.columns
+        result =
+            (aSel, _) <- State.attempt toASel env |> Result.try
+            (fnSel, _) <- State.attempt toFnSel env |> Result.map
 
+            count = List.len fnSel.columns
+
+            decode = \cells ->
+                fn <- fnSel.decode cells |> Result.try
+                a <- cells
+                    |> List.drop count
+                    |> aSel.decode
+                    |> Result.map
+                fn a
+
+            {
+                columns: fnSel.columns |> List.concat aSel.columns,
+                decode,
+            }
+
+        State.fromResult result
+
+rowArray : Query (Selection a err) err -> (Selection (List a -> b) err -> Selection b err)
+rowArray = \@Query qs -> \@Selection ps ->
+        _ <- wrap @Selection
+
+        sel <- State.bind ps
+        env <- State.get |> State.bind
+
+        rowState =
+            query <- State.bind qs
+            rowSel <- query.options.value |> unwrapSelection |> State.map
+
+            {
+                sql: querySql query rowSel.columns Row,
+                decode: rowSel.decode,
+            }
+
+        State.attempt rowState env
+        |> Result.map \(row, _) ->
+            sql =
+                [Raw "(select array("]
+                |> List.concat row.sql
+                |> List.append (Raw "))")
+
+            decode = Sql.Types.rowArray \items ->
+                List.mapTry items row.decode
+
+            expr = { sql, decode }
+
+            apExprSel expr sel
+        |> State.fromResult
+
+selectionList : List (Selection a err) -> Selection (List a) err
+selectionList = \sels ->
+    _ <- wrap @Selection
+    env <- State.get |> State.bind
+
+    sels
+    |> List.mapTry \@Selection sel -> State.attempt sel env |> Result.map .0
+    |> Result.map \allSels ->
         decode = \cells ->
-            fn <- fnSel.decode cells |> Result.try
-            a <- cells
-                |> List.drop count
-                |> aSel.decode
-                |> Result.map
-            fn a
+            allSels
+            |> List.walkTry (cells, List.withCapacity (List.len sels)) decodeSel
+            |> Result.map .1
+
+        decodeSel = \(remainingCells, decodedSels), sel ->
+            { before, others } = List.split remainingCells (List.len sel.columns)
+
+            decoded <- sel.decode before |> Result.map
+
+            (others, List.append decodedSels decoded)
 
         {
-            columns: fnSel.columns |> List.concat aSel.columns,
+            columns: allSels |> List.joinMap .columns,
             decode,
         }
+    |> State.fromResult
 
-rowArray : Query (Selection a) [] -> (Selection (List a -> b) -> Selection b)
-rowArray = \qs -> \@Selection toSel ->
-        env <- @Selection
-        row = buildQuery qs env Row
-
-        sql =
-            [Raw "(select array("]
-            |> List.concat row.sql
-            |> List.append (Raw "))")
-
-        decode = Sql.Types.rowArray \items ->
-            List.mapTry items row.decode
-
-        expr = { sql, decode }
-
-        apExprSel expr (toSel env)
-
-selectionList : List (Selection a) -> Selection (List a)
-selectionList = \sels ->
-    env <- @Selection
-
-    allSels = List.map sels \@Selection toSel -> toSel env
-
-    decode = \cells ->
-        allSels
-        |> List.walkTry (cells, List.withCapacity (List.len sels)) decodeSel
-        |> Result.map .1
-
-    decodeSel = \(remainingCells, decodedSels), sel ->
-        { before, others } = List.split remainingCells (List.len sel.columns)
-
-        decoded <- sel.decode before |> Result.map
-
-        (others, List.append decodedSels decoded)
-
-    {
-        columns: allSels |> List.joinMap .columns,
-        decode,
-    }
-
-map : Selection a, (a -> b) -> Selection b
-map = \@Selection toSel, fn ->
-    env <- @Selection
-
-    sel = toSel env
+map : Selection a err, (a -> b) -> Selection b err
+map = \ss, fn ->
+    sel <- updateSelection ss
 
     {
         columns: sel.columns,
