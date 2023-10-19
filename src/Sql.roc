@@ -165,33 +165,35 @@ queryOne = \qs ->
             _ ->
                 Err EmptyResult
 
-querySelection : Selection a err -> Result (Pg.Cmd.Cmd _ _) err
+querySelection : Selection a err -> Result (Pg.Cmd.Cmd _ _) [Empty, BuildErr err]
 querySelection = \@Selection ss ->
-    (sel, _) <- State.attempt ss emptyEnv |> Result.map
+    (sel, _) <-
+        State.attempt ss emptyEnv
+        |> Result.mapErr BuildErr
+        |> Result.try
 
-    { sql, params } =
-        # TODO: Simplify to no-op cmd
-        if List.isEmpty sel.columns then
-            [Raw "select 1"]
-            |> compileSql
-        else
+    if List.isEmpty sel.columns then
+        Err Empty
+    else
+        { sql, params } =
             commaJoin sel.columns
             |> List.prepend (Raw "select ")
             |> compileSql
 
-    Pg.Cmd.new sql
-    |> Pg.Cmd.bind params
-    |> Pg.Cmd.withCustomDecode \result ->
-        rows = Pg.Result.rows result
+        Pg.Cmd.new sql
+        |> Pg.Cmd.bind params
+        |> Pg.Cmd.withCustomDecode \result ->
+            rows = Pg.Result.rows result
 
-        when rows |> List.takeFirst 1 is
-            [cells] ->
-                cells
-                |> sel.decode
-                |> Result.mapErr DecodeErr
+            when rows |> List.takeFirst 1 is
+                [cells] ->
+                    cells
+                    |> sel.decode
+                    |> Result.mapErr DecodeErr
 
-            _ ->
-                Err EmptyResult
+                _ ->
+                    Err EmptyResult
+        |> Ok
 
 buildBareQuery : Query (Selection a []) [],
     Env
