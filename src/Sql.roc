@@ -90,11 +90,10 @@ Table table : {
     columns : Str -> table,
 }
 
-wrap = \wrapper, fn -> wrapper (fn {})
-
 from : Table table, (table -> Select a err) -> Query a err
-from = \table, next ->
-    _ <- wrap @Query
+from = \table, next -> @Query (fromHelp table next)
+
+fromHelp = \table, next ->
     alias <- addAlias table.alias |> State.bind
 
     options <- table.columns alias
@@ -254,8 +253,9 @@ unwrapSelect = \@Select state -> state
 
 join : Table table, (table -> Expr PgBool *), (table -> Select a err) -> Select a err
 join = \table, onExpr, next ->
-    _ <- wrap @Select
+    @Select (joinHelp table onExpr next)
 
+joinHelp = \table, onExpr, next ->
     alias <- addAlias table.alias |> State.bind
     columns = table.columns alias
 
@@ -275,15 +275,15 @@ on = \toA, b -> \table -> toA table |> eq b
 
 select : a -> Select a *
 select = \a ->
-    _ <- wrap @Select
-
-    State.ok {
+    {
         joins: List.withCapacity 4,
         where: [],
         limit: [],
         orderBy: [],
         value: a,
     }
+    |> State.ok
+    |> @Select
 
 where : Select a err, Expr PgBool * -> Select a err
 where =
@@ -355,12 +355,12 @@ updateSelection = \@Selection sel, fn -> @Selection (State.map sel \options -> f
 
 into : a -> Selection a err
 into = \value ->
-    _ <- wrap @Selection
-
-    State.ok {
+    {
         columns: [],
         decode: \_ -> Ok value,
     }
+    |> State.ok
+    |> @Selection
 
 column : Expr * a -> (Selection (a -> b) err -> Selection b err)
 column = \@Expr expr -> \ss ->
@@ -388,65 +388,68 @@ apExprSel = \expr, sel ->
 
 with : Selection a err -> (Selection (a -> b) err -> Selection b err)
 with = \@Selection toASel -> \@Selection toFnSel ->
-        _ <- wrap @Selection
+        @Selection (withHelp toASel toFnSel)
 
-        env <- State.get |> State.bind
+withHelp = \toASel, toFnSel ->
+    env <- State.get |> State.bind
 
-        result =
-            (aSel, _) <- State.attempt toASel env |> Result.try
-            (fnSel, _) <- State.attempt toFnSel env |> Result.map
+    result =
+        (aSel, _) <- State.attempt toASel env |> Result.try
+        (fnSel, _) <- State.attempt toFnSel env |> Result.map
 
-            count = List.len fnSel.columns
+        count = List.len fnSel.columns
 
-            decode = \cells ->
-                fn <- fnSel.decode cells |> Result.try
-                a <- cells
-                    |> List.drop count
-                    |> aSel.decode
-                    |> Result.map
-                fn a
+        decode = \cells ->
+            fn <- fnSel.decode cells |> Result.try
+            a <- cells
+                |> List.drop count
+                |> aSel.decode
+                |> Result.map
+            fn a
 
-            {
-                columns: fnSel.columns |> List.concat aSel.columns,
-                decode,
-            }
+        {
+            columns: fnSel.columns |> List.concat aSel.columns,
+            decode,
+        }
 
-        State.fromResult result
+    State.fromResult result
 
 rowArray : Query (Selection a err) err -> (Selection (List a -> b) err -> Selection b err)
 rowArray = \@Query qs -> \@Selection ps ->
-        _ <- wrap @Selection
+        @Selection (rowArrayHelp qs ps)
 
-        sel <- State.bind ps
-        env <- State.get |> State.bind
+rowArrayHelp = \qs, ps ->
+    sel <- State.bind ps
+    env <- State.get |> State.bind
 
-        rowState =
-            query <- State.bind qs
-            rowSel <- query.options.value |> unwrapSelection |> State.map
+    rowState =
+        query <- State.bind qs
+        rowSel <- query.options.value |> unwrapSelection |> State.map
 
-            {
-                sql: querySql query rowSel.columns Row,
-                decode: rowSel.decode,
-            }
+        {
+            sql: querySql query rowSel.columns Row,
+            decode: rowSel.decode,
+        }
 
-        State.attempt rowState env
-        |> Result.map \(row, _) ->
-            sql =
-                [Raw "(select array("]
-                |> List.concat row.sql
-                |> List.append (Raw "))")
+    State.attempt rowState env
+    |> Result.map \(row, _) ->
+        sql =
+            [Raw "(select array("]
+            |> List.concat row.sql
+            |> List.append (Raw "))")
 
-            decode = Sql.Types.rowArray \items ->
-                List.mapTry items row.decode
+        decode = Sql.Types.rowArray \items ->
+            List.mapTry items row.decode
 
-            expr = { sql, decode }
+        expr = { sql, decode }
 
-            apExprSel expr sel
-        |> State.fromResult
+        apExprSel expr sel
+    |> State.fromResult
 
 selectionList : List (Selection a err) -> Selection (List a) err
-selectionList = \sels ->
-    _ <- wrap @Selection
+selectionList = \sels -> @Selection (selectionListHelp sels)
+
+selectionListHelp = \sels ->
     env <- State.get |> State.bind
 
     sels
