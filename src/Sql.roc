@@ -54,6 +54,7 @@ interface Sql
         map,
         selectionList,
         rowArray,
+        tryMapQuery,
     ]
     imports [
         pg.Pg.Cmd.{ Binding },
@@ -164,9 +165,9 @@ queryOne = \qs ->
             _ ->
                 Err EmptyResult
 
-querySelection : Selection a [] -> Pg.Cmd.Cmd _ _
+querySelection : Selection a err -> Result (Pg.Cmd.Cmd _ _) err
 querySelection = \@Selection ss ->
-    (sel, _) = State.perform ss emptyEnv
+    (sel, _) <- State.attempt ss emptyEnv |> Result.map
 
     { sql, params } =
         # TODO: Simplify to no-op cmd
@@ -236,6 +237,28 @@ compileQuery = \qs ->
     buildBareQuery qs emptyEnv
     |> .sql
     |> compileSql
+
+# Advanced: Failable query building
+
+tryMapQuery : Query a err, (a -> Result b err) -> Query b err
+tryMapQuery = \@Query qs, fn ->
+    @Query (tryMapQueryHelp qs fn)
+
+tryMapQueryHelp = \qs, fn ->
+    query <- State.bind qs
+
+    fn query.options.value
+    |> Result.map \new -> {
+        from: query.from,
+        options: {
+            joins: query.options.joins,
+            where: query.options.where,
+            orderBy: query.options.orderBy,
+            limit: query.options.limit,
+            value: new,
+        },
+    }
+    |> State.fromResult
 
 # Options
 
