@@ -43,6 +43,8 @@ interface Sql
         concat,
         and,
         or,
+        andList,
+        orList,
         not,
         add,
         div,
@@ -697,6 +699,7 @@ boolOp = \@Expr a, op, @Expr b ->
     }
 
 # Expr: Logical
+# TODO: Test precendence is ok!
 
 and : Expr PgBool *, Expr PgBool * -> Expr PgBool Bool
 and = \a, b -> boolOp a "and" b
@@ -717,6 +720,46 @@ not = \@Expr a ->
         |> List.append (Raw ")"),
         decode: Sql.Types.bool,
     }
+
+andList : List (Expr PgBool Bool) -> Expr PgBool Bool
+andList = \exprs ->
+    joinBool true and exprs
+
+orList : List (Expr PgBool Bool) -> Expr PgBool Bool
+orList = \exprs ->
+    joinBool false or exprs
+
+joinBool = \default, operator, exprs ->
+    # We could simplify this by using default as the initial value,
+    # but in most cases we would produce something like (true and ...),
+    # which is not very nice to read.
+    result =
+        List.walk exprs Empty \acc, rhs ->
+            when acc is
+                Empty ->
+                    NotEmpty rhs
+
+                NotEmpty lhs ->
+                    NotEmpty (operator lhs rhs)
+
+    when result is
+        Empty ->
+            default
+
+        NotEmpty expr ->
+            expr
+
+true : Expr PgBool Bool
+true = @Expr {
+    sql: [Raw "true"],
+    decode: Sql.Types.bool,
+}
+
+false : Expr PgBool Bool
+false = @Expr {
+    sql: [Raw "false"],
+    decode: Sql.Types.bool,
+}
 
 # Expr: Num
 
