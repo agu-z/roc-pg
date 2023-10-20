@@ -227,11 +227,22 @@ querySql = \query, columns, columnWrapper ->
                 |> List.concat (commaJoin columns)
                 |> List.append (Raw ")")
 
+    joinsSql =
+        List.join query.options.joins
+
     [Raw "select "]
-    |> List.reserve 16
+    |> List.reserve
+        (
+            List.len columnsSql
+            + List.len query.from
+            + List.len joinsSql
+            + List.len query.options.where
+            + List.len query.options.orderBy
+            + List.len query.options.limit
+        )
     |> List.concat columnsSql
     |> List.concat query.from
-    |> List.concat (List.join query.options.joins)
+    |> List.concat joinsSql
     |> List.concat query.options.where
     |> List.concat query.options.orderBy
     |> List.concat query.options.limit
