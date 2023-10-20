@@ -40,6 +40,8 @@ interface Sql
         gt,
         gte,
         in,
+        like,
+        ilike,
         concat,
         and,
         or,
@@ -690,6 +692,14 @@ in = \@Expr needle, toExpr, haystack ->
         sql: inSql,
         decode: Sql.Types.bool,
     }
+
+like : Expr PgText *, Expr PgText * -> Expr PgBool Bool
+like = \a, b ->
+    boolOp a "like" b
+
+ilike : Expr PgText *, Expr PgText * -> Expr PgBool Bool
+ilike = \a, b ->
+    boolOp a "ilike" b
 
 boolOp : Expr pg *, Str, Expr pg * -> Expr PgBool Bool
 boolOp = \@Expr a, op, @Expr b ->
