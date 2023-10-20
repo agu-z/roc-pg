@@ -16,6 +16,7 @@ interface Sql
         join,
         on,
         limit,
+        offset,
         orderBy,
         asc,
         desc,
@@ -239,6 +240,7 @@ querySql = \query, columns, columnWrapper ->
             + List.len query.options.where
             + List.len query.options.orderBy
             + List.len query.options.limit
+            + List.len query.options.offset
         )
     |> List.concat columnsSql
     |> List.concat query.from
@@ -246,6 +248,7 @@ querySql = \query, columns, columnWrapper ->
     |> List.concat query.options.where
     |> List.concat query.options.orderBy
     |> List.concat query.options.limit
+    |> List.concat query.options.offset
 
 compileQuery = \qs ->
     buildBareQuery qs emptyEnv
@@ -269,6 +272,7 @@ tryMapQueryHelp = \qs, fn ->
             where: query.options.where,
             orderBy: query.options.orderBy,
             limit: query.options.limit,
+            offset: query.options.offset,
             value: new,
         },
     }
@@ -283,6 +287,7 @@ SelectOptions a : {
     where : Sql,
     orderBy : Sql,
     limit : Sql,
+    offset : Sql,
     value : a,
 }
 
@@ -316,6 +321,7 @@ select = \a ->
         joins: List.withCapacity 4,
         where: [],
         limit: [],
+        offset: [],
         orderBy: [],
         value: a,
     }
@@ -341,6 +347,11 @@ limit : Select a err, Nat -> Select a err
 limit =
     options, max <- updateOptions
     { options & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
+
+offset : Select a err, Nat -> Select a err
+offset =
+    options, max <- updateOptions
+    { options & offset: [Raw " offset ", Param (Pg.Cmd.nat max)] }
 
 Order := { sql : Sql, direction : [Asc, Desc] }
 
