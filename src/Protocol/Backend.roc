@@ -332,18 +332,17 @@ dataRow : Decode Message _
 dataRow =
     columnCount <- await i16
 
-    dataRowColumn
-    |> fixedList columnCount
+    fixedList
+        columnCount
+        (
+            valueLen <- await i32
+
+            if valueLen == -1 then
+                succeed []
+            else
+                take (Num.toNat valueLen) \x -> x
+        )
     |> map DataRow
-
-dataRowColumn = 
-    valueLen <- await i32
-
-    if valueLen == -1 then
-        succeed Null
-    else
-        take (Num.toNat valueLen) \x -> x
-        |> map Present
 
 fixedList = \count, itemDecode ->
     collected <- loop (List.withCapacity (Num.toNat count))

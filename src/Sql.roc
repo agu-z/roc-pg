@@ -53,6 +53,7 @@ interface Sql
         into,
         map,
         selectionList,
+        row,
         rowArray,
         tryMapQuery,
     ]
@@ -439,9 +440,40 @@ withHelp = \toASel, toFnSel ->
 
     State.fromResult result
 
+row : Query (Selection a err) err -> (Selection (a -> b) err -> Selection b err)
+row = \@Query qs -> \@Selection ps ->
+        @Selection (rowHelp qs ps)
+
+rowHelp = \qs, ps ->
+    sel <- State.bind ps
+    env <- State.get |> State.bind
+
+    rowState =
+        query <- State.bind qs
+        rowSel <- query.options.value |> unwrapSelection |> State.map
+
+        limited =
+            options = query.options
+            { query & options: { options & limit: [Raw " limit 1"] } }
+
+        { query: limited, sel: rowSel }
+
+    State.attempt rowState env
+    |> Result.map \(rowQ, _) ->
+        sql =
+            [Raw "("]
+            |> List.concat (querySql rowQ.query rowQ.sel.columns Row)
+            |> List.append (Raw ")")
+
+        {
+            sql,
+            decode: Sql.Types.row rowQ.sel.decode,
+        }
+        |> apExprSel sel
+    |> State.fromResult
+
 rowArray : Query (Selection a err) err -> (Selection (List a -> b) err -> Selection b err)
-rowArray = \@Query qs -> \@Selection ps ->
-        @Selection (rowArrayHelp qs ps)
+rowArray = \@Query qs -> \@Selection ps -> @Selection (rowArrayHelp qs ps)
 
 rowArrayHelp = \qs, ps ->
     sel <- State.bind ps
@@ -457,14 +489,13 @@ rowArrayHelp = \qs, ps ->
         }
 
     State.attempt rowState env
-    |> Result.map \(row, _) ->
+    |> Result.map \(rowQ, _) ->
         sql =
             [Raw "(select array("]
-            |> List.concat row.sql
+            |> List.concat rowQ.sql
             |> List.append (Raw "))")
 
-        decode = Sql.Types.rowArray \items ->
-            List.mapTry items row.decode
+        decode = Sql.Types.array (Sql.Types.row rowQ.decode)
 
         expr = { sql, decode }
 

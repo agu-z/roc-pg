@@ -16,7 +16,8 @@ interface Sql.Types exposes [
         str,
         bool,
         unsupported,
-        rowArray,
+        row,
+        array,
         PgI16,
         PgI32,
         PgI64,
@@ -58,6 +59,7 @@ nullable = \@Decode sub ->
     bytes <- @Decode
 
     if List.isEmpty bytes then
+        # TODO: Use Null tag instead of empty list
         Ok Null
     else
         sub bytes
@@ -107,29 +109,34 @@ unsupported = \typeName ->
     }
     |> Ok
 
-rowArray = \cb ->
-    arr <- textFormat
+array : Decode pg a -> Decode (PgArray pg) (List a)
+array = \@Decode decodeItem ->
+    arrayBytes <- @Decode
 
-    # TODO: Write a proper parser
-    # This parser is a huge hack for a PoC
-    arr
-    |> Str.graphemes
-    |> List.drop 2
-    |> List.dropLast
-    |> List.dropLast
-    |> Str.joinWith ""
-    |> Str.split "\",\""
-    |> List.map row
-    |> cb
+    arrayBytes
+    |> parseArray
+    |> List.mapTry \item ->
+        when item is
+            Null ->
+                decodeItem []
 
-row = \items ->
-    items
-    |> Str.graphemes
-    |> List.dropFirst
-    |> List.dropLast
-    |> Str.joinWith ""
-    |> Str.split ","
-    |> List.map Str.toUtf8
+            Present val ->
+                decodeItem val
+
+row : (List (List U8) -> Result a DecodeErr) -> Decode pg a
+row = \decodeRow ->
+    rowBytes <- @Decode
+
+    rowBytes
+    |> parseRow
+    |> List.map \field ->
+        when field is
+            Null ->
+                []
+
+            Present val ->
+                val
+    |> decodeRow
 
 parseRow = \bytes ->
     bytes
@@ -220,6 +227,91 @@ expect prs "(,,)" == [Null, Null, Null]
 expect prs "(\"\")" == [Present ""]
 expect prs "(\"\",)" == [Present "", Null]
 
+parseArray = \bytes ->
+    bytes
+    |> List.dropFirst
+    |> List.walk
+        {
+            items: List.withCapacity 16,
+            curr: List.withCapacity 32,
+            quote: Pending,
+            escaped: Bool.false,
+        }
+        arrayChar
+    |> .items
+
+arrayChar = \state, byte ->
+    # This parser assumes postgres won't respond with malformed syntax
+    ## TODO: Handle null
+    when byte is
+        _ if state.escaped ->
+            { state &
+                escaped: Bool.false,
+                curr: state.curr |> List.append byte,
+            }
+
+        '"' ->
+            when state.quote is
+                Pending ->
+                    { state & quote: Open }
+
+                Open ->
+                    { state & quote: Closed }
+
+                Closed ->
+                    { state &
+                        quote: Open,
+                        # reopening means the string contains a literal quote
+                        curr: state.curr |> List.append byte,
+                    }
+
+        '\\' ->
+            { state & escaped: Bool.true }
+
+        ',' | '}' if state.quote != Open ->
+            items =
+                if List.isEmpty state.curr && state.quote == Pending then
+                    state.items
+                else
+                    state.items |> List.append (Present state.curr)
+
+            { state &
+                items,
+                curr: List.withCapacity 32,
+                quote: Pending,
+            }
+
+        _ ->
+            { state & curr: state.curr |> List.append byte }
+
+pas = \input ->
+    input
+    |> Str.toUtf8
+    |> parseArray
+    |> List.map \item ->
+        when item is
+            Null -> Null
+            Present present ->
+                present
+                |> Str.fromUtf8
+                |> Result.withDefault ""
+                |> Present
+
+expect pas "{}" == []
+expect pas "{42}" == [Present "42"]
+expect
+    result =
+        pas "{\"(hi,\\\"lala\\\"\\\"\\\")\"}"
+        |> List.map \item ->
+            when item is
+                Present p ->
+                    Present (prs p)
+
+                Null ->
+                    Null
+
+    result == [Present [Present "hi", Present "lala\""]]
+
 textFormat : (Str -> Result a DecodeErr) -> Decode pg a
 textFormat = \fn ->
     bytes <- @Decode
@@ -246,3 +338,5 @@ PgF64 : PgNum { f64 : {} }
 PgText : PgCmp { text : {} }
 
 PgBool : PgCmp { bool : {} }
+
+PgArray a : { array : a }
