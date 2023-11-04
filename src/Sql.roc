@@ -15,6 +15,8 @@ interface Sql
         where,
         join,
         on,
+        leftJoin,
+        useOuter,
         limit,
         offset,
         orderBy,
@@ -26,7 +28,7 @@ interface Sql
         i64,
         str,
         null,
-        present,
+        asNullable,
         isNull,
         isNotNull,
         isDistinctFrom,
@@ -66,7 +68,6 @@ interface Sql
         pg.Pg.Cmd.{ Binding },
         pg.Pg.Result,
         Sql.Types.{
-            Nullable,
             Decode,
             PgI16,
             PgI32,
@@ -76,6 +77,7 @@ interface Sql
             PgBool,
             PgCmp,
         },
+        Sql.Nullable.{ Nullable },
         State.{ State },
     ]
 
@@ -314,6 +316,33 @@ joinHelp = \table, onExpr, next ->
         List.prepend onSql (Raw " join \(table.schema).\(table.name) as \(alias) on ")
 
     { options & joins: options.joins |> List.prepend joinSql }
+
+Outer table := table
+
+leftJoin : Table table, (table -> Expr PgBool *), (Outer table -> Select a err) -> Select a err
+leftJoin = \table, onExpr, next ->
+    @Select (leftJoinHelp table onExpr next)
+
+leftJoinHelp = \table, onExpr, next ->
+    alias <- addAlias table.alias |> State.bind
+    columns = table.columns alias
+
+    (@Expr { sql: onSql }) = onExpr columns
+
+    options <-
+        next (@Outer columns)
+        |> unwrapSelect
+        |> State.map
+
+    joinSql =
+        List.prepend onSql (Raw " left join \(table.schema).\(table.name) as \(alias) on ")
+
+    { options & joins: options.joins |> List.prepend joinSql }
+
+useOuter : Outer table, (table -> Expr pg a) -> NullableExpr pg a
+useOuter = \@Outer table, expr ->
+    # DESIGN: break into its own module? might help combine multiple outer joins
+    asNullable (expr table)
 
 on = \toA, b -> \table -> toA table |> eq b
 
@@ -610,8 +639,8 @@ null = @Expr {
     decode: Sql.Types.nullable (Sql.Types.fail "not null"),
 }
 
-present : Expr pg roc -> NullableExpr pg roc
-present = \@Expr a ->
+asNullable : Expr pg roc -> NullableExpr pg roc
+asNullable = \@Expr a ->
     @Expr {
         sql: a.sql,
         decode: Sql.Types.nullable a.decode,
