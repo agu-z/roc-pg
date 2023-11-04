@@ -6,7 +6,6 @@ interface Sql.Types exposes [
         succeed,
         fail,
         nullable,
-        Nullable,
         i16,
         i32,
         i64,
@@ -25,7 +24,9 @@ interface Sql.Types exposes [
         PgBool,
         PgCmp,
     ]
-    imports []
+    imports [
+        Sql.Nullable.{ Nullable },
+    ]
 
 # Decoding
 
@@ -52,8 +53,6 @@ succeed = \value -> @Decode \_ -> Ok value
 fail : Str -> Decode pg a
 fail = \message -> @Decode \_ -> Err (Error message)
 
-Nullable a : [Null, Present a]
-
 nullable : Decode pg a -> Decode (Nullable pg) (Nullable a)
 nullable = \@Decode sub ->
     bytes <- @Decode
@@ -63,7 +62,7 @@ nullable = \@Decode sub ->
         Ok Null
     else
         sub bytes
-        |> Result.map Present
+        |> Result.map NotNull
 
 i16 : Decode PgI16 I16
 i16 = textFormat Str.toI16
@@ -120,7 +119,7 @@ array = \@Decode decodeItem ->
             Null ->
                 decodeItem []
 
-            Present val ->
+            NotNull val ->
                 decodeItem val
 
 row : (List (List U8) -> Result a DecodeErr) -> Decode pg a
@@ -134,7 +133,7 @@ row = \decodeRow ->
             Null ->
                 []
 
-            Present val ->
+            NotNull val ->
                 val
     |> decodeRow
 
@@ -183,7 +182,7 @@ rowChar = \state, byte ->
                 if List.isEmpty state.curr && state.quote == Pending then
                     Null
                 else
-                    Present state.curr
+                    NotNull state.curr
 
             { state &
                 items: state.items |> List.append item,
@@ -201,31 +200,31 @@ prs = \input ->
     |> List.map \item ->
         when item is
             Null -> Null
-            Present present ->
+            NotNull present ->
                 present
                 |> Str.fromUtf8
                 |> Result.withDefault ""
-                |> Present
+                |> NotNull
 
-expect prs "(42)" == [Present "42"]
-expect prs "(42,hi)" == [Present "42", Present "hi"]
-expect prs "(42,\" hi\")" == [Present "42", Present " hi"]
-expect prs "(\"hello world\",hi)" == [Present "hello world", Present "hi"]
-expect prs "(\"hello \\\"Agus\\\"\",21)" == [Present "hello \"Agus\"", Present "21"]
-expect prs "(\"hello \"\"Agus\"\"\",21)" == [Present "hello \"Agus\"", Present "21"]
-expect prs "(\"a\"\"\")" == [Present "a\""]
-expect prs "(\"a\\\\b\")" == [Present "a\\b"]
-expect prs "(\"a\nb\")" == [Present "a\nb"]
-expect prs "(\"hi, world!\",\"hello, agus\")" == [Present "hi, world!", Present "hello, agus"]
-expect prs "(spaces,no quotes)" == [Present "spaces", Present "no quotes"]
-expect prs "(,prev is null)" == [Null, Present "prev is null"]
-expect prs "(next is null,)" == [Present "next is null", Null]
-expect prs "(next is null,,prev is null)" == [Present "next is null", Null, Present "prev is null"]
+expect prs "(42)" == [NotNull "42"]
+expect prs "(42,hi)" == [NotNull "42", NotNull "hi"]
+expect prs "(42,\" hi\")" == [NotNull "42", NotNull " hi"]
+expect prs "(\"hello world\",hi)" == [NotNull "hello world", NotNull "hi"]
+expect prs "(\"hello \\\"Agus\\\"\",21)" == [NotNull "hello \"Agus\"", NotNull "21"]
+expect prs "(\"hello \"\"Agus\"\"\",21)" == [NotNull "hello \"Agus\"", NotNull "21"]
+expect prs "(\"a\"\"\")" == [NotNull "a\""]
+expect prs "(\"a\\\\b\")" == [NotNull "a\\b"]
+expect prs "(\"a\nb\")" == [NotNull "a\nb"]
+expect prs "(\"hi, world!\",\"hello, agus\")" == [NotNull "hi, world!", NotNull "hello, agus"]
+expect prs "(spaces,no quotes)" == [NotNull "spaces", NotNull "no quotes"]
+expect prs "(,prev is null)" == [Null, NotNull "prev is null"]
+expect prs "(next is null,)" == [NotNull "next is null", Null]
+expect prs "(next is null,,prev is null)" == [NotNull "next is null", Null, NotNull "prev is null"]
 expect prs "()" == [Null]
 expect prs "(,)" == [Null, Null]
 expect prs "(,,)" == [Null, Null, Null]
-expect prs "(\"\")" == [Present ""]
-expect prs "(\"\",)" == [Present "", Null]
+expect prs "(\"\")" == [NotNull ""]
+expect prs "(\"\",)" == [NotNull "", Null]
 
 parseArray = \bytes ->
     bytes
@@ -273,7 +272,7 @@ arrayChar = \state, byte ->
                 if List.isEmpty state.curr && state.quote == Pending then
                     state.items
                 else
-                    state.items |> List.append (Present state.curr)
+                    state.items |> List.append (NotNull state.curr)
 
             { state &
                 items,
@@ -291,26 +290,26 @@ pas = \input ->
     |> List.map \item ->
         when item is
             Null -> Null
-            Present present ->
+            NotNull present ->
                 present
                 |> Str.fromUtf8
                 |> Result.withDefault ""
-                |> Present
+                |> NotNull
 
 expect pas "{}" == []
-expect pas "{42}" == [Present "42"]
+expect pas "{42}" == [NotNull "42"]
 expect
     result =
         pas "{\"(hi,\\\"lala\\\"\\\"\\\")\"}"
         |> List.map \item ->
             when item is
-                Present p ->
-                    Present (prs p)
+                NotNull p ->
+                    NotNull (prs p)
 
                 Null ->
                     Null
 
-    result == [Present [Present "hi", Present "lala\""]]
+    result == [NotNull [NotNull "hi", NotNull "lala\""]]
 
 textFormat : (Str -> Result a DecodeErr) -> Decode pg a
 textFormat = \fn ->
