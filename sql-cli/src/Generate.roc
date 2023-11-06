@@ -59,27 +59,44 @@ tableDef = \schemaName, table ->
 columnField = \column ->
     fieldName = Name.def column.name
 
-    typeDecoder =
-        when decoderName column.dataType is
+    decoderExpr =
+        when (column.typeCategory, column.elemDataType) is
+            ("A", NotNull elemType) ->
+                elemDecoder = decoder {
+                    type: elemType,
+                    isNullable: Bool.true,
+                }
+
+                "(Sql.Types.array \(elemDecoder))"
+
+            _ ->
+                decoder {
+                    type: column.dataType,
+                    isNullable: column.isNullable,
+                }
+
+    columnName = Name.sqlName column.name
+
+    "\(fieldName): identifier alias \(columnName) \(decoderExpr),"
+    |> indent 2
+
+decoder : { type : Str, isNullable : Bool } -> Str
+decoder = \column ->
+    inner =
+        when elemTypeDecoder column.type is
             Ok name ->
                 "Sql.Types.\(name)"
 
             Err Unsupported ->
-                "(Sql.Types.unsupported \"\(column.dataType)\")"
+                "(Sql.Types.unsupported \"\(column.type)\")"
 
-    decoder =
-        if column.isNullable then
-            "(Sql.Types.nullable \(typeDecoder))"
-        else
-            typeDecoder
+    if column.isNullable then
+        "(Sql.Types.nullable \(inner))"
+    else
+        inner
 
-    columnName = Name.sqlName column.name
-
-    "\(fieldName): identifier alias \(columnName) \(decoder),"
-    |> indent 2
-
-decoderName : Str -> Result Str [Unsupported]
-decoderName = \sqlType ->
+elemTypeDecoder : Str -> Result Str [Unsupported]
+elemTypeDecoder = \sqlType ->
     when sqlType is
         "int2" ->
             Ok "i16"
@@ -117,7 +134,6 @@ decoderName = \sqlType ->
             # - bit strings
             # - text search
             # - json
-            # - arrays
             # - composite
             Err Unsupported
 
@@ -132,24 +148,25 @@ expect
             name: "products",
             schema: "public",
             columns: [
-                { name: "name", dataType: "text", isNullable: Bool.false },
-                { name: "price", dataType: "numeric", isNullable: Bool.true },
+                { name: "name", dataType: "text", isNullable: Bool.false, typeCategory: "S", elemDataType: Null },
+                { name: "price", dataType: "numeric", isNullable: Bool.true, typeCategory: "N", elemDataType: Null },
             ],
         },
         {
             name: "users",
             schema: "public",
             columns: [
-                { name: "id", dataType: "int4", isNullable: Bool.false },
-                { name: "active", dataType: "bool", isNullable: Bool.false },
+                { name: "id", dataType: "int4", isNullable: Bool.false, typeCategory: "N", elemDataType: Null },
+                { name: "active", dataType: "bool", isNullable: Bool.false, typeCategory: "B", elemDataType: Null },
+                { name: "permissions", dataType: "_text", isNullable: Bool.false, typeCategory: "A", elemDataType: NotNull "text" },
             ],
         },
         {
             name: "productUsers",
             schema: "public",
             columns: [
-                { name: "userId", dataType: "int4", isNullable: Bool.false },
-                { name: "productId", dataType: "int4", isNullable: Bool.false },
+                { name: "userId", dataType: "int4", isNullable: Bool.false, typeCategory: "N", elemDataType: Null },
+                { name: "productId", dataType: "int4", isNullable: Bool.false, typeCategory: "N", elemDataType: Null },
                 {
                     name:
                     """
@@ -157,6 +174,8 @@ expect
                     """,
                     dataType: "int4",
                     isNullable: Bool.false,
+                    typeCategory: "N",
+                    elemDataType: Null,
                 },
             ],
         },
@@ -194,6 +213,7 @@ expect
             columns: \\alias -> {
                 id: identifier alias "id" Sql.Types.i32,
                 active: identifier alias "active" Sql.Types.bool,
+                permissions: identifier alias "permissions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
             },
         }
 

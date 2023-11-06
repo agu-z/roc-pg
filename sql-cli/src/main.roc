@@ -12,10 +12,26 @@ app "roc-sql"
         pg.Pg.Client,
         pg.Pg.Cmd,
         pg.Pg.Result,
-        pg.Sql.{ from, join, on, select, where, eq, gt, not, into, column, in, str, i16, rowArray },
+        pg.Sql.{
+            from,
+            join,
+            leftJoin,
+            on,
+            useOuter,
+            select,
+            where,
+            eq,
+            gt,
+            not,
+            into,
+            column,
+            in,
+            str,
+            i16,
+            rowArray,
+        },
         PgCatalog,
         Generate,
-
     ]
     provides [main] to pf
 
@@ -68,10 +84,13 @@ tablesQuery = \schemaName ->
 columnsQuery = \tables ->
     columns <- from PgCatalog.pgAttribute
     typ <- join PgCatalog.pgType (on .oid columns.atttypid)
+    elemTyp <- leftJoin PgCatalog.pgType (on .oid typ.typelem)
 
     into {
         name: <- column columns.attname,
         dataType: <- column typ.typname,
+        typeCategory: <- column typ.typcategory,
+        elemDataType: <- column (useOuter elemTyp .typname),
         isNullable: <- column (not columns.attnotnull),
     }
     |> select

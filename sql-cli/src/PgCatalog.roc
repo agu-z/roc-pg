@@ -177,11 +177,11 @@ pgStatistic = {
         stavalues3: identifier alias "stavalues3" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
         stavalues2: identifier alias "stavalues2" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
         stavalues1: identifier alias "stavalues1" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
-        stanumbers5: identifier alias "stanumbers5" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        stanumbers4: identifier alias "stanumbers4" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        stanumbers3: identifier alias "stanumbers3" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        stanumbers2: identifier alias "stanumbers2" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        stanumbers1: identifier alias "stanumbers1" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
+        stanumbers5: identifier alias "stanumbers5" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        stanumbers4: identifier alias "stanumbers4" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        stanumbers3: identifier alias "stanumbers3" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        stanumbers2: identifier alias "stanumbers2" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        stanumbers1: identifier alias "stanumbers1" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
     },
 }
 
@@ -221,7 +221,7 @@ pgType = {
         typnamespace: identifier alias "typnamespace" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
         typdefaultbin: identifier alias "typdefaultbin" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
-        typacl: identifier alias "typacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        typacl: identifier alias "typacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -232,7 +232,7 @@ pgForeignTable = {
     columns: \alias -> {
         ftserver: identifier alias "ftserver" Sql.Types.i32,
         ftrelid: identifier alias "ftrelid" Sql.Types.i32,
-        ftoptions: identifier alias "ftoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        ftoptions: identifier alias "ftoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -269,7 +269,7 @@ pgShadow = {
         passwd: identifier alias "passwd" (Sql.Types.nullable Sql.Types.str),
         usesysid: identifier alias "usesysid" (Sql.Types.nullable Sql.Types.i32),
         valuntil: identifier alias "valuntil" (Sql.Types.nullable (Sql.Types.unsupported "timestamptz")),
-        useconfig: identifier alias "useconfig" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        useconfig: identifier alias "useconfig" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -290,7 +290,7 @@ pgRoles = {
         rolpassword: identifier alias "rolpassword" (Sql.Types.nullable Sql.Types.str),
         oid: identifier alias "oid" (Sql.Types.nullable Sql.Types.i32),
         rolvaliduntil: identifier alias "rolvaliduntil" (Sql.Types.nullable (Sql.Types.unsupported "timestamptz")),
-        rolconfig: identifier alias "rolconfig" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        rolconfig: identifier alias "rolconfig" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -304,7 +304,7 @@ pgStatisticExtData = {
         stxdndistinct: identifier alias "stxdndistinct" (Sql.Types.nullable (Sql.Types.unsupported "pg_ndistinct")),
         stxddependencies: identifier alias "stxddependencies" (Sql.Types.nullable (Sql.Types.unsupported "pg_dependencies")),
         stxdmcv: identifier alias "stxdmcv" (Sql.Types.nullable (Sql.Types.unsupported "pg_mcv_list")),
-        stxdexpr: identifier alias "stxdexpr" (Sql.Types.nullable (Sql.Types.unsupported "_pg_statistic")),
+        stxdexpr: identifier alias "stxdexpr" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "pg_statistic"))),
     },
 }
 
@@ -329,7 +329,7 @@ pgSettings = {
         unit: identifier alias "unit" (Sql.Types.nullable Sql.Types.str),
         setting: identifier alias "setting" (Sql.Types.nullable Sql.Types.str),
         name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
-        enumvals: identifier alias "enumvals" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        enumvals: identifier alias "enumvals" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -359,9 +359,9 @@ pgHbaFileRules = {
         netmask: identifier alias "netmask" (Sql.Types.nullable Sql.Types.str),
         address: identifier alias "address" (Sql.Types.nullable Sql.Types.str),
         type: identifier alias "type" (Sql.Types.nullable Sql.Types.str),
-        options: identifier alias "options" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        userName: identifier alias "user_name" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        database: identifier alias "database" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        options: identifier alias "options" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        userName: identifier alias "user_name" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        database: identifier alias "database" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -425,7 +425,7 @@ pgUserMapping = {
         umserver: identifier alias "umserver" Sql.Types.i32,
         umuser: identifier alias "umuser" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        umoptions: identifier alias "umoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        umoptions: identifier alias "umoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -489,7 +489,7 @@ pgSubscription = {
         subdbid: identifier alias "subdbid" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
         subskiplsn: identifier alias "subskiplsn" (Sql.Types.unsupported "pg_lsn"),
-        subpublications: identifier alias "subpublications" (Sql.Types.unsupported "_text"),
+        subpublications: identifier alias "subpublications" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -521,9 +521,9 @@ pgAttribute = {
         atttypid: identifier alias "atttypid" Sql.Types.i32,
         attrelid: identifier alias "attrelid" Sql.Types.i32,
         attmissingval: identifier alias "attmissingval" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
-        attfdwoptions: identifier alias "attfdwoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        attoptions: identifier alias "attoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        attacl: identifier alias "attacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        attfdwoptions: identifier alias "attfdwoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        attoptions: identifier alias "attoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        attacl: identifier alias "attacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -551,17 +551,17 @@ pgProc = {
         proowner: identifier alias "proowner" Sql.Types.i32,
         pronamespace: identifier alias "pronamespace" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        proargtypes: identifier alias "proargtypes" (Sql.Types.unsupported "oidvector"),
+        proargtypes: identifier alias "proargtypes" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
         prosqlbody: identifier alias "prosqlbody" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
         proargdefaults: identifier alias "proargdefaults" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
         prorows: identifier alias "prorows" Sql.Types.f32,
         procost: identifier alias "procost" Sql.Types.f32,
-        proargmodes: identifier alias "proargmodes" (Sql.Types.nullable (Sql.Types.unsupported "_char")),
-        proconfig: identifier alias "proconfig" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        proargnames: identifier alias "proargnames" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        protrftypes: identifier alias "protrftypes" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
-        proallargtypes: identifier alias "proallargtypes" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
-        proacl: identifier alias "proacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        proargmodes: identifier alias "proargmodes" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        proconfig: identifier alias "proconfig" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        proargnames: identifier alias "proargnames" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        protrftypes: identifier alias "protrftypes" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        proallargtypes: identifier alias "proallargtypes" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        proacl: identifier alias "proacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -601,8 +601,8 @@ pgClass = {
         relfrozenxid: identifier alias "relfrozenxid" Sql.Types.i32,
         relpartbound: identifier alias "relpartbound" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
         reltuples: identifier alias "reltuples" Sql.Types.f32,
-        reloptions: identifier alias "reloptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        relacl: identifier alias "relacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        reloptions: identifier alias "reloptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        relacl: identifier alias "relacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -642,13 +642,13 @@ pgConstraint = {
         connamespace: identifier alias "connamespace" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
         conbin: identifier alias "conbin" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
-        confdelsetcols: identifier alias "confdelsetcols" (Sql.Types.nullable (Sql.Types.unsupported "_int2")),
-        confkey: identifier alias "confkey" (Sql.Types.nullable (Sql.Types.unsupported "_int2")),
-        conkey: identifier alias "conkey" (Sql.Types.nullable (Sql.Types.unsupported "_int2")),
-        conexclop: identifier alias "conexclop" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
-        conffeqop: identifier alias "conffeqop" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
-        conppeqop: identifier alias "conppeqop" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
-        conpfeqop: identifier alias "conpfeqop" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
+        confdelsetcols: identifier alias "confdelsetcols" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
+        confkey: identifier alias "confkey" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
+        conkey: identifier alias "conkey" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
+        conexclop: identifier alias "conexclop" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        conffeqop: identifier alias "conffeqop" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        conppeqop: identifier alias "conppeqop" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        conpfeqop: identifier alias "conpfeqop" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
     },
 }
 
@@ -682,12 +682,12 @@ pgIndex = {
         indisunique: identifier alias "indisunique" Sql.Types.bool,
         indnkeyatts: identifier alias "indnkeyatts" Sql.Types.i16,
         indnatts: identifier alias "indnatts" Sql.Types.i16,
-        indoption: identifier alias "indoption" (Sql.Types.unsupported "int2vector"),
-        indkey: identifier alias "indkey" (Sql.Types.unsupported "int2vector"),
+        indoption: identifier alias "indoption" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
+        indkey: identifier alias "indkey" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
         indrelid: identifier alias "indrelid" Sql.Types.i32,
         indexrelid: identifier alias "indexrelid" Sql.Types.i32,
-        indclass: identifier alias "indclass" (Sql.Types.unsupported "oidvector"),
-        indcollation: identifier alias "indcollation" (Sql.Types.unsupported "oidvector"),
+        indclass: identifier alias "indclass" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        indcollation: identifier alias "indcollation" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
         indpred: identifier alias "indpred" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
         indexprs: identifier alias "indexprs" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
     },
@@ -888,7 +888,7 @@ pgLanguage = {
         lanplcallfoid: identifier alias "lanplcallfoid" Sql.Types.i32,
         lanowner: identifier alias "lanowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        lanacl: identifier alias "lanacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        lanacl: identifier alias "lanacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -899,7 +899,7 @@ pgLargeobjectMetadata = {
     columns: \alias -> {
         lomowner: identifier alias "lomowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        lomacl: identifier alias "lomacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        lomacl: identifier alias "lomacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -939,14 +939,14 @@ pgStatisticExt = {
     alias: "pse",
     columns: \alias -> {
         stxname: identifier alias "stxname" Sql.Types.str,
-        stxkeys: identifier alias "stxkeys" (Sql.Types.unsupported "int2vector"),
+        stxkeys: identifier alias "stxkeys" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
         stxstattarget: identifier alias "stxstattarget" Sql.Types.i32,
         stxowner: identifier alias "stxowner" Sql.Types.i32,
         stxnamespace: identifier alias "stxnamespace" Sql.Types.i32,
         stxrelid: identifier alias "stxrelid" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
         stxexprs: identifier alias "stxexprs" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
-        stxkind: identifier alias "stxkind" (Sql.Types.unsupported "_char"),
+        stxkind: identifier alias "stxkind" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -981,7 +981,7 @@ pgTrigger = {
         tgname: identifier alias "tgname" Sql.Types.str,
         tgnargs: identifier alias "tgnargs" Sql.Types.i16,
         tgtype: identifier alias "tgtype" Sql.Types.i16,
-        tgattr: identifier alias "tgattr" (Sql.Types.unsupported "int2vector"),
+        tgattr: identifier alias "tgattr" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
         tgconstraint: identifier alias "tgconstraint" Sql.Types.i32,
         tgconstrindid: identifier alias "tgconstrindid" Sql.Types.i32,
         tgconstrrelid: identifier alias "tgconstrrelid" Sql.Types.i32,
@@ -1004,7 +1004,7 @@ pgEventTrigger = {
         evtfoid: identifier alias "evtfoid" Sql.Types.i32,
         evtowner: identifier alias "evtowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        evttags: identifier alias "evttags" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        evttags: identifier alias "evttags" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -1054,7 +1054,7 @@ pgNamespace = {
         nspname: identifier alias "nspname" Sql.Types.str,
         nspowner: identifier alias "nspowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        nspacl: identifier alias "nspacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        nspacl: identifier alias "nspacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1109,7 +1109,7 @@ pgDatabase = {
         oid: identifier alias "oid" Sql.Types.i32,
         datminmxid: identifier alias "datminmxid" Sql.Types.i32,
         datfrozenxid: identifier alias "datfrozenxid" Sql.Types.i32,
-        datacl: identifier alias "datacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        datacl: identifier alias "datacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1120,7 +1120,7 @@ pgDbRoleSetting = {
     columns: \alias -> {
         setrole: identifier alias "setrole" Sql.Types.i32,
         setdatabase: identifier alias "setdatabase" Sql.Types.i32,
-        setconfig: identifier alias "setconfig" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        setconfig: identifier alias "setconfig" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -1132,8 +1132,8 @@ pgTablespace = {
         spcname: identifier alias "spcname" Sql.Types.str,
         spcowner: identifier alias "spcowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        spcoptions: identifier alias "spcoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        spcacl: identifier alias "spcacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        spcoptions: identifier alias "spcoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        spcacl: identifier alias "spcacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1254,8 +1254,8 @@ pgExtension = {
         extnamespace: identifier alias "extnamespace" Sql.Types.i32,
         extowner: identifier alias "extowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        extcondition: identifier alias "extcondition" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        extconfig: identifier alias "extconfig" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
+        extcondition: identifier alias "extcondition" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        extconfig: identifier alias "extconfig" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
     },
 }
 
@@ -1269,8 +1269,8 @@ pgForeignDataWrapper = {
         fdwhandler: identifier alias "fdwhandler" Sql.Types.i32,
         fdwowner: identifier alias "fdwowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        fdwoptions: identifier alias "fdwoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        fdwacl: identifier alias "fdwacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        fdwoptions: identifier alias "fdwoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        fdwacl: identifier alias "fdwacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1285,8 +1285,8 @@ pgForeignServer = {
         srvfdw: identifier alias "srvfdw" Sql.Types.i32,
         srvowner: identifier alias "srvowner" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        srvoptions: identifier alias "srvoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        srvacl: identifier alias "srvacl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        srvoptions: identifier alias "srvoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        srvacl: identifier alias "srvacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1302,7 +1302,7 @@ pgPolicy = {
         oid: identifier alias "oid" Sql.Types.i32,
         polwithcheck: identifier alias "polwithcheck" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
         polqual: identifier alias "polqual" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
-        polroles: identifier alias "polroles" (Sql.Types.unsupported "_oid"),
+        polroles: identifier alias "polroles" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
     },
 }
 
@@ -1325,7 +1325,7 @@ pgDefaultAcl = {
         defaclnamespace: identifier alias "defaclnamespace" Sql.Types.i32,
         defaclrole: identifier alias "defaclrole" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
-        defaclacl: identifier alias "defaclacl" (Sql.Types.unsupported "_aclitem"),
+        defaclacl: identifier alias "defaclacl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1338,7 +1338,7 @@ pgInitPrivs = {
         objsubid: identifier alias "objsubid" Sql.Types.i32,
         classoid: identifier alias "classoid" Sql.Types.i32,
         objoid: identifier alias "objoid" Sql.Types.i32,
-        initprivs: identifier alias "initprivs" (Sql.Types.unsupported "_aclitem"),
+        initprivs: identifier alias "initprivs" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1393,7 +1393,7 @@ pgParameterAcl = {
     columns: \alias -> {
         parname: identifier alias "parname" Sql.Types.str,
         oid: identifier alias "oid" Sql.Types.i32,
-        paracl: identifier alias "paracl" (Sql.Types.nullable (Sql.Types.unsupported "_aclitem")),
+        paracl: identifier alias "paracl" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem"))),
     },
 }
 
@@ -1404,11 +1404,11 @@ pgPartitionedTable = {
     columns: \alias -> {
         partstrat: identifier alias "partstrat" Sql.Types.str,
         partnatts: identifier alias "partnatts" Sql.Types.i16,
-        partattrs: identifier alias "partattrs" (Sql.Types.unsupported "int2vector"),
+        partattrs: identifier alias "partattrs" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
         partdefid: identifier alias "partdefid" Sql.Types.i32,
         partrelid: identifier alias "partrelid" Sql.Types.i32,
-        partcollation: identifier alias "partcollation" (Sql.Types.unsupported "oidvector"),
-        partclass: identifier alias "partclass" (Sql.Types.unsupported "oidvector"),
+        partcollation: identifier alias "partcollation" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
+        partclass: identifier alias "partclass" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
         partexprs: identifier alias "partexprs" (Sql.Types.nullable (Sql.Types.unsupported "pg_node_tree")),
     },
 }
@@ -1490,7 +1490,7 @@ pgPublicationRel = {
     name: "pg_publication_rel",
     alias: "ppr",
     columns: \alias -> {
-        prattrs: identifier alias "prattrs" (Sql.Types.nullable (Sql.Types.unsupported "int2vector")),
+        prattrs: identifier alias "prattrs" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
         prrelid: identifier alias "prrelid" Sql.Types.i32,
         prpubid: identifier alias "prpubid" Sql.Types.i32,
         oid: identifier alias "oid" Sql.Types.i32,
@@ -1517,7 +1517,7 @@ pgGroup = {
     columns: \alias -> {
         groname: identifier alias "groname" (Sql.Types.nullable Sql.Types.str),
         grosysid: identifier alias "grosysid" (Sql.Types.nullable Sql.Types.i32),
-        grolist: identifier alias "grolist" (Sql.Types.nullable (Sql.Types.unsupported "_oid")),
+        grolist: identifier alias "grolist" (Sql.Types.array (Sql.Types.nullable Sql.Types.i32)),
     },
 }
 
@@ -1534,7 +1534,7 @@ pgUser = {
         passwd: identifier alias "passwd" (Sql.Types.nullable Sql.Types.str),
         usesysid: identifier alias "usesysid" (Sql.Types.nullable Sql.Types.i32),
         valuntil: identifier alias "valuntil" (Sql.Types.nullable (Sql.Types.unsupported "timestamptz")),
-        useconfig: identifier alias "useconfig" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        useconfig: identifier alias "useconfig" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -1550,7 +1550,7 @@ pgPolicies = {
         qual: identifier alias "qual" (Sql.Types.nullable Sql.Types.str),
         cmd: identifier alias "cmd" (Sql.Types.nullable Sql.Types.str),
         permissive: identifier alias "permissive" (Sql.Types.nullable Sql.Types.str),
-        roles: identifier alias "roles" (Sql.Types.nullable (Sql.Types.unsupported "_name")),
+        roles: identifier alias "roles" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -1657,9 +1657,9 @@ pgStats = {
         mostCommonElems: identifier alias "most_common_elems" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
         histogramBounds: identifier alias "histogram_bounds" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
         mostCommonVals: identifier alias "most_common_vals" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
-        elemCountHistogram: identifier alias "elem_count_histogram" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        mostCommonElemFreqs: identifier alias "most_common_elem_freqs" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        mostCommonFreqs: identifier alias "most_common_freqs" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
+        elemCountHistogram: identifier alias "elem_count_histogram" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        mostCommonElemFreqs: identifier alias "most_common_elem_freqs" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        mostCommonFreqs: identifier alias "most_common_freqs" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
     },
 }
 
@@ -1676,13 +1676,13 @@ pgStatsExt = {
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         nDistinct: identifier alias "n_distinct" (Sql.Types.nullable (Sql.Types.unsupported "pg_ndistinct")),
         dependencies: identifier alias "dependencies" (Sql.Types.nullable (Sql.Types.unsupported "pg_dependencies")),
-        mostCommonValNulls: identifier alias "most_common_val_nulls" (Sql.Types.nullable (Sql.Types.unsupported "_bool")),
-        kinds: identifier alias "kinds" (Sql.Types.nullable (Sql.Types.unsupported "_char")),
-        attnames: identifier alias "attnames" (Sql.Types.nullable (Sql.Types.unsupported "_name")),
-        mostCommonVals: identifier alias "most_common_vals" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        exprs: identifier alias "exprs" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
-        mostCommonBaseFreqs: identifier alias "most_common_base_freqs" (Sql.Types.nullable (Sql.Types.unsupported "_float8")),
-        mostCommonFreqs: identifier alias "most_common_freqs" (Sql.Types.nullable (Sql.Types.unsupported "_float8")),
+        mostCommonValNulls: identifier alias "most_common_val_nulls" (Sql.Types.array (Sql.Types.nullable Sql.Types.bool)),
+        kinds: identifier alias "kinds" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        attnames: identifier alias "attnames" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        mostCommonVals: identifier alias "most_common_vals" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        exprs: identifier alias "exprs" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
+        mostCommonBaseFreqs: identifier alias "most_common_base_freqs" (Sql.Types.array (Sql.Types.nullable Sql.Types.f64)),
+        mostCommonFreqs: identifier alias "most_common_freqs" (Sql.Types.array (Sql.Types.nullable Sql.Types.f64)),
     },
 }
 
@@ -1705,9 +1705,9 @@ pgStatsExtExprs = {
         mostCommonElems: identifier alias "most_common_elems" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
         histogramBounds: identifier alias "histogram_bounds" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
         mostCommonVals: identifier alias "most_common_vals" (Sql.Types.nullable (Sql.Types.unsupported "anyarray")),
-        elemCountHistogram: identifier alias "elem_count_histogram" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        mostCommonElemFreqs: identifier alias "most_common_elem_freqs" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
-        mostCommonFreqs: identifier alias "most_common_freqs" (Sql.Types.nullable (Sql.Types.unsupported "_float4")),
+        elemCountHistogram: identifier alias "elem_count_histogram" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        mostCommonElemFreqs: identifier alias "most_common_elem_freqs" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
+        mostCommonFreqs: identifier alias "most_common_freqs" (Sql.Types.array (Sql.Types.nullable Sql.Types.f32)),
     },
 }
 
@@ -1720,7 +1720,7 @@ pgPublicationTables = {
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         pubname: identifier alias "pubname" (Sql.Types.nullable Sql.Types.str),
         rowfilter: identifier alias "rowfilter" (Sql.Types.nullable Sql.Types.str),
-        attnames: identifier alias "attnames" (Sql.Types.nullable (Sql.Types.unsupported "_name")),
+        attnames: identifier alias "attnames" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -1787,7 +1787,7 @@ pgAvailableExtensionVersions = {
         name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
         comment: identifier alias "comment" (Sql.Types.nullable Sql.Types.str),
         version: identifier alias "version" (Sql.Types.nullable Sql.Types.str),
-        requires: identifier alias "requires" (Sql.Types.nullable (Sql.Types.unsupported "_name")),
+        requires: identifier alias "requires" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
@@ -1815,7 +1815,7 @@ pgPreparedStatements = {
         statement: identifier alias "statement" (Sql.Types.nullable Sql.Types.str),
         name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
         prepareTime: identifier alias "prepare_time" (Sql.Types.nullable (Sql.Types.unsupported "timestamptz")),
-        parameterTypes: identifier alias "parameter_types" (Sql.Types.nullable (Sql.Types.unsupported "_regtype")),
+        parameterTypes: identifier alias "parameter_types" (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "regtype"))),
     },
 }
 
@@ -2538,7 +2538,7 @@ pgUserMappings = {
         umuser: identifier alias "umuser" (Sql.Types.nullable Sql.Types.i32),
         srvid: identifier alias "srvid" (Sql.Types.nullable Sql.Types.i32),
         umid: identifier alias "umid" (Sql.Types.nullable Sql.Types.i32),
-        umoptions: identifier alias "umoptions" (Sql.Types.nullable (Sql.Types.unsupported "_text")),
+        umoptions: identifier alias "umoptions" (Sql.Types.array (Sql.Types.nullable Sql.Types.str)),
     },
 }
 
