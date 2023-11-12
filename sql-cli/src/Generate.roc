@@ -40,7 +40,7 @@ module = \schema ->
 tableDef : Schema.Table, Schema -> { name : Str, def : Str }
 tableDef = \table, schema ->
     defName : Str
-    defName = Name.def table.name
+    defName = Name.identifier table.name
 
     columnDefs : List { field : Str, primaryDef : Result Str [None] }
     columnDefs =
@@ -77,7 +77,7 @@ tableDef = \table, schema ->
 
 columnDef : Schema.Column, I32, Schema -> { field : Str, primaryDef : Result Str [None] }
 columnDef = \column, tableId, schema ->
-    fieldName = Name.def column.name
+    fieldName = Name.identifier column.name
 
     columnId = (tableId, column.num)
 
@@ -85,7 +85,7 @@ columnDef = \column, tableId, schema ->
         when Schema.primaryColumn schema columnId is
             Ok pcol ->
                 qualifiedName = "\(pcol.tableName)_\(pcol.columnName)"
-                defName = Name.def qualifiedName
+                defName = Name.identifier qualifiedName
 
                 pdef =
                     if pcol.id == columnId then
