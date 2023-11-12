@@ -15,7 +15,7 @@ app "rental"
         pg.Pg.Result,
         json.Core,
         pg.Sql.{ select, into, from, column, where, eq, i32, join, on },
-        pg.Sql.Types.{ Nullable },
+        pg.Sql.Nullable.{ Nullable },
         VideoRental,
     ]
     provides [main] to pf
@@ -63,7 +63,7 @@ Address : {
     postalCode : Nullable Str,
 }
 
-selectAddress : _ -> Sql.Selection Address
+selectAddress : _ -> Sql.Selection Address err
 selectAddress = \table ->
     into {
         line1: <- table.address |> column,
