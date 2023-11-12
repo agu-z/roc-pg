@@ -11,7 +11,6 @@ interface Sql
         compileQuery,
         from,
         select,
-        identifier,
         where,
         join,
         on,
@@ -23,6 +22,8 @@ interface Sql
         asc,
         desc,
         Order,
+        identifier,
+        discardPhantom,
         i16,
         i32,
         i64,
@@ -50,6 +51,8 @@ interface Sql
         andList,
         orList,
         not,
+        true,
+        false,
         add,
         div,
         sub,
@@ -297,7 +300,7 @@ SelectOptions a : {
 
 unwrapSelect = \@Select state -> state
 
-join : Table table, (table -> Expr PgBool *), (table -> Select a err) -> Select a err
+join : Table table, (table -> Expr (PgBool *) *), (table -> Select a err) -> Select a err
 join = \table, onExpr, next ->
     @Select (joinHelp table onExpr next)
 
@@ -319,7 +322,7 @@ joinHelp = \table, onExpr, next ->
 
 Outer table := table
 
-leftJoin : Table table, (table -> Expr PgBool *), (Outer table -> Select a err) -> Select a err
+leftJoin : Table table, (table -> Expr (PgBool *) *), (Outer table -> Select a err) -> Select a err
 leftJoin = \table, onExpr, next ->
     @Select (leftJoinHelp table onExpr next)
 
@@ -359,7 +362,7 @@ select = \a ->
     |> State.ok
     |> @Select
 
-where : Select a err, Expr PgBool * -> Select a err
+where : Select a err, Expr (PgBool *) * -> Select a err
 where =
     options, (@Expr expr) <- updateOptions
 
@@ -606,27 +609,39 @@ identifier = \table, col, decode -> @Expr {
         decode,
     }
 
+## Discards the phantom type variable that represents the SQL-level type.
+##
+## This should be used as a last resort, when the query builder is preventing you
+## from writing an expression that you know it's valid.
+##
+## IMPORTANT: The compiled expression won't include a SQL cast!
+discardPhantom : Expr * roc -> Expr * roc
+discardPhantom = \@Expr expr -> @Expr {
+        sql: expr.sql,
+        decode: Sql.Types.discardPhantom expr.decode,
+    }
+
 # Expr: Literals
 
-i16 : I16 -> Expr PgI16 I16
+i16 : I16 -> Expr (PgI16 *) I16
 i16 = \value -> @Expr {
         sql: [Param (Pg.Cmd.i16 value)],
         decode: Sql.Types.i16,
     }
 
-i32 : I32 -> Expr PgI32 I32
+i32 : I32 -> Expr (PgI32 *) I32
 i32 = \value -> @Expr {
         sql: [Param (Pg.Cmd.i32 value)],
         decode: Sql.Types.i32,
     }
 
-i64 : I64 -> Expr PgI64 I64
+i64 : I64 -> Expr (PgI64 *) I64
 i64 = \value -> @Expr {
         sql: [Param (Pg.Cmd.i64 value)],
         decode: Sql.Types.i64,
     }
 
-str : Str -> Expr PgText Str
+str : Str -> Expr (PgText *) Str
 str = \value ->
     @Expr {
         sql: [Param (Pg.Cmd.str value)],
@@ -648,56 +663,56 @@ asNullable = \@Expr a ->
 
 # Expr: Comparison
 
-isNull : NullableExpr * * -> Expr PgBool Bool
+isNull : NullableExpr * * -> Expr (PgBool *) Bool
 isNull = \@Expr a ->
     @Expr {
         sql: a.sql |> List.append (Raw " is null"),
         decode: Sql.Types.bool,
     }
 
-isNotNull : NullableExpr * * -> Expr PgBool Bool
+isNotNull : NullableExpr * * -> Expr (PgBool *) Bool
 isNotNull = \@Expr a ->
     @Expr {
         sql: a.sql |> List.append (Raw " is not null"),
         decode: Sql.Types.bool,
     }
 
-isDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr PgBool Bool
+isDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr (PgBool *) Bool
 isDistinctFrom = \a, b -> boolOp a "is distinct from" b
 
-isNotDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr PgBool Bool
+isNotDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr (PgBool *) Bool
 isNotDistinctFrom = \a, b -> boolOp a "is not distinct from" b
 
 nullableEq = isNotDistinctFrom
 
 nullableNeq = isDistinctFrom
 
-concat : Expr PgText *, Expr PgText * -> Expr PgText Str
+concat : Expr (PgText *) *, Expr (PgText *) * -> Expr (PgText *) Str
 concat = \@Expr a, @Expr b ->
     @Expr {
         sql: binOp a.sql "||" b.sql,
         decode: Sql.Types.str,
     }
 
-lt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+lt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
 lt = \a, b -> boolOp a "<" b
 
-lte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+lte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
 lte = \a, b -> boolOp a "<=" b
 
-eq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+eq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
 eq = \a, b -> boolOp a "=" b
 
-neq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+neq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
 neq = \a, b -> boolOp a "<>" b
 
-gte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+gte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
 gte = \a, b -> boolOp a ">=" b
 
-gt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr PgBool Bool
+gt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
 gt = \a, b -> boolOp a ">" b
 
-in : Expr (PgCmp a) *, (item -> Expr (PgCmp a) *), List item -> Expr PgBool Bool
+in : Expr (PgCmp a) *, (item -> Expr (PgCmp a) *), List item -> Expr (PgBool *) Bool
 in = \@Expr needle, toExpr, haystack ->
     itemToSql = \item ->
         (@Expr { sql }) = toExpr item
@@ -720,15 +735,15 @@ in = \@Expr needle, toExpr, haystack ->
         decode: Sql.Types.bool,
     }
 
-like : Expr PgText *, Expr PgText * -> Expr PgBool Bool
+like : Expr (PgText *) *, Expr (PgText *) * -> Expr (PgBool *) Bool
 like = \a, b ->
     boolOp a "like" b
 
-ilike : Expr PgText *, Expr PgText * -> Expr PgBool Bool
+ilike : Expr (PgText *) *, Expr (PgText *) * -> Expr (PgBool *) Bool
 ilike = \a, b ->
     boolOp a "ilike" b
 
-boolOp : Expr pg *, Str, Expr pg * -> Expr PgBool Bool
+boolOp : Expr * *, Str, Expr * * -> Expr (PgBool *) Bool
 boolOp = \@Expr a, op, @Expr b ->
     @Expr {
         sql: binOp a.sql op b.sql,
@@ -738,17 +753,17 @@ boolOp = \@Expr a, op, @Expr b ->
 # Expr: Logical
 # TODO: Test precendence is ok!
 
-and : Expr PgBool *, Expr PgBool * -> Expr PgBool Bool
+and : Expr (PgBool *) *, Expr (PgBool *) * -> Expr (PgBool *) Bool
 and = \a, b -> boolOp a "and" b
 
-or : Expr PgBool *, Expr PgBool * -> Expr PgBool Bool
+or : Expr (PgBool *) *, Expr (PgBool a) * -> Expr (PgBool *) Bool
 or = \@Expr a, @Expr b ->
     @Expr {
         sql: binOpParens a.sql "or" b.sql,
         decode: Sql.Types.bool,
     }
 
-not : Expr PgBool * -> Expr PgBool Bool
+not : Expr (PgBool *) * -> Expr (PgBool *) Bool
 not = \@Expr a ->
     @Expr {
         sql: [Raw "not ("]
@@ -758,14 +773,17 @@ not = \@Expr a ->
         decode: Sql.Types.bool,
     }
 
-andList : List (Expr PgBool Bool) -> Expr PgBool Bool
+andList : List (Expr (PgBool a) Bool) -> Expr (PgBool a) Bool
 andList = \exprs ->
-    joinBool true and exprs
+    joinBool openTrue and exprs
 
-orList : List (Expr PgBool Bool) -> Expr PgBool Bool
+orList : List (Expr (PgBool a) Bool) -> Expr (PgBool a) Bool
 orList = \exprs ->
-    joinBool false or exprs
+    joinBool openFalse or exprs
 
+BoolOp a : Expr (PgBool a) Bool, Expr (PgBool a) Bool -> Expr (PgBool a) Bool
+
+joinBool : Expr (PgBool a) Bool, BoolOp a, List (Expr (PgBool a) Bool) -> Expr (PgBool a) Bool
 joinBool = \default, operator, exprs ->
     # We could simplify this by using default as the initial value,
     # but in most cases we would produce something like (true and ...),
@@ -786,14 +804,26 @@ joinBool = \default, operator, exprs ->
         NotEmpty expr ->
             expr
 
-true : Expr PgBool Bool
+true : Expr (PgBool a) Bool
 true = @Expr {
     sql: [Raw "true"],
     decode: Sql.Types.bool,
 }
 
-false : Expr PgBool Bool
+false : Expr (PgBool *) Bool
 false = @Expr {
+    sql: [Raw "false"],
+    decode: Sql.Types.bool,
+}
+
+# These are needed for `andList` and `orList`
+
+openTrue = @Expr {
+    sql: [Raw "true"],
+    decode: Sql.Types.bool,
+}
+
+openFalse = @Expr {
     sql: [Raw "false"],
     decode: Sql.Types.bool,
 }

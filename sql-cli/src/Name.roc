@@ -1,6 +1,7 @@
 interface Name
     exposes [
         module,
+        type,
         def,
         tableAlias,
         sqlName,
@@ -61,12 +62,15 @@ pascalCase = \name ->
                 ""
     |> Str.joinWith ""
 
+expect pascalCase "product_users" == "ProductUsers"
+expect pascalCase "order_Products" == "OrderProducts"
+expect pascalCase "123" == "N123"
+
 module : Str -> Str
 module = pascalCase
 
-expect module "product_users" == "ProductUsers"
-expect module "order_Products" == "OrderProducts"
-expect module "123" == "N123"
+type : Str -> Str
+type = pascalCase
 
 tableAlias : Str -> Str
 tableAlias = \name ->

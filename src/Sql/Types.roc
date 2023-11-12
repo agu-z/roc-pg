@@ -6,6 +6,7 @@ interface Sql.Types exposes [
         succeed,
         fail,
         nullable,
+        discardPhantom,
         i16,
         i32,
         i64,
@@ -15,6 +16,7 @@ interface Sql.Types exposes [
         str,
         bool,
         unsupported,
+        Raw,
         row,
         array,
         PgI16,
@@ -64,28 +66,31 @@ nullable = \@Decode sub ->
         sub bytes
         |> Result.map NotNull
 
-i16 : Decode PgI16 I16
+discardPhantom : Decode * a -> Decode * a
+discardPhantom = \@Decode sub -> @Decode sub
+
+i16 : Decode (PgI16 *) I16
 i16 = textFormat Str.toI16
 
-i32 : Decode PgI32 I32
+i32 : Decode (PgI32 *) I32
 i32 = textFormat Str.toI32
 
-i64 : Decode PgI64 I64
+i64 : Decode (PgI64 *) I64
 i64 = textFormat Str.toI64
 
-f32 : Decode PgF32 F32
+f32 : Decode (PgF32 *) F32
 f32 = textFormat Str.toF32
 
-f64 : Decode PgF64 F64
+f64 : Decode (PgF64 *) F64
 f64 = textFormat Str.toF64
 
-dec : Decode (PgNum *) Dec
+dec : Decode (PgDec *) Dec
 dec = textFormat Str.toDec
 
-str : Decode PgText Str
+str : Decode (PgText *) Str
 str = textFormat Ok
 
-bool : Decode PgBool Bool
+bool : Decode (PgBool *) Bool
 bool =
     bytes <- @Decode
 
@@ -99,16 +104,21 @@ bool =
         _ ->
             Err (InvalidBool bytes)
 
+Raw : {
+    bytes : List U8,
+    typeName : Str,
+}
+
+unsupported : Str -> Decode * Raw
 unsupported = \typeName ->
     bytes <- @Decode
 
-    Unsupported {
+    Ok {
         bytes,
         typeName,
     }
-    |> Ok
 
-array : Decode pg a -> Decode (PgArray pg) (List a)
+array : Decode pg a -> Decode (PgArray pg *) (List a)
 array = \@Decode decodeItem ->
     arrayBytes <- @Decode
 
@@ -328,14 +338,16 @@ PgCmp a : { eq : {} }a
 
 PgNum a : PgCmp { num : {} }a
 
-PgI16 : PgNum { i16 : {} }
-PgI32 : PgNum { i32 : {} }
-PgI64 : PgNum { i64 : {} }
-PgF32 : PgNum { f32 : {} }
-PgF64 : PgNum { f64 : {} }
+PgI16 a : PgNum { i16 : {} }a
+PgI32 a : PgNum { i32 : {} }a
+PgI64 a : PgNum { i64 : {} }a
+PgF32 a : PgNum { f32 : {} }a
+PgF64 a : PgNum { f64 : {} }a
+PgDec a : PgNum { dec : {} }a
 
-PgText : PgCmp { text : {} }
+PgText a : PgCmp { text : {} }a
 
-PgBool : PgCmp { bool : {} }
+PgBool a : PgCmp { bool : {} }a
 
-PgArray a : { array : a }
+PgArray item a : { array : item }a
+

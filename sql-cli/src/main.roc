@@ -30,8 +30,10 @@ app "roc-sql"
             i16,
             rowArray,
         },
+        pg.Sql.Nullable.{ Nullable },
         PgCatalog,
         Generate,
+        Schema,
     ]
     provides [main] to pf
 
@@ -57,15 +59,19 @@ generate = \options ->
         |> Pg.Client.command client
         |> await
 
-    Stdout.line (Generate.module options.schema tables)
+    Schema.new options.schema tables
+    |> Generate.module
+    |> Stdout.line
 
 tablesQuery = \schemaName ->
     tables <- from PgCatalog.pgClass
     schema <- join PgCatalog.pgNamespace (on .oid tables.relnamespace)
 
     into {
+        id: <- column tables.oid,
         name: <- column tables.relname,
         columns: <- rowArray (columnsQuery tables),
+        constraints: <- rowArray (constraintsQuery tables),
     }
     |> select
     |> where (schema.nspname |> eq (str schemaName))
@@ -87,6 +93,7 @@ columnsQuery = \tables ->
     elemTyp <- leftJoin PgCatalog.pgType (on .oid typ.typelem)
 
     into {
+        num: <- column columns.attnum,
         name: <- column columns.attname,
         dataType: <- column typ.typname,
         typeCategory: <- column typ.typcategory,
@@ -94,9 +101,44 @@ columnsQuery = \tables ->
         isNullable: <- column (not columns.attnotnull),
     }
     |> select
-    |> where (tables.oid |> eq columns.attrelid) # exclude dropped columns
+    |> where (Sql.discardPhantom tables.oid |> eq columns.attrelid) # exclude dropped columns
     |> where (not columns.attisdropped) # exclude system columns
     |> where (columns.attnum |> gt (i16 0))
+
+constraintsQuery = \tables ->
+    constraints <- from PgCatalog.pgConstraint
+
+    into {
+        type: <- column constraints.contype,
+        columns: <- columnNumArray constraints.conkey,
+        foreignTable: <- column constraints.confrelid,
+        foreignColumns: <- columnNumArray constraints.confkey,
+    }
+    |> select
+    |> where (tables.oid |> eq constraints.conrelid)
+    |> where
+        (
+            constraints.contype
+            |> in str [
+                "p", # primary key
+                "f", # foreign key
+            ]
+        )
+
+# TODO: add helpers to Sql to make this simpler
+columnNumArray = \expr ->
+    into \nullableArray ->
+        nullableArray
+        |> Sql.Nullable.withDefault []
+        |> List.map unwrapNullable
+    |> (column expr)
+    |> Sql.with
+
+unwrapNullable : Nullable a -> a
+unwrapNullable = \nullable ->
+    when nullable is
+        Null -> crash "unexpected null"
+        NotNull a -> a
 
 argsParser : Arg.NamedParser Options
 argsParser =
