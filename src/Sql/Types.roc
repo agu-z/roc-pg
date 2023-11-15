@@ -149,7 +149,7 @@ row = \decodeRow ->
 
 parseRow = \bytes ->
     bytes
-    |> List.dropFirst
+    |> List.dropFirst 1
     |> List.walk
         {
             items: List.withCapacity 6,
@@ -238,7 +238,7 @@ expect prs "(\"\",)" == [NotNull "", Null]
 
 parseArray = \bytes ->
     bytes
-    |> List.dropFirst
+    |> List.dropFirst 1
     |> List.walk
         {
             items: List.withCapacity 16,

@@ -65,7 +65,7 @@ with = \@Batch batch, cmd ->
 
                 Ok {
                     value: fn a,
-                    rest: List.dropFirst rest,
+                    rest: List.dropFirst rest 1,
                 }
 
             _ ->

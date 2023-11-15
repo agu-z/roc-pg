@@ -272,7 +272,7 @@ batchReadStep = \batchDecode, stream, { remaining, results } ->
             result <- readCmdResult fields stream |> await
 
             next {
-                remaining: remaining |> List.dropFirst,
+                remaining: remaining |> List.dropFirst 1,
                 results: results |> List.append result,
             }
 

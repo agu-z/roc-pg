@@ -43,7 +43,7 @@ u8 =
 
     when bytes is
         [byte, ..] ->
-            Ok { decoded: byte, remaining: List.drop bytes 1 }
+            Ok { decoded: byte, remaining: List.dropFirst bytes 1 }
 
         _ ->
             Err UnexpectedEnd
@@ -58,7 +58,7 @@ u16 =
                 Num.shiftLeftBy (Num.toU16 b0) 8
                 |> Num.bitwiseOr (Num.toU16 b1)
 
-            Ok { decoded: value, remaining: List.drop bytes 2 }
+            Ok { decoded: value, remaining: List.dropFirst bytes 2 }
 
         _ ->
             Err UnexpectedEnd
@@ -75,7 +75,7 @@ u32 =
                 |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU32 b2) 8)
                 |> Num.bitwiseOr (Num.toU32 b3)
 
-            Ok { decoded: value, remaining: List.drop bytes 4 }
+            Ok { decoded: value, remaining: List.dropFirst bytes 4 }
 
         _ ->
             Err UnexpectedEnd
@@ -96,7 +96,7 @@ u64 =
                 |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b6) 8)
                 |> Num.bitwiseOr (Num.toU64 b7)
 
-            Ok { decoded: value, remaining: List.drop bytes 8 }
+            Ok { decoded: value, remaining: List.dropFirst bytes 8 }
 
         _ ->
             Err UnexpectedEnd

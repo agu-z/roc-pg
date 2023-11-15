@@ -484,7 +484,7 @@ withHelp = \toASel, toFnSel ->
         decode = \cells ->
             fn <- fnSel.decode cells |> Result.try
             a <- cells
-                |> List.drop count
+                |> List.dropFirst count
                 |> aSel.decode
                 |> Result.map
             fn a
