@@ -377,15 +377,15 @@ where =
 
     { options & where: newWhere }
 
-limit : Select a err, Nat -> Select a err
+limit : Select a err, U64 -> Select a err
 limit =
     options, max <- updateOptions
-    { options & limit: [Raw " limit ", Param (Pg.Cmd.nat max)] }
+    { options & limit: [Raw " limit ", Param (Pg.Cmd.u64 max)] }
 
-offset : Select a err, Nat -> Select a err
+offset : Select a err, U64 -> Select a err
 offset =
-    options, max <- updateOptions
-    { options & offset: [Raw " offset ", Param (Pg.Cmd.nat max)] }
+    options, start <- updateOptions
+    { options & offset: [Raw " offset ", Param (Pg.Cmd.u64 start)] }
 
 Order := { sql : Sql, direction : [Asc, Desc] }
 
