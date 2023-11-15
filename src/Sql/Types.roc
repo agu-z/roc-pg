@@ -15,6 +15,7 @@ interface Sql.Types exposes [
         dec,
         str,
         bool,
+        uuid,
         unsupported,
         Raw,
         row,
@@ -24,6 +25,7 @@ interface Sql.Types exposes [
         PgI64,
         PgText,
         PgBool,
+        PgUuid,
         PgCmp,
     ]
     imports [
@@ -89,6 +91,10 @@ dec = textFormat Str.toDec
 
 str : Decode (PgText *) Str
 str = textFormat Ok
+
+# TODO: Make a proper uuid type
+uuid : Decode (PgUuid *) Str
+uuid = textFormat Ok
 
 bool : Decode (PgBool *) Bool
 bool =
@@ -334,7 +340,7 @@ textFormat = \fn ->
 
 # Types
 
-PgCmp a : { eq : {} }a
+PgCmp a : { cmp : {} }a
 
 PgNum a : PgCmp { num : {} }a
 
@@ -348,6 +354,8 @@ PgDec a : PgNum { dec : {} }a
 PgText a : PgCmp { text : {} }a
 
 PgBool a : PgCmp { bool : {} }a
+
+PgUuid a : PgCmp { text : {} }a
 
 PgArray item a : { array : item }a
 

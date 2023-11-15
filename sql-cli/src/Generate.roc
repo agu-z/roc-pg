@@ -156,7 +156,7 @@ unqualifiedPgType = \sqlType ->
             Ok ("i32", "PgI32", "I32")
 
         "int8" ->
-            Ok ("i64", "PgI64", "I164")
+            Ok ("i64", "PgI64", "I64")
 
         "float4" ->
             Ok ("f32", "PgF32", "F32")
@@ -173,6 +173,9 @@ unqualifiedPgType = \sqlType ->
         "bool" ->
             Ok ("bool", "PgBool", "Bool")
 
+        "uuid" ->
+            Ok ("uuid", "PgUuid", "Str")
+
         _ ->
             # TODO:
             # https://www.postgresql.org/docs/current/datatype.html
@@ -181,7 +184,6 @@ unqualifiedPgType = \sqlType ->
             # - enums
             # - geo
             # - net
-            # - uuid
             # - bit strings
             # - text search
             # - json
