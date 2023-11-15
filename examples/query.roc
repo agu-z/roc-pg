@@ -1,16 +1,18 @@
 app "query"
     packages {
-        pf: "https://github.com/roc-lang/basic-cli/releases/download/0.3.2/tE4xS_zLdmmxmHwHih9kHWQ7fsXtJr7W7h3425-eZFk.tar.br",
         pg: "../src/main.roc",
+        pf: "https://github.com/roc-lang/basic-cli/releases/download/0.5.0/Cufzl36_SnJ4QbOoEmiJ5dIpUxBvdB3NEySvuH82Wio.tar.br",
     }
     imports [
         pf.Task.{ Task, await },
-        pf.Process,
         pf.Stdout,
         pf.Stderr,
         pg.Pg.Cmd,
         pg.Pg.Client,
         pg.Pg.Result,
+        # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
+        pf.Tcp,
+        pg.Cmd,
     ]
     provides [main] to pf
 
@@ -49,20 +51,20 @@ task =
 
     Stdout.line (Str.joinWith rows "\n")
 
-main : Task {} []
+main : Task {} I32
 main =
     Task.attempt task \result ->
         when result is
             Ok _ ->
-                Process.exit 0
+                Task.ok {}
 
             Err (TcpPerformErr (PgErr err)) ->
                 _ <- Stderr.line (Pg.Client.errorToStr err) |> await
-                Process.exit 2
+                Task.err 2
 
             Err err ->
                 dbg
                     err
 
                 _ <- Stderr.line "Something went wrong" |> await
-                Process.exit 1
+                Task.err 2

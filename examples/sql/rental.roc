@@ -1,12 +1,11 @@
 app "rental"
     packages {
-        pf: "https://github.com/roc-lang/basic-cli/releases/download/0.3.2/tE4xS_zLdmmxmHwHih9kHWQ7fsXtJr7W7h3425-eZFk.tar.br",
-        json: "https://github.com/lukewilliamboswell/roc-json/releases/download/v0.3.0/y2bZ-J_3aq28q0NpZPjw0NC6wghUYFooJpH03XzJ3Ls.tar.br",
+        pf: "https://github.com/roc-lang/basic-cli/releases/download/0.5.0/Cufzl36_SnJ4QbOoEmiJ5dIpUxBvdB3NEySvuH82Wio.tar.br",
+        json: "https://github.com/lukewilliamboswell/roc-json/releases/download/0.5.0/jEPD_1ZLFiFrBeYKiKvHSisU-E3LZJeenfa9nvqJGeE.tar.br",
         pg: "../../src/main.roc",
     }
     imports [
         pf.Task.{ Task, await },
-        pf.Process,
         pf.Stdout,
         pf.Stderr,
         pf.Arg,
@@ -17,6 +16,9 @@ app "rental"
         pg.Sql.{ select, into, from, column, where, eq, i32, join, on },
         pg.Sql.Nullable.{ Nullable },
         VideoRental,
+        # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
+        pf.Tcp,
+        pg.Cmd,
     ]
     provides [main] to pf
 
@@ -71,48 +73,43 @@ selectAddress = \table ->
         postalCode: <- table.postalCode |> column,
     }
 
-main : Task {} []
+main : Task {} I32
 main =
     args <- Arg.list |> await
 
-    argsResult =
-        Arg.i64Option {
-            long: "customer",
-        }
-        |> Arg.program {
-            name: "video-rental",
-        }
-        |> Arg.parseFormatted args
+    customerIdArg =
+        args
+        |> List.get 1
+        |> Result.try Str.toI32
 
-    when argsResult is
+    when customerIdArg is
         Ok customerId ->
             customerId
-            |> Num.toI32
             |> printCustomer
             |> handlePgTask
 
-        Err helpMenu ->
-            _ <- Stdout.line helpMenu |> Task.await
-            Process.exit 1
+        Err _ ->
+            _ <- Stdout.line "Usage: rental customer-id" |> Task.await
+            Task.err 1
 
-handlePgTask : Task {} [TcpConnectErr _, TcpPerformErr _] -> Task {} []
+handlePgTask : Task {} [TcpConnectErr _, TcpPerformErr _] -> Task {} I32
 handlePgTask = \task ->
     result <- Task.attempt task
 
     when result is
         Ok _ ->
-            Process.exit 0
+            Task.ok {}
 
         Err (TcpPerformErr (PgErr err)) ->
             _ <- Stderr.line (Pg.Client.errorToStr err) |> await
-            Process.exit 2
+            Task.err 2
 
         Err err ->
             dbg
                 err
 
             _ <- Stderr.line "Something went wrong" |> await
-            Process.exit 3
+            Task.err 3
 
 printJson = \value ->
     Encode.toBytes value Core.json

@@ -6,7 +6,7 @@ set -u
 
 SRC="$(dirname $0)/src"
 
-roc build $SRC/main.roc
+roc build $SRC/roc-sql.roc
 chmod +X $SRC/roc-sql
 
 $SRC/roc-sql                  \

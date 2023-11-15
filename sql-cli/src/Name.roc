@@ -89,7 +89,7 @@ isValidSqlName = \value ->
             (isLowerAlpha first || first == '_')
             && (
                 bytes
-                |> List.dropFirst
+                |> List.dropFirst 1
                 |> List.all \char ->
                     isLowerAlpha char || char == '_' || isNumeric char
             )
@@ -131,7 +131,7 @@ lowerCamelCase = \wordList ->
         [first, ..] ->
             rest =
                 wordList
-                |> List.drop 1
+                |> List.dropFirst 1
                 |> upperCamelCase
 
             List.concat first rest

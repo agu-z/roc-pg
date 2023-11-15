@@ -15,7 +15,7 @@ interface Pg.Client
         Pg.Result.{ CmdResult },
         Pg.Cmd.{ Cmd },
         Pg.Batch.{ Batch },
-        pf.Task.{ Task, await, fail },
+        pf.Task.{ Task, await },
         pf.Tcp,
         Cmd,
         Batch,
@@ -53,7 +53,7 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
         AuthCleartextPassword ->
             when auth is
                 None ->
-                    fail PasswordRequired
+                    Task.err PasswordRequired
 
                 Password pwd ->
                     _ <- Protocol.Frontend.passwordMessage pwd |> send stream
@@ -61,7 +61,7 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
                     next state
 
         AuthUnsupported ->
-            fail UnsupportedAuth
+            Task.err UnsupportedAuth
 
         BackendKeyData backendKey ->
             next { state & backendKey: Ok backendKey }
@@ -137,7 +137,7 @@ command = \cmd, @Client { stream } ->
 
     _ <- readReadyForQuery stream |> await
 
-    Task.succeed decoded
+    Task.ok decoded
 
 # Batches
 
@@ -262,10 +262,10 @@ batchReadStep = \batchDecode, stream, { remaining, results } ->
                     return value
 
                 Err (MissingCmdResult index) ->
-                    Task.fail (PgProtoErr (MissingBatchedCmdResult index))
+                    Task.err (PgProtoErr (MissingBatchedCmdResult index))
 
                 Err (ExpectErr err) ->
-                    Task.fail (PgExpectErr err)
+                    Task.err (PgExpectErr err)
 
         [first, ..] ->
             fields <- await (batchedCmdFields results first.fields)
@@ -279,19 +279,19 @@ batchReadStep = \batchDecode, stream, { remaining, results } ->
 batchedCmdFields = \results, fieldsMethod ->
     when fieldsMethod is
         Describe ->
-            Task.succeed []
+            Task.ok []
 
         ReuseFrom index ->
             when List.get results index is
                 Ok result ->
-                    Task.succeed (Pg.Result.fields result)
+                    Task.ok (Pg.Result.fields result)
 
                 Err OutOfBounds ->
                     # TODO: better name
-                    Task.fail (PgProtoErr ResultOutOfBounds)
+                    Task.err (PgProtoErr ResultOutOfBounds)
 
         Known fields ->
-            Task.succeed fields
+            Task.ok fields
 
 # Execute helpers
 
@@ -427,25 +427,25 @@ messageLoop = \stream, initState, stepFn ->
 
     when message is
         ErrorResponse error ->
-            fail (PgErr error)
+            Task.err (PgErr error)
 
         ParameterStatus _ ->
-            Task.succeed (Step state)
+            Task.ok (Step state)
 
         _ ->
             stepFn message state
 
 next : a -> Task [Step a] *
 next = \state ->
-    Task.succeed (Step state)
+    Task.ok (Step state)
 
 return : a -> Task [Done a] *
 return = \result ->
-    Task.succeed (Done result)
+    Task.ok (Done result)
 
 unexpected : a -> Task * [PgProtoErr [UnexpectedMsg a]]
 unexpected = \msg ->
-    fail (PgProtoErr (UnexpectedMsg msg))
+    Task.err (PgProtoErr (UnexpectedMsg msg))
 
 send : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
 send = \bytes, stream, callback ->
