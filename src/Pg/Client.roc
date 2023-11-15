@@ -34,8 +34,8 @@ withConnect :
         auth ? [None, Password Str],
         database : Str,
     },
-    (Client -> Task {} _)
-    -> Task {} _
+    (Client -> Task a _)
+    -> Task a _
 withConnect = \{ host, port, database, auth ? None, user }, callback ->
     stream <- Tcp.withConnect host port
 
