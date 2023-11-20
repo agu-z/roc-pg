@@ -18,12 +18,12 @@ app "prepared"
 
 task =
     client <- Pg.Client.withConnect {
-            host: "localhost",
-            port: 5432,
-            user: "aguz",
-            auth: Password "the_password",
-            database: "aguz",
-        }
+        host: "localhost",
+        port: 5432,
+        user: "postgres",
+        auth: None,
+        database: "postgres",
+    }
 
     _ <- Stdout.line "Connected!" |> await
 

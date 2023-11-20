@@ -2,6 +2,30 @@
 
 Interface with PostgreSQL databases from pure Roc.
 
+This package offers both a simple API to run any SQL command as a string, and a higher-level query builder that can help you write type-safe queries. 
+
+## Status
+
+I'd like this to become a stable PostgreSQL interface for Roc eventually, but this project is currently a work in progress.
+
+You can already use this to build simple applications using this but the lack of TLS support means you can't yet use it in cases where you run the database in a separate machine.
+
+### Documentation
+
+The API has been somewhat in flux until recently. I have now started working on documentation, but the [examples](./examples) is probably the best we have for now.
+
+Feel free to DM me at [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-Agus-Zubiaga), though!
+
+### Query Builder
+
+The query builder is one of the most exciting parts of this package but also the most incomplete for now. You can currently generate a Roc module from your schema, that you can use with the functions exposed under [`Sql`](./src/Sql.roc) to compose type-safe SELECT statements.
+
+The plan is to support all the other SQL commands, but I haven't gotten there yet.
+
+See an [example](./examples/store) of a simple HTTP API built with the query builder!
+
+
+
 ## Examples
 
 Connecting and performing a query
@@ -18,11 +42,12 @@ task =
           }
 
     Pg.Cmd.new "select name, price from products"
-    |> Pg.Cmd.expectN
-        (Pg.Result.succeed (\name -> \price -> { name, price })
-            |> Pg.Result.with (Pg.Result.str "name")
-            |> Pg.Result.with (Pg.Result.dec "price")
-        )
+    |> Pg.Cmd.expectN (
+        Pg.Result.succeed { 
+            name: <- Pg.Result.str "name" |> Pg.Result.apply, 
+            price: <- Pg.Result.dec "price" |> Pg.Result.apply
+        }
+    ) 
     |> Pg.Client.command client
 ```
 
@@ -34,11 +59,12 @@ Parameterized queries
 ```elm
 Pg.Cmd.new "select name, price from products where id = $1"
 |> Pg.Cmd.bind [ Pg.Cmd.u32 productId ]
-|> Pg.Cmd.expect1
-    (Pg.Result.succeed (\name -> \price -> { name, price })
-        |> Pg.Result.with (Pg.Result.str "name")
-        |> Pg.Result.with (Pg.Result.dec "price")
-    )
+|> Pg.Cmd.expect1 (
+    Pg.Result.succeed { 
+        name: <- Pg.Result.str "name" |> Pg.Result.apply, 
+        price: <- Pg.Result.dec "price" |> Pg.Result.apply
+    }
+) 
 |> Pg.Client.command client
 ```
 
@@ -70,7 +96,7 @@ Batch commands in a single roundtrip (applicative)
 </summary>
 
 ```elm
-Pg.Batch.succeed (\email -> \products -> { email, products })
+Pg.Batch.succeed \email -> \products -> { email, products }
 |> Pg.Batch.with
     (
         selectUser
@@ -86,11 +112,12 @@ Pg.Batch.succeed (\email -> \products -> { email, products })
             where orders.id = $1
             """
         |> Pg.Cmd.bind [ Pg.Cmd.u32 orderId ]
-        |> Pg.Cmd.expectN
-            (Pg.Result.succeed (\name -> \price -> { name, price })
-                |> Pg.Result.with (Pg.Result.str "name")
-                |> Pg.Result.with (Pg.Result.dec "price")
-            )
+        |> Pg.Cmd.expectN (
+            Pg.Result.succeed { 
+                name: <- Pg.Result.str "name" |> Pg.Result.apply, 
+                price: <- Pg.Result.dec "price" |> Pg.Result.apply
+            }
+        ) 
     )
 |> Pg.Client.batch client
 ```
@@ -119,9 +146,6 @@ Note: `roc-pg` automatically reuses statements in a batch by only parsing (and d
 
 </details>
 
-## Status
-
-I'd like this to become a stable PostgreSQL interface for Roc eventually, but not unlike Roc itself, this project is a work in progress.
 
 ### Features
 
@@ -150,12 +174,8 @@ I'd like this to become a stable PostgreSQL interface for Roc eventually, but no
 
 \* Requires new platform primitives
 
+This list does not include features of the query builder as we are still figuring out those.
 
-## Query Builder Experiment
-
-Under [sql-cli](./sql-cli) there's a CLI that will load a database's schema and generate Roc code which can be used with the [Sql module](./src/Sql.roc) to create type-safe queries.
-
-See an [example here](./examples/sql/rental.roc).
 
 ## Resources
 

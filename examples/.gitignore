@@ -1,7 +1,8 @@
 query
 prepared
 batch
-sql/rental
+store/server
+store/Public.roc
 
 scratch
 scratch.roc
