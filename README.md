@@ -1,20 +1,22 @@
 # roc-pg
 
-Interface with PostgreSQL databases from pure Roc.
+Interface with PostgreSQL databases from Roc.
 
-This package offers both a simple API to run any SQL command as a string, and a higher-level query builder that can help you write type-safe queries. 
+This package implements a PostgreSQL client on pure Roc that depends only on a TCP effect from the platform. 
+
+It exposes a simple API that allows you to run SQL commands as strings and a query builder that helps you write composable type-safe queries against your schema.
 
 ## Status
 
-I'd like this to become a stable PostgreSQL interface for Roc eventually, but this project is currently a work in progress.
+I'd like this to become a stable PostgreSQL interface for Roc, but this project is currently a work in progress.
 
-You can already use this to build useful applications. However, until we have a platform with TLS support, we should stick to experiments or simple apps where you run the database in the same machine.
+You can already use this to build useful applications. However, until we have a platform with TLS support, you should stick to experiments or simple apps where you run the database in the same machine.
 
 ### Query Builder
 
-The query builder is one of the most exciting parts of this package but also the most incomplete for now. 
+The query builder is one of the most exciting features of this package, but more experimental than the lower-level API.
 
-You can currently generate a Roc module from your schema that you can use through the functions exposed under [`Sql`](./src/Sql.roc) to compose type-safe SELECT statements.
+You can currently generate a Roc module from your schema that you can use through the functions exposed under [`Sql`](./src/Sql.roc) to compose type-safe `SELECT` statements.
 
 The plan is to support all the other SQL commands, but that's coming later. In the meantime, you can perform those by creating a raw SQL command with `Pg.Cmd.new`.
 
@@ -153,7 +155,6 @@ Feel free to DM me at [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-
 - [x] Parameterized queries
 - [x] Decoding results
 - [x] Decoding errors
-- [ ] [`Decode`](https://www.roc-lang.org/builtins/Decode) ability implementation
 - [ ] Authentication methods
   - [x] Cleartext password
   - [ ] MD5 password \*
@@ -170,11 +171,10 @@ Feel free to DM me at [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-
 - [ ] Connection pooling \*
 - [ ] Notifications (listen/notify)
 - [ ] Notices
-- [ ] Platform independence
 
 \* Requires new platform primitives
 
-This list does not include features of the query builder as we are still figuring out those.
+This list does not include features of the query builder as I'm still figuring out those.
 
 
 ## Resources
