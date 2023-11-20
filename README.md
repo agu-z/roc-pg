@@ -8,23 +8,17 @@ This package offers both a simple API to run any SQL command as a string, and a 
 
 I'd like this to become a stable PostgreSQL interface for Roc eventually, but this project is currently a work in progress.
 
-You can already use this to build simple applications using this but the lack of TLS support means you can't yet use it in cases where you run the database in a separate machine.
-
-### Documentation
-
-The API has been somewhat in flux until recently. I have now started working on documentation, but the [examples](./examples) is probably the best we have for now.
-
-Feel free to DM me at [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-Agus-Zubiaga), though!
+You can already use this to build useful applications. However, until we have a platform with TLS support, we should stick to experiments or simple apps where you run the database in the same machine.
 
 ### Query Builder
 
-The query builder is one of the most exciting parts of this package but also the most incomplete for now. You can currently generate a Roc module from your schema, that you can use with the functions exposed under [`Sql`](./src/Sql.roc) to compose type-safe SELECT statements.
+The query builder is one of the most exciting parts of this package but also the most incomplete for now. 
 
-The plan is to support all the other SQL commands, but I haven't gotten there yet.
+You can currently generate a Roc module from your schema that you can use through the functions exposed under [`Sql`](./src/Sql.roc) to compose type-safe SELECT statements.
 
-See an [example](./examples/store) of a simple HTTP API built with the query builder!
+The plan is to support all the other SQL commands, but that's coming later. In the meantime, you can perform those by creating a raw SQL command with `Pg.Cmd.new`.
 
-
+**See an [example](./examples/store) of a simple HTTP API built with the query builder!**
 
 ## Examples
 
@@ -146,8 +140,14 @@ Note: `roc-pg` automatically reuses statements in a batch by only parsing (and d
 
 </details>
 
+## Documentation
 
-### Features
+The API has been in a state of flux until recently. I have now started working on documentation, but the [examples](./examples) is probably the best we have for now.
+
+Feel free to DM me at [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-Agus-Zubiaga), though!
+
+
+## Features
 
 - [x] Connection handling
 - [x] Parameterized queries
