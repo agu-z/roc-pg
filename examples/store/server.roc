@@ -183,6 +183,8 @@ main = \req ->
 
 runDb : Pg.Cmd.Cmd a err -> Task a _
 runDb = \cmd ->
+    # Currently creating a connection per request.
+    # We will support pooling in the future, but we need to come up with some new platform primitives.
     client <- Pg.Client.withConnect {
             host: "localhost",
             port: 5432,
