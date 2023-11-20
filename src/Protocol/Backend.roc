@@ -34,6 +34,7 @@ Message : [
     ErrorResponse Error,
     ParseComplete,
     BindComplete,
+    NoData,
     RowDescription (List RowField),
     ParameterDescription,
     DataRow (List (List U8)),
@@ -73,6 +74,9 @@ message = \msgType ->
 
         '2' ->
             succeed BindComplete
+
+        'n' ->
+            succeed NoData
 
         'T' ->
             rowDescription

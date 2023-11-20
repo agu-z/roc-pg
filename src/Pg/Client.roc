@@ -6,6 +6,7 @@ interface Pg.Client
         prepare,
         Error,
         errorToStr,
+        Client,
     ]
     imports [
         Protocol.Backend,
@@ -302,7 +303,7 @@ readCmdResult = \initFields, stream ->
         }
 
     when msg is
-        ParseComplete | BindComplete | ParameterDescription ->
+        ParseComplete | BindComplete | ParameterDescription | NoData ->
             next state
 
         RowDescription fields ->
@@ -355,7 +356,7 @@ prepare = \sql, { name, client } ->
     msg, state <- messageLoop stream []
 
     when msg is
-        ParseComplete | ParameterDescription ->
+        ParseComplete | ParameterDescription | NoData ->
             next state
 
         RowDescription fields ->
