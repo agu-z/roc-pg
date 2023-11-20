@@ -8,7 +8,7 @@ app "roc-sql"
         pf.Stdout,
         pf.Stderr,
         pf.Arg,
-        pg.Pg.Client,
+        pg.Pg.BasicCliClient,
         pg.Pg.Cmd,
         pg.Pg.Result,
         pg.Sql.{
@@ -49,7 +49,7 @@ Options : {
 
 generate : Options -> Task {} _
 generate = \options ->
-    client <- Pg.Client.withConnect {
+    client <- Pg.BasicCliClient.withConnect {
             host: options.host,
             port: options.port,
             user: options.user,
@@ -58,7 +58,7 @@ generate = \options ->
 
     tables <-
         Sql.queryAll (tablesQuery options.schema)
-        |> Pg.Client.command client
+        |> Pg.BasicCliClient.command client
         |> await
 
     Schema.new options.schema tables
@@ -301,7 +301,7 @@ runGenerateTask = \options ->
             Task.ok {}
 
         Err (TcpPerformErr (PgErr err)) ->
-            _ <- Stderr.line (Pg.Client.errorToStr err) |> await
+            _ <- Stderr.line (Pg.BasicCliClient.errorToStr err) |> await
             Task.err 2
 
         Err err ->

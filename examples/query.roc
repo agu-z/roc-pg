@@ -8,7 +8,7 @@ app "query"
         pf.Stdout,
         pf.Stderr,
         pg.Pg.Cmd,
-        pg.Pg.Client,
+        pg.Pg.BasicCliClient,
         pg.Pg.Result,
         # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
         pf.Tcp,
@@ -17,7 +17,7 @@ app "query"
     provides [main] to pf
 
 task =
-    client <- Pg.Client.withConnect {
+    client <- Pg.BasicCliClient.withConnect {
         host: "localhost",
         port: 5432,
         user: "postgres",
@@ -46,7 +46,7 @@ task =
                 |> Pg.Result.with (Pg.Result.str "name")
                 |> Pg.Result.with (Pg.Result.u8 "age")
             )
-        |> Pg.Client.command client
+        |> Pg.BasicCliClient.command client
         |> await
 
     Stdout.line (Str.joinWith rows "\n")
@@ -59,7 +59,7 @@ main =
                 Task.ok {}
 
             Err (TcpPerformErr (PgErr err)) ->
-                _ <- Stderr.line (Pg.Client.errorToStr err) |> await
+                _ <- Stderr.line (Pg.BasicCliClient.errorToStr err) |> await
                 Task.err 2
 
             Err err ->

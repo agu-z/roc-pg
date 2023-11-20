@@ -8,7 +8,7 @@ app "prepared"
         pf.Stdout,
         pf.Stderr,
         pg.Pg.Cmd,
-        pg.Pg.Client,
+        pg.Pg.BasicCliClient,
         pg.Pg.Result,
         # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
         pf.Tcp,
@@ -17,7 +17,7 @@ app "prepared"
     provides [main] to pf
 
 task =
-    client <- Pg.Client.withConnect {
+    client <- Pg.BasicCliClient.withConnect {
         host: "localhost",
         port: 5432,
         user: "postgres",
@@ -29,7 +29,7 @@ task =
 
     addCmd <-
         "select $1::int + $2::int as result"
-        |> Pg.Client.prepare { client, name: "add" }
+        |> Pg.BasicCliClient.prepare { client, name: "add" }
         |> await
 
     addAndPrint = \a, b ->
@@ -37,7 +37,7 @@ task =
             addCmd
             |> Pg.Cmd.bind [Pg.Cmd.u8 a, Pg.Cmd.u8 b]
             |> Pg.Cmd.expect1 (Pg.Result.u8 "result")
-            |> Pg.Client.command client
+            |> Pg.BasicCliClient.command client
             |> await
 
         aStr = Num.toStr a
@@ -58,7 +58,7 @@ main =
                 Task.ok {}
 
             Err (TcpPerformErr (PgErr err)) ->
-                _ <- Stderr.line (Pg.Client.errorToStr err) |> await
+                _ <- Stderr.line (Pg.BasicCliClient.errorToStr err) |> await
                 Task.err 2
 
             Err err ->
