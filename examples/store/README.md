@@ -11,7 +11,7 @@ To run it, you first need a PostgreSQL server running and database called `roc_p
 $ createdb roc_pg_example
 
 # Restore dump
-$ psql -U postgres -d roc_pg_example < example/store/db.sql
+$ psql -U postgres -d roc_pg_example < examples/store/db.sql
 ```
 
 Now you can generate the schema module from our new database:
