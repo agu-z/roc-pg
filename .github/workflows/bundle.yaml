@@ -22,5 +22,5 @@ jobs:
       - name: Bundle and release the library
         uses: hasnep/bundle-roc-library@v0.1.0
         with:
-          library: package/main.roc
+          library: src/main.roc
           token: ${{ github.token }}
