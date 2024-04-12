@@ -191,14 +191,14 @@ batch = \cmdBatch, @Client { stream } ->
         }
         (\state -> batchReadStep batchDecode stream state)
 
-initBatchedCmd : Set Nat,
+initBatchedCmd : Set U64,
     Batch.BatchedCmd,
-    Nat
+    U64
     -> {
         messages : List U8,
         fields : [
             Describe,
-            ReuseFrom Nat,
+            ReuseFrom U64,
             Known (List Pg.Result.RowField),
         ],
     }
@@ -415,7 +415,7 @@ readMessage = \stream ->
     meta <- headerBytes |> protoDecode Protocol.Backend.header |> await
 
     if meta.len > 0 then
-        payload <- Tcp.readExactly (Num.toNat meta.len) stream |> await
+        payload <- Tcp.readExactly (Num.toU64 meta.len) stream |> await
         protoDecode payload (Protocol.Backend.message meta.msgType)
     else
         protoDecode [] (Protocol.Backend.message meta.msgType)

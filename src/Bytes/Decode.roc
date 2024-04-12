@@ -119,7 +119,7 @@ i64 : Decode I64 [UnexpectedEnd]
 i64 =
     map u64 Num.toI64
 
-take : Nat, (List U8 -> value) -> Decode value [UnexpectedEnd]
+take : U64, (List U8 -> value) -> Decode value [UnexpectedEnd]
 take = \count, callback ->
     bytes <- @Decode
     { before, others } = List.split bytes count

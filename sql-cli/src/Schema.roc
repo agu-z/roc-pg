@@ -47,7 +47,7 @@ Constraint : {
 
 new : Str, List Table -> Schema
 new = \schemaName, tables ->
-    tablesLen : Nat
+    tablesLen : U64
     tablesLen = List.len tables
 
     keys : {

@@ -22,7 +22,6 @@ interface Pg.Result
         f32,
         f64,
         dec,
-        nat,
         with,
         apply,
         succeed,
@@ -44,7 +43,7 @@ fields = \@CmdResult result -> result.fields
 rows : CmdResult -> List (List (List U8))
 rows = \@CmdResult result -> result.rows
 
-len : CmdResult -> Nat
+len : CmdResult -> U64
 len = \@CmdResult result ->
     List.len result.rows
 
@@ -93,8 +92,6 @@ f32 = decoder Str.toF32
 f64 = decoder Str.toF64
 
 dec = decoder Str.toDec
-
-nat = decoder Str.toNat
 
 decoder = \fn -> \name ->
         rowFields <- @Decode

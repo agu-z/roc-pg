@@ -193,7 +193,7 @@ unqualifiedPgType = \sqlType ->
 asNullable : Str -> Str
 asNullable = \inner -> "(Sql.Types.nullable \(inner))"
 
-indent : Str, Nat -> Str
+indent : Str, U64 -> Str
 indent = \line, count ->
     spaces = Str.repeat "    " count
     "\(spaces)\(line)"

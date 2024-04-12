@@ -22,7 +22,7 @@ Batch a err := Params {
                 rest : List CmdResult,
             }
             [
-                MissingCmdResult Nat,
+                MissingCmdResult U64,
                 ExpectErr err,
             ],
     }
@@ -32,11 +32,11 @@ Params a : {
     seenSql : SeenSql,
 }a
 
-SeenSql : Dict Str { index : Nat, reused : Bool }
+SeenSql : Dict Str { index : U64, reused : Bool }
 
-BatchedCmd : Cmd.Params {} [ReuseSql Nat]
+BatchedCmd : Cmd.Params {} [ReuseSql U64]
 
-reuseName : Nat -> Str
+reuseName : U64 -> Str
 reuseName = \index ->
     indexStr = Num.toStr index
     "b[\(indexStr)]"
@@ -111,7 +111,7 @@ smallest = \a, b ->
     else
         b
 
-addCmd : Params *, Cmd * * -> { seenSql : SeenSql, newCmd : BatchedCmd, newIndex : Nat }
+addCmd : Params *, Cmd * * -> { seenSql : SeenSql, newCmd : BatchedCmd, newIndex : U64 }
 addCmd = \batch, cmd ->
     cmdParams = Cmd.params cmd
     newIndex = List.len batch.commands
@@ -146,7 +146,7 @@ addCmd = \batch, cmd ->
 
             { seenSql: batch.seenSql, newCmd, newIndex }
 
-batchedCmd : Cmd.Kind [ReuseSql Nat], Cmd.Params {} [] -> BatchedCmd
+batchedCmd : Cmd.Kind [ReuseSql U64], Cmd.Params {} [] -> BatchedCmd
 batchedCmd = \kind, cmdParams -> {
     kind,
     bindings: cmdParams.bindings,

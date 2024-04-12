@@ -190,7 +190,7 @@ unwrapNullable = \nullable ->
 
 # Poor man's arg parser:
 parseArgs = \args ->
-    dropFirstStr : Str, Nat -> Str
+    dropFirstStr : Str, U64 -> Str
     dropFirstStr = \val, n ->
         # Sorry unicode gods
         val

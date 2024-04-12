@@ -21,7 +21,6 @@ interface Pg.Cmd
         i128,
         f32,
         f64,
-        nat,
         bytes,
         withCustomDecode,
         inspect,
@@ -123,7 +122,6 @@ i64 = num
 i128 = num
 f32 = num
 f64 = num
-nat = num
 
 num : Num * -> Binding
 num = \value ->

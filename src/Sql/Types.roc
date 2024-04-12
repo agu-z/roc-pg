@@ -40,7 +40,7 @@ DecodeErr : [
     InvalidUtf8,
     InvalidNumStr,
     InvalidBool (List U8),
-    MissingColumn Nat,
+    MissingColumn U64,
     Error Str,
 ]
 

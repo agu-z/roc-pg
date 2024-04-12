@@ -344,18 +344,18 @@ dataRow =
             if valueLen == -1 then
                 succeed []
             else
-                take (Num.toNat valueLen) \x -> x
+                take (Num.toU64 valueLen) \x -> x
         )
     |> map DataRow
 
 fixedList = \count, itemDecode ->
-    collected <- loop (List.withCapacity (Num.toNat count))
+    collected <- loop (List.withCapacity (Num.toU64 count))
 
     item <- map itemDecode
 
     added = List.append collected item
 
-    if List.len added == Num.toNat count then
+    if List.len added == Num.toU64 count then
         Done added
     else
         Loop added
