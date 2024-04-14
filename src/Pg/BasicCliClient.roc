@@ -379,7 +379,7 @@ errorToStr = \err ->
     addField = \str, name, result ->
         when result is
             Ok value ->
-                "\(str)\n\(name): \(value)"
+                "$(str)\n$(name): $(value)"
 
             Err {} ->
                 str
@@ -400,7 +400,7 @@ errorToStr = \err ->
         |> addField "Line" err.line
         |> addField "Routine" err.line
 
-    "\(err.localizedSeverity) (\(err.code)): \(err.message)\n\(fieldsStr)"
+    "$(err.localizedSeverity) ($(err.code)): $(err.message)\n$(fieldsStr)"
     |> Str.trim
 
 # Helpers

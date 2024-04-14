@@ -69,18 +69,18 @@ inspect = \cmd ->
         |> List.mapWithIndex
             \val, index ->
                 n = index + 1
-                "$\(Num.toStr n) = \(inspectBinding val)"
+                "$$(Num.toStr n) = $(inspectBinding val)"
         |> Str.joinWith "\n"
 
-    "\(kindStr)\n\(bindingsStr)"
+    "$(kindStr)\n$(bindingsStr)"
 
 inspectKind = \kind ->
     when kind is
         SqlCmd sql ->
-            "SQL: \(sql)"
+            "SQL: $(sql)"
 
         PreparedCmd { name } ->
-            "Prepared: \(name)"
+            "Prepared: $(name)"
 
 inspectBinding = \binding ->
     when binding is

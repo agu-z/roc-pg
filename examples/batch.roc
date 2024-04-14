@@ -51,7 +51,7 @@ task =
         |> await
 
     str42 = Num.toStr resultWith.fortyTwo
-    _ <- Stdout.line "\(resultWith.hi) \(str42)" |> await
+    _ <- Stdout.line "$(resultWith.hi) $(str42)" |> await
 
     resultSeq <-
         List.range { start: At 0, end: At 20 }

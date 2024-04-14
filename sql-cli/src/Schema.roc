@@ -77,8 +77,8 @@ new = \schemaName, tables ->
 
                                 Err NotFound ->
                                     {
-                                        tableName: "\(Num.toStr table.id)",
-                                        columnName: "\(Num.toStr colNum)",
+                                        tableName: "$(Num.toStr table.id)",
+                                        columnName: "$(Num.toStr colNum)",
                                     }
 
                         ((table.id, colNum), names)

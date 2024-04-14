@@ -50,7 +50,7 @@ sqlName = \value ->
 
 quote : Str -> Str
 quote = \value ->
-    "\"\(value)\""
+    "\"$(value)\""
 
 sqlQuote : Str -> Str
 sqlQuote = \value ->
@@ -58,7 +58,7 @@ sqlQuote = \value ->
         value
         |> Str.replaceEach "\"" "\\\"\\\""
 
-    "\\\"\(doubled)\\\""
+    "\\\"$(doubled)\\\""
 
 expect sqlName "products" == "\"products\""
 expect sqlName "product_orders" == "\"product_orders\""
@@ -180,7 +180,7 @@ words = \value ->
                 wordList: state.wordList,
             }
         else
-            code = Str.toUtf8 "c\(Num.toStr char)"
+            code = Str.toUtf8 "c$(Num.toStr char)"
 
             {
                 word: List.concat state.word code,

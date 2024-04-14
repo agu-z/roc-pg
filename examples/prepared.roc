@@ -44,7 +44,7 @@ task =
         bStr = Num.toStr b
         resultStr = Num.toStr result
 
-        Stdout.line "\(aStr) + \(bStr) = \(resultStr)"
+        Stdout.line "$(aStr) + $(bStr) = $(resultStr)"
 
     _ <- addAndPrint 1 2 |> await
 

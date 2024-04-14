@@ -41,7 +41,7 @@ task =
                     (\name -> \age ->
                             ageStr = Num.toStr age
 
-                            "\(name): \(ageStr)"
+                            "$(name): $(ageStr)"
                     )
                 |> Pg.Result.with (Pg.Result.str "name")
                 |> Pg.Result.with (Pg.Result.u8 "age")

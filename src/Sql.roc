@@ -114,7 +114,7 @@ fromHelp = \table, next ->
         |> State.map
 
     {
-        from: [Raw " from \(table.schema).\(table.name) as \(alias)"],
+        from: [Raw " from $(table.schema).$(table.name) as $(alias)"],
         options,
     }
 
@@ -132,7 +132,7 @@ addAlias = \wanted ->
 
             _ <- State.put newEnv |> State.map
 
-            "\(wanted)_\(strCount)"
+            "$(wanted)_$(strCount)"
 
         Err KeyNotFound ->
             newEnv = { env &
@@ -316,7 +316,7 @@ joinHelp = \table, onExpr, next ->
         |> State.map
 
     joinSql =
-        List.prepend onSql (Raw " join \(table.schema).\(table.name) as \(alias) on ")
+        List.prepend onSql (Raw " join $(table.schema).$(table.name) as $(alias) on ")
 
     { options & joins: options.joins |> List.prepend joinSql }
 
@@ -338,7 +338,7 @@ leftJoinHelp = \table, onExpr, next ->
         |> State.map
 
     joinSql =
-        List.prepend onSql (Raw " left join \(table.schema).\(table.name) as \(alias) on ")
+        List.prepend onSql (Raw " left join $(table.schema).$(table.name) as $(alias) on ")
 
     { options & joins: options.joins |> List.prepend joinSql }
 
@@ -605,7 +605,7 @@ NullableExpr pg roc : Expr (Nullable pg) (Nullable roc)
 
 identifier : Str, Str, Decode pg roc -> Expr pg roc
 identifier = \table, col, decode -> @Expr {
-        sql: [Raw "\(table).\(col)"],
+        sql: [Raw "$(table).$(col)"],
         decode,
     }
 
@@ -885,14 +885,14 @@ commaJoin = \items ->
 binOp = \a, op, b ->
     a
     |> List.reserve (List.len b + 1)
-    |> List.append (Raw " \(op) ")
+    |> List.append (Raw " $(op) ")
     |> List.concat b
 
 binOpParens = \a, op, b ->
     [Raw "("]
     |> List.reserve (List.len a + List.len b + 2)
     |> List.concat a
-    |> List.append (Raw " \(op) ")
+    |> List.append (Raw " $(op) ")
     |> List.concat b
     |> List.append (Raw ")")
 
@@ -931,7 +931,7 @@ addPart = \{ params, sql }, part ->
 
             binding = Num.toStr (index + 1)
 
-            { sql: "\(sql)$\(binding)", params: newParams }
+            { sql: "$(sql)$$(binding)", params: newParams }
 
         Raw raw ->
             { sql: Str.concat sql raw, params }

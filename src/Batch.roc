@@ -39,7 +39,7 @@ BatchedCmd : Cmd.Params {} [ReuseSql U64]
 reuseName : U64 -> Str
 reuseName = \index ->
     indexStr = Num.toStr index
-    "b[\(indexStr)]"
+    "b[$(indexStr)]"
 
 succeed : a -> Batch a err
 succeed = \value ->

@@ -228,7 +228,7 @@ parseArgs = \args ->
                 Ok state.args
 
             Param arg ->
-                Err "Missing value for \(arg)"
+                Err "Missing value for $(arg)"
     |> Result.try \argsDict ->
         arg = \{ long, short ? "" } -> \fnResult ->
                 getResult =
@@ -240,7 +240,7 @@ parseArgs = \args ->
                         Ok (fn value)
 
                     _ ->
-                        Err "The option `--\(long)` is required but was not provided!"
+                        Err "The option `--$(long)` is required but was not provided!"
 
         Ok {
             host: <- arg { long: "host", short: "h" },
@@ -262,7 +262,7 @@ parseArgs = \args ->
                 }
 
             Err InvalidNumStr ->
-                Err "Invalid port number: \(options.port)"
+                Err "Invalid port number: $(options.port)"
     |> Result.mapErr \err ->
         """
         Generate Roc for your PostgreSQL schema
@@ -274,7 +274,7 @@ parseArgs = \args ->
             --database, -d    database name to connect to  (string)
             --schema    specific schema to generate  (string)
 
-        \(err)
+        $(err)
         """
 
 main : Task {} I32

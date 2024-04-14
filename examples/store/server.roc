@@ -24,7 +24,7 @@ app "store-server"
 handleRequest : Request -> Task _ _
 handleRequest = \req ->
     method = Http.methodToStr req.method
-    {} <- Stdout.line "\n\(method) \(req.url)" |> Task.await
+    {} <- Stdout.line "\n$(method) $(req.url)" |> Task.await
 
     url = Url.fromStr req.url
 
@@ -221,5 +221,5 @@ urlSegments = \url ->
 parseId : Str -> Task I32 [BadRequest Str]
 parseId = \idStr ->
     Str.toI32 idStr
-    |> Result.mapErr \InvalidNumStr -> BadRequest "Invalid id: \(idStr)"
+    |> Result.mapErr \InvalidNumStr -> BadRequest "Invalid id: $(idStr)"
     |> Task.fromResult
