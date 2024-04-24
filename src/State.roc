@@ -9,6 +9,7 @@ interface State
         ok,
         err,
         fromResult,
+        State
     ]
     imports []
 

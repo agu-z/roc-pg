@@ -26,6 +26,7 @@ interface Sql.Types exposes [
         PgText,
         PgBool,
         PgUuid,
+        PgNum,
         PgCmp,
     ]
     imports [
