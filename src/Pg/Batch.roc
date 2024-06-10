@@ -1,9 +1,7 @@
-interface Pg.Batch
-    exposes [Batch, succeed, with, sequence]
-    imports [
-        Batch,
-        Cmd.{ Cmd },
-    ]
+module [Batch, succeed, with, sequence]
+
+import Batch
+import Cmd exposing [Cmd]
 
 Batch a err : Batch.Batch a err
 

@@ -1,14 +1,12 @@
-interface Name
-    exposes [
-        module,
-        type,
-        identifier,
-        tableAlias,
-        sqlName,
-    ]
-    imports [
-        Keyword,
-    ]
+module [
+    module,
+    type,
+    identifier,
+    tableAlias,
+    sqlName,
+]
+
+import Keyword
 
 # Roc
 

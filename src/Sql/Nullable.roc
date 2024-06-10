@@ -1,6 +1,4 @@
-interface Sql.Nullable
-    exposes [Nullable, map, withDefault]
-    imports []
+module [Nullable, map, withDefault]
 
 Nullable a : [Null, NotNull a]
 

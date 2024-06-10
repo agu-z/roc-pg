@@ -1,21 +1,18 @@
-app "batch"
-    packages {
-        pg: "../src/main.roc",
-        pf: "https://github.com/roc-lang/basic-cli/releases/download/0.8.1/x8URkvfyi9I0QhmVG98roKBUs_AZRkLFwFJVJ3942YA.tar.br",
-    }
-    imports [
-        pf.Task.{ Task, await },
-        pf.Stdout,
-        pf.Stderr,
-        pg.Pg.Cmd,
-        pg.Pg.BasicCliClient,
-        pg.Pg.Batch,
-        pg.Pg.Result,
-        # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
-        pf.Tcp,
-        pg.Cmd,
-    ]
-    provides [main] to pf
+app [main] {
+    pg: "../src/main.roc",
+    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.8.1/x8URkvfyi9I0QhmVG98roKBUs_AZRkLFwFJVJ3942YA.tar.br",
+}
+
+import pf.Task exposing [Task, await]
+import pf.Stdout
+import pf.Stderr
+import pg.Pg.Cmd
+import pg.Pg.BasicCliClient
+import pg.Pg.Batch
+import pg.Pg.Result
+# Unused but required because of: https://github.com/roc-lang/roc/issues/5477
+import pf.Tcp
+import pg.Cmd
 
 task =
     client <- Pg.BasicCliClient.withConnect {

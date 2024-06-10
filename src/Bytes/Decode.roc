@@ -1,25 +1,23 @@
-interface Bytes.Decode
-    exposes [
-        Decode,
-        decode,
-        u8,
-        u16,
-        u32,
-        u64,
-        i8,
-        i16,
-        i32,
-        i64,
-        cStr,
-        take,
-        map,
-        succeed,
-        fail,
-        await,
-        Step,
-        loop,
-    ]
-    imports []
+module [
+    Decode,
+    decode,
+    u8,
+    u16,
+    u32,
+    u64,
+    i8,
+    i16,
+    i32,
+    i64,
+    cStr,
+    take,
+    map,
+    succeed,
+    fail,
+    await,
+    Step,
+    loop,
+]
 
 Decode value err :=
     List U8

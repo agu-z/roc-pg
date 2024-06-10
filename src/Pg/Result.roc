@@ -1,32 +1,32 @@
-interface Pg.Result
-    exposes [
-        CmdResult,
-        RowField,
-        create,
-        len,
-        fields,
-        rows,
-        decode,
-        Decode,
-        str,
-        u8,
-        u16,
-        u32,
-        u64,
-        u128,
-        i8,
-        i16,
-        i32,
-        i64,
-        i128,
-        f32,
-        f64,
-        dec,
-        with,
-        apply,
-        succeed,
-    ]
-    imports [Protocol.Backend]
+module [
+    CmdResult,
+    RowField,
+    create,
+    len,
+    fields,
+    rows,
+    decode,
+    Decode,
+    str,
+    u8,
+    u16,
+    u32,
+    u64,
+    u128,
+    i8,
+    i16,
+    i32,
+    i64,
+    i128,
+    f32,
+    f64,
+    dec,
+    with,
+    apply,
+    succeed,
+]
+
+import Protocol.Backend
 
 RowField : Protocol.Backend.RowField
 

@@ -1,43 +1,40 @@
-app "roc-sql"
-    packages {
-        pf: "https://github.com/roc-lang/basic-cli/releases/download/0.5.0/Cufzl36_SnJ4QbOoEmiJ5dIpUxBvdB3NEySvuH82Wio.tar.br",
-        pg: "../../src/main.roc",
-    }
-    imports [
-        pf.Task.{ Task, await },
-        pf.Stdout,
-        pf.Stderr,
-        pf.Arg,
-        pg.Pg.BasicCliClient,
-        pg.Pg.Cmd,
-        pg.Pg.Result,
-        pg.Sql.{
-            from,
-            join,
-            leftJoin,
-            on,
-            useOuter,
-            select,
-            where,
-            eq,
-            gt,
-            not,
-            into,
-            column,
-            in,
-            str,
-            i16,
-            rowArray,
-        },
-        pg.Sql.Nullable.{ Nullable },
-        PgCatalog,
-        Generate,
-        Schema,
-        # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
-        pf.Tcp,
-        pg.Cmd,
-    ]
-    provides [main] to pf
+app [main] {
+    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.5.0/Cufzl36_SnJ4QbOoEmiJ5dIpUxBvdB3NEySvuH82Wio.tar.br",
+    pg: "../../src/main.roc",
+}
+
+import pf.Task exposing [Task, await]
+import pf.Stdout
+import pf.Stderr
+import pf.Arg
+import pg.Pg.BasicCliClient
+import pg.Pg.Cmd
+import pg.Pg.Result
+import pg.Sql exposing [
+    from,
+    join,
+    leftJoin,
+    on,
+    useOuter,
+    select,
+    where,
+    eq,
+    gt,
+    not,
+    into,
+    column,
+    in,
+    str,
+    i16,
+    rowArray,
+]
+import pg.Sql.Nullable exposing [Nullable]
+import PgCatalog
+import Generate
+import Schema
+# Unused but required because of: https://github.com/roc-lang/roc/issues/5477
+import pf.Tcp
+import pg.Cmd
 
 Options : {
     host : Str,
@@ -281,8 +278,7 @@ main : Task {} I32
 main =
     args <- Arg.list |> await
 
-    dbg
-        parseArgs args
+    dbg parseArgs args
 
     when parseArgs args is
         Ok options ->
@@ -305,8 +301,7 @@ runGenerateTask = \options ->
             Task.err 2
 
         Err err ->
-            dbg
-                err
+            dbg err
 
             _ <- Stderr.line "Something went wrong" |> await
             Task.err 1

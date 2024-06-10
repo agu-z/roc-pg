@@ -1,28 +1,26 @@
-interface Protocol.Backend
-    exposes [
-        header,
-        message,
-        Message,
-        KeyData,
-        Status,
-        RowField,
-        Error,
-    ]
-    imports [
-        Bytes.Decode.{
-            Decode,
-            await,
-            map,
-            succeed,
-            fail,
-            loop,
-            u8,
-            i16,
-            i32,
-            cStr,
-            take,
-        },
-    ]
+module [
+    header,
+    message,
+    Message,
+    KeyData,
+    Status,
+    RowField,
+    Error,
+]
+
+import Bytes.Decode exposing [
+    Decode,
+    await,
+    map,
+    succeed,
+    fail,
+    loop,
+    u8,
+    i16,
+    i32,
+    cStr,
+    take,
+]
 
 Message : [
     AuthOk,

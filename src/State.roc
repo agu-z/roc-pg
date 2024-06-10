@@ -1,17 +1,15 @@
-interface State
-    exposes [
-        attempt,
-        perform,
-        bind,
-        map,
-        get,
-        put,
-        ok,
-        err,
-        fromResult,
-        State
-    ]
-    imports []
+module [
+    attempt,
+    perform,
+    bind,
+    map,
+    get,
+    put,
+    ok,
+    err,
+    fromResult,
+    State,
+]
 
 State state ok err := state -> Result (ok, state) err
 

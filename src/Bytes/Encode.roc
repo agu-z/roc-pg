@@ -1,18 +1,16 @@
-interface Bytes.Encode
-    exposes [
-        sequence,
-        u8,
-        u16,
-        u32,
-        u64,
-        i8,
-        i16,
-        i32,
-        i64,
-        cStr,
-        nullTerminate,
-    ]
-    imports []
+module [
+    sequence,
+    u8,
+    u16,
+    u32,
+    u64,
+    i8,
+    i16,
+    i32,
+    i64,
+    cStr,
+    nullTerminate,
+]
 
 sequence : List (List U8) -> List U8
 sequence =

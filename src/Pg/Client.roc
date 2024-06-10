@@ -1,26 +1,24 @@
-interface Pg.Client
-    exposes [
-        withConnect,
-        command,
-        batch,
-        prepare,
-        Error,
-        errorToStr,
-        Client,
-    ]
-    imports [
-        Protocol.Backend,
-        Protocol.Frontend,
-        Bytes.Encode,
-        Bytes.Decode.{ decode },
-        Pg.Result.{ CmdResult },
-        Pg.Cmd.{ Cmd },
-        Pg.Batch.{ Batch },
-        pf.Task.{ Task, await },
-        pf.Tcp,
-        Cmd,
-        Batch,
-    ]
+module [
+    withConnect,
+    command,
+    batch,
+    prepare,
+    Error,
+    errorToStr,
+    Client,
+]
+
+import Protocol.Backend
+import Protocol.Frontend
+import Bytes.Encode
+import Bytes.Decode exposing [decode]
+import Pg.Result exposing [CmdResult]
+import Pg.Cmd exposing [Cmd]
+import Pg.Batch exposing [Batch]
+import pf.Task exposing [Task, await]
+import pf.Tcp
+import Cmd
+import Batch
 
 Client := {
     stream : Tcp.Stream,

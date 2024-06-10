@@ -1,34 +1,32 @@
-interface Pg.Cmd
-    exposes [
-        Cmd,
-        new,
-        expectN,
-        expect1,
-        map,
-        bind,
-        Binding,
-        null,
-        str,
-        u8,
-        u16,
-        u32,
-        u64,
-        u128,
-        i8,
-        i16,
-        i32,
-        i64,
-        i128,
-        f32,
-        f64,
-        bytes,
-        withCustomDecode,
-        inspect,
-    ]
-    imports [
-        Cmd,
-        Pg.Result.{ CmdResult },
-    ]
+module [
+    Cmd,
+    new,
+    expectN,
+    expect1,
+    map,
+    bind,
+    Binding,
+    null,
+    str,
+    u8,
+    u16,
+    u32,
+    u64,
+    u128,
+    i8,
+    i16,
+    i32,
+    i64,
+    i128,
+    f32,
+    f64,
+    bytes,
+    withCustomDecode,
+    inspect,
+]
+
+import Cmd
+import Pg.Result exposing [CmdResult]
 
 Cmd a err : Cmd.Cmd a err
 

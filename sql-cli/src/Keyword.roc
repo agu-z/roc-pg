@@ -1,8 +1,6 @@
-interface Keyword
-    exposes [
-        isReserved,
-    ]
-    imports []
+module [
+    isReserved,
+]
 
 # Reserved Keywords: https://www.postgresql.org/docs/current/sql-keywords-appendix.html
 

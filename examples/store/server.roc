@@ -1,25 +1,22 @@
-app "store-server"
-    packages {
-        pf: "https://github.com/roc-lang/basic-webserver/releases/download/0.3.0/gJOTXTeR3CD4zCbRqK7olo4edxQvW5u3xGL-8SSxDcY.tar.br",
-        json: "https://github.com/lukewilliamboswell/roc-json/releases/download/0.6.3/_2Dh4Eju2v_tFtZeMq8aZ9qw2outG04NbkmKpFhXS_4.tar.br",
-        pg: "../../src/main.roc",
-    }
-    imports [
-        pf.Task.{ Task, await },
-        pf.Stdout,
-        pf.Http.{ Request, Response },
-        pf.Url.{ Url },
-        json.Core,
-        pg.Pg.Client,
-        pg.Pg.Result,
-        pg.Pg.Cmd,
-        pg.Sql.{ select, into, from, column, where, eq, join, on },
-        Public,
-        # Unused but required because of: https://github.com/roc-lang/roc/issues/5477
-        pf.Tcp,
-        pg.Cmd,
-    ]
-    provides [main] to pf
+app [main] {
+    pf: platform "https://github.com/roc-lang/basic-webserver/releases/download/0.3.0/gJOTXTeR3CD4zCbRqK7olo4edxQvW5u3xGL-8SSxDcY.tar.br",
+    json: "https://github.com/lukewilliamboswell/roc-json/releases/download/0.6.3/_2Dh4Eju2v_tFtZeMq8aZ9qw2outG04NbkmKpFhXS_4.tar.br",
+    pg: "../../src/main.roc",
+}
+
+import pf.Task exposing [Task, await]
+import pf.Stdout
+import pf.Http exposing [Request, Response]
+import pf.Url exposing [Url]
+import json.Core
+import pg.Pg.Client
+import pg.Pg.Result
+import pg.Pg.Cmd
+import pg.Sql exposing [select, into, from, column, where, eq, join, on]
+import Public
+# Unused but required because of: https://github.com/roc-lang/roc/issues/5477
+import pf.Tcp
+import pg.Cmd
 
 handleRequest : Request -> Task _ _
 handleRequest = \req ->
@@ -172,8 +169,7 @@ main = \req ->
                 }
 
         Err err ->
-            dbg
-                err
+            dbg err
 
             Task.ok {
                 status: 500,

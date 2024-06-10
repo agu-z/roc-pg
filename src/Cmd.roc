@@ -1,24 +1,23 @@
-interface Cmd exposes
-    [
-        Cmd,
-        Params,
-        Limit,
-        Kind,
-        fromSql,
-        prepared,
-        params,
-        withLimit,
-        decode,
-        withDecode,
-        map,
-        bind,
-        Binding,
-        encodeBindings,
-    ] imports [
-        Protocol.Frontend.{ FormatCode },
-        Protocol.Backend.{ RowField },
-        Pg.Result.{ CmdResult },
-    ]
+module [
+    Cmd,
+    Params,
+    Limit,
+    Kind,
+    fromSql,
+    prepared,
+    params,
+    withLimit,
+    decode,
+    withDecode,
+    map,
+    bind,
+    Binding,
+    encodeBindings,
+]
+
+import Protocol.Frontend exposing [FormatCode]
+import Protocol.Backend exposing [RowField]
+import Pg.Result exposing [CmdResult]
 
 Cmd a err := Params { decode : CmdResult -> Result a err } []
 

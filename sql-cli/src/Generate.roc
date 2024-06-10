@@ -1,6 +1,7 @@
-interface Generate
-    exposes [module]
-    imports [Name, Schema.{ Schema }]
+module [module]
+
+import Name
+import Schema exposing [Schema]
 
 module : Schema -> Str
 module = \schema ->

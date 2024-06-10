@@ -1,15 +1,13 @@
-interface Schema
-    exposes [
-        Schema,
-        ColumnId,
-        Table,
-        Column,
-        new,
-        getName,
-        getTables,
-        primaryColumn,
-    ]
-    imports []
+module [
+    Schema,
+    ColumnId,
+    Table,
+    Column,
+    new,
+    getName,
+    getTables,
+    primaryColumn,
+]
 
 Nullable a : [Null, NotNull a]
 

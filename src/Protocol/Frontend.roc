@@ -1,27 +1,25 @@
-interface Protocol.Frontend
-    exposes [
-        startup,
-        passwordMessage,
-        terminate,
-        parse,
-        bind,
-        FormatCode,
-        describePortal,
-        describeStatement,
-        execute,
-        closeStatement,
-        sync,
-    ]
-    imports [
-        Bytes.Encode.{
-            sequence,
-            nullTerminate,
-            u8,
-            i16,
-            i32,
-            cStr,
-        },
-    ]
+module [
+    startup,
+    passwordMessage,
+    terminate,
+    parse,
+    bind,
+    FormatCode,
+    describePortal,
+    describeStatement,
+    execute,
+    closeStatement,
+    sync,
+]
+
+import Bytes.Encode exposing [
+    sequence,
+    nullTerminate,
+    u8,
+    i16,
+    i32,
+    cStr,
+]
 
 startup : { user : Str, database : Str } -> List U8
 startup = \{ user, database } ->

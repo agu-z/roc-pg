@@ -1,17 +1,15 @@
-interface Batch
-    exposes [
-        Batch,
-        BatchedCmd,
-        succeed,
-        with,
-        params,
-        reuseName,
-        sequence,
-    ]
-    imports [
-        Cmd.{ Cmd },
-        Pg.Result.{ CmdResult },
-    ]
+module [
+    Batch,
+    BatchedCmd,
+    succeed,
+    with,
+    params,
+    reuseName,
+    sequence,
+]
+
+import Cmd exposing [Cmd]
+import Pg.Result exposing [CmdResult]
 
 Batch a err := Params {
         decode : List CmdResult
