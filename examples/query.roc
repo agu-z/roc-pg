@@ -1,19 +1,15 @@
 app [main] {
     pg: "../src/main.roc",
-    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.8.1/x8URkvfyi9I0QhmVG98roKBUs_AZRkLFwFJVJ3942YA.tar.br",
+    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.10.0/vNe6s9hWzoTZtFmNkvEICPErI9ptji_ySjicO6CkucY.tar.br",
 }
 
 import pf.Task exposing [Task, await]
 import pf.Stdout
-import pf.Stderr
 import pg.Pg.Cmd
 import pg.Pg.BasicCliClient
 import pg.Pg.Result
-# Unused but required because of: https://github.com/roc-lang/roc/issues/5477
-import pf.Tcp
-import pg.Cmd
 
-task =
+main =
     client <- Pg.BasicCliClient.withConnect {
             host: "localhost",
             port: 5432,
@@ -22,43 +18,27 @@ task =
             database: "postgres",
         }
 
-    _ <- Stdout.line "Connected!" |> await
+    Stdout.line! "Connected!"
 
-    rows <-
+    rows =
         Pg.Cmd.new
             """
             select $1 as name, $2 as age
             union all
             select 'Julio' as name, 23 as age
             """
-        |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
-        |> Pg.Cmd.expectN
-            (
-                Pg.Result.succeed
-                    (\name -> \age ->
-                            ageStr = Num.toStr age
+            |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
+            |> Pg.Cmd.expectN
+                (
+                    Pg.Result.succeed
+                        (\name -> \age ->
+                                ageStr = Num.toStr age
 
-                            "$(name): $(ageStr)"
-                    )
-                |> Pg.Result.with (Pg.Result.str "name")
-                |> Pg.Result.with (Pg.Result.u8 "age")
-            )
-        |> Pg.BasicCliClient.command client
-        |> await
+                                "$(name): $(ageStr)"
+                        )
+                    |> Pg.Result.with (Pg.Result.str "name")
+                    |> Pg.Result.with (Pg.Result.u8 "age")
+                )
+            |> Pg.BasicCliClient.command! client
 
     Stdout.line (Str.joinWith rows "\n")
-
-main : Task {} I32
-main =
-    Task.attempt task \result ->
-        when result is
-            Ok _ ->
-                Task.ok {}
-
-            Err (TcpPerformErr (PgErr err)) ->
-                _ <- Stderr.line (Pg.BasicCliClient.errorToStr err) |> await
-                Task.err 2
-
-            Err err ->
-                _ <- Stderr.line (Inspect.toStr err) |> await
-                Task.err 2
