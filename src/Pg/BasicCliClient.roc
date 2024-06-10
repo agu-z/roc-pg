@@ -1,5 +1,6 @@
-# This is a temporary copy of Pg.Client that works with the latest basic-cli version
-# We won't need this when https://github.com/roc-lang/basic-cli/pull/132 is shipped in a new release
+## Unfortunately, the regular `Pg.Client` module  runs into the
+## infamous "Error during alias analysis" compiler bug when used from basic-cli.
+## This version does not.
 module [
     withConnect,
     command,
