@@ -1,27 +1,23 @@
 app [main] {
-    pf: platform "https://github.com/roc-lang/basic-webserver/releases/download/0.3.0/gJOTXTeR3CD4zCbRqK7olo4edxQvW5u3xGL-8SSxDcY.tar.br",
-    json: "https://github.com/lukewilliamboswell/roc-json/releases/download/0.6.3/_2Dh4Eju2v_tFtZeMq8aZ9qw2outG04NbkmKpFhXS_4.tar.br",
+    pf: platform "https://github.com/roc-lang/basic-webserver/releases/download/0.4.0/iAiYpbs5zdVB75golcg_YMtgexN3e2fwhsYPLPCeGzk.tar.br",
+    json: "https://github.com/lukewilliamboswell/roc-json/releases/download/0.10.0/KbIfTNbxShRX1A1FgXei1SpO5Jn8sgP6HP6PXbi-xyA.tar.br",
     pg: "../../src/main.roc",
 }
 
-import pf.Task exposing [Task, await]
+import pf.Task exposing [Task]
 import pf.Stdout
 import pf.Http exposing [Request, Response]
 import pf.Url exposing [Url]
-import json.Core
+import json.Json
 import pg.Pg.Client
-import pg.Pg.Result
 import pg.Pg.Cmd
 import pg.Sql exposing [select, into, from, column, where, eq, join, on]
 import Public
-# Unused but required because of: https://github.com/roc-lang/roc/issues/5477
-import pf.Tcp
-import pg.Cmd
 
 handleRequest : Request -> Task _ _
 handleRequest = \req ->
     method = Http.methodToStr req.method
-    {} <- Stdout.line "\n$(method) $(req.url)" |> Task.await
+    Stdout.line! "\n$(method) $(req.url)"
 
     url = Url.fromStr req.url
 
@@ -53,7 +49,7 @@ handleRequest = \req ->
             |> Task.map okJson
 
         (Get, ["products", idStr]) ->
-            id <- parseId idStr |> await
+            id = parseId! idStr
 
             query =
                 products <- from Public.products
@@ -91,7 +87,7 @@ handleRequest = \req ->
             |> Task.map okJson
 
         (Get, ["orders", idStr, "products"]) ->
-            id <- parseId idStr |> await
+            id = parseId! idStr
 
             query =
                 products <- from Public.products
@@ -188,10 +184,7 @@ runDb = \cmd ->
             database: "roc_pg_example",
         }
 
-    _ <- cmd
-        |> Pg.Cmd.inspect
-        |> Stdout.line
-        |> await
+    Stdout.line! (Pg.Cmd.inspect cmd)
 
     Pg.Client.command cmd client
 
@@ -204,7 +197,7 @@ okJson = \data -> {
             value: "application/json" |> Str.toUtf8,
         },
     ],
-    body: Encode.toBytes data Core.json,
+    body: Encode.toBytes data Json.utf8,
 }
 
 urlSegments : Url -> List Str
