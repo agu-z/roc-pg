@@ -1,5 +1,9 @@
 # roc-pg
 
+⚠️ BROKEN: This package runs into a bug in the recent versions of the compiler and platforms. I'm looking into fixing those, but it might take a while. If you want to use this now, reach out to me in [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-Agus-Zubiaga), and I can help you find a combination of versions that works.
+
+--
+
 Interface with PostgreSQL databases from Roc.
 
 This package implements a PostgreSQL client on pure Roc that depends only on a TCP effect from the platform. 
