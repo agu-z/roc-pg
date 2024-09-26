@@ -14,11 +14,11 @@ module [
 import Protocol.Backend
 import Protocol.Frontend
 import Bytes.Encode
+import Task exposing [await]
 import Bytes.Decode exposing [decode]
 import Pg.Result exposing [CmdResult]
 import Pg.Cmd exposing [Cmd]
 import Pg.Batch exposing [Batch]
-import pf.Task exposing [Task, await]
 import pf.Tcp
 import Cmd
 import Batch
@@ -39,7 +39,7 @@ withConnect :
     (Client -> Task {} _)
     -> Task {} _
 withConnect = \{ host, port, database, auth ? None, user }, callback ->
-    stream <- Tcp.withConnect host port
+    stream = Tcp.connect! host port
 
     _ <- Protocol.Frontend.startup { user, database } |> send stream
 
@@ -406,7 +406,7 @@ errorToStr = \err ->
 
 readMessage : Tcp.Stream -> Task Protocol.Backend.Message [PgProtoErr _, TcpReadErr _, TcpUnexpectedEOF]
 readMessage = \stream ->
-    headerBytes <- Tcp.readExactly 5 stream |> await
+    headerBytes <- Tcp.readExactly stream 5 |> await
 
     protoDecode = \bytes, dec ->
         decode bytes dec
@@ -416,7 +416,7 @@ readMessage = \stream ->
     meta <- headerBytes |> protoDecode Protocol.Backend.header |> await
 
     if meta.len > 0 then
-        payload <- Tcp.readExactly (Num.toU64 meta.len) stream |> await
+        payload <- Tcp.readExactly stream (Num.toU64 meta.len) |> await
         protoDecode payload (Protocol.Backend.message meta.msgType)
     else
         protoDecode [] (Protocol.Backend.message meta.msgType)
@@ -451,7 +451,7 @@ unexpected = \msg ->
 
 send : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
 send = \bytes, stream, callback ->
-    Tcp.write bytes stream |> await callback
+    Tcp.write stream bytes |> await callback
 
 sendWithSync : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
 sendWithSync = \bytes, stream, callback ->
