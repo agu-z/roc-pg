@@ -33,3 +33,23 @@ readU16 = \bytes, LE ->
 expect readU16 [0x01, 0x02, 0x03] LE == Ok (0x0102, [0x03])
 expect readU16 [0x01, 0x02] LE == Ok (0x0102, [])
 expect readU16 [0x01] LE == Err TooShort
+
+## Read a 32-bit unsigned integer
+readU32 : List U8, Endianness -> Result (U32, List U8) [TooShort]
+readU32 = \bytes, LE ->
+    when bytes is
+        [b0, b1, b2, b3, .. as rest] ->
+            value =
+                Num.shiftLeftBy (Num.toU32 b0) 24
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU32 b1) 16)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU32 b2) 8)
+                |> Num.bitwiseOr (Num.toU32 b3)
+
+            Ok (value, rest)
+
+        _ ->
+            Err TooShort
+
+expect readU32 [0x01, 0x02, 0x03, 0x04, 0x05] LE == Ok (0x01020304, [0x05])
+expect readU32 [0x01, 0x02, 0x03, 0x04] LE == Ok (0x01020304, [])
+expect readU32 [0x01, 0x02, 0x03] LE == Err TooShort
