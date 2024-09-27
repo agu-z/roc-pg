@@ -53,3 +53,27 @@ readU32 = \bytes, LE ->
 expect readU32 [0x01, 0x02, 0x03, 0x04, 0x05] LE == Ok (0x01020304, [0x05])
 expect readU32 [0x01, 0x02, 0x03, 0x04] LE == Ok (0x01020304, [])
 expect readU32 [0x01, 0x02, 0x03] LE == Err TooShort
+
+## Read a 64-bit unsigned integer
+readU64 : List U8, Endianness -> Result (U64, List U8) [TooShort]
+readU64 = \bytes, LE ->
+    when bytes is
+        [b0, b1, b2, b3, b4, b5, b6, b7, .. as rest] ->
+            value =
+                Num.shiftLeftBy (Num.toU64 b0) 56
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b1) 48)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b2) 40)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b3) 32)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b4) 24)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b5) 16)
+                |> Num.bitwiseOr (Num.shiftLeftBy (Num.toU64 b6) 8)
+                |> Num.bitwiseOr (Num.toU64 b7)
+
+            Ok (value, rest)
+
+        _ ->
+            Err TooShort
+
+expect readU64 [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09] LE == Ok (0x0102030405060708, [0x09])
+expect readU64 [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08] LE == Ok (0x0102030405060708, [])
+expect readU64 [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07] LE == Err TooShort
