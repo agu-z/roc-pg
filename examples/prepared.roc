@@ -9,13 +9,13 @@ import pg.Pg.BasicCliClient
 import pg.Pg.Result
 
 main =
-    client <- Pg.BasicCliClient.withConnect {
-            host: "localhost",
-            port: 5432,
-            user: "postgres",
-            auth: None,
-            database: "postgres",
-        }
+    client = Pg.BasicCliClient.connect! {
+        host: "localhost",
+        port: 5432,
+        user: "postgres",
+        auth: None,
+        database: "postgres",
+    }
 
     Stdout.line! "Connected!"
 

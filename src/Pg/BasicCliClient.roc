@@ -2,7 +2,7 @@
 ## infamous "Error during alias analysis" compiler bug when used from basic-cli.
 ## This version does not.
 module [
-    withConnect,
+    connect,
     command,
     batch,
     prepare,
@@ -14,7 +14,6 @@ module [
 import Protocol.Backend
 import Protocol.Frontend
 import Bytes.Encode
-import Task exposing [await]
 import Bytes.Decode exposing [decode]
 import Pg.Result exposing [CmdResult]
 import Pg.Cmd exposing [Cmd]
@@ -28,20 +27,19 @@ Client := {
     backendKey : Result Protocol.Backend.KeyData [Pending],
 }
 
-withConnect :
+connect :
     {
         host : Str,
         port : U16,
         user : Str,
         auth ? [None, Password Str],
         database : Str,
-    },
-    (Client -> Task {} _)
-    -> Task {} _
-withConnect = \{ host, port, database, auth ? None, user }, callback ->
+    }
+    -> Task Client _
+connect = \{ host, port, database, auth ? None, user } ->
     stream = Tcp.connect! host port
 
-    _ <- Protocol.Frontend.startup { user, database } |> send stream
+    Tcp.write! stream (Protocol.Frontend.startup { user, database })
 
     msg, state <- messageLoop stream {
             parameters: Dict.empty {},
@@ -58,7 +56,7 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
                     Task.err PasswordRequired
 
                 Password pwd ->
-                    _ <- Protocol.Frontend.passwordMessage pwd |> send stream
+                    Tcp.write! stream (Protocol.Frontend.passwordMessage pwd)
 
                     next state
 
@@ -69,17 +67,12 @@ withConnect = \{ host, port, database, auth ? None, user }, callback ->
             next { state & backendKey: Ok backendKey }
 
         ReadyForQuery _ ->
-            result <-
-                @Client {
-                    stream,
-                    backendKey: state.backendKey,
-                }
-                |> callback
-                |> await
+            client = @Client {
+                stream,
+                backendKey: state.backendKey,
+            }
 
-            _ <- Protocol.Frontend.terminate |> send stream
-
-            return result
+            return client
 
         _ ->
             unexpected msg
@@ -128,16 +121,16 @@ command = \cmd, @Client { stream } ->
                     fields: prepared.fields,
                 }
 
-    _ <- sendWithSync init.messages stream
+    sendWithSync! stream init.messages
 
-    result <- readCmdResult init.fields stream |> await
+    result = readCmdResult! init.fields stream
 
-    decoded <- Cmd.decode result cmd
-        |> Result.mapErr PgExpectErr
-        |> Task.fromResult
-        |> await
+    decoded =
+        Cmd.decode result cmd
+            |> Result.mapErr PgExpectErr
+            |> Task.fromResult!
 
-    _ <- readReadyForQuery stream |> await
+    readReadyForQuery! stream
 
     Task.ok decoded
 
@@ -183,7 +176,7 @@ batch = \cmdBatch, @Client { stream } ->
         |> Bytes.Encode.sequence
 
     messages = commandMessages |> List.concat closeMessages
-    _ <- sendWithSync messages stream
+    sendWithSync! stream messages
 
     Task.loop
         {
@@ -259,8 +252,7 @@ batchReadStep = \batchDecode, stream, { remaining, results } ->
         [] ->
             when batchDecode results is
                 Ok { value } ->
-                    _ <- readReadyForQuery stream |> await
-
+                    readReadyForQuery! stream
                     return value
 
                 Err (MissingCmdResult index) ->
@@ -270,8 +262,8 @@ batchReadStep = \batchDecode, stream, { remaining, results } ->
                     Task.err (PgExpectErr err)
 
         [first, ..] ->
-            fields <- await (batchedCmdFields results first.fields)
-            result <- readCmdResult fields stream |> await
+            fields = batchedCmdFields! results first.fields
+            result = readCmdResult! fields stream
 
             next {
                 remaining: remaining |> List.dropFirst 1,
@@ -347,12 +339,13 @@ prepare : Str,{ name : Str, client : Client }
 prepare = \sql, { name, client } ->
     (@Client { stream }) = client
 
-    _ <- Bytes.Encode.sequence [
-            Protocol.Frontend.parse { sql, name },
-            Protocol.Frontend.describeStatement { name },
-            Protocol.Frontend.sync,
-        ]
-        |> send stream
+    parseAndDescribe = Bytes.Encode.sequence [
+        Protocol.Frontend.parse { sql, name },
+        Protocol.Frontend.describeStatement { name },
+        Protocol.Frontend.sync,
+    ]
+
+    Tcp.write! stream parseAndDescribe
 
     msg, state <- messageLoop stream []
 
@@ -406,17 +399,17 @@ errorToStr = \err ->
 
 readMessage : Tcp.Stream -> Task Protocol.Backend.Message [PgProtoErr _, TcpReadErr _, TcpUnexpectedEOF]
 readMessage = \stream ->
-    headerBytes <- Tcp.readExactly stream 5 |> await
+    headerBytes = Tcp.readExactly! stream 5
 
     protoDecode = \bytes, dec ->
         decode bytes dec
         |> Result.mapErr PgProtoErr
         |> Task.fromResult
 
-    meta <- headerBytes |> protoDecode Protocol.Backend.header |> await
+    meta = headerBytes |> protoDecode! Protocol.Backend.header
 
     if meta.len > 0 then
-        payload <- Tcp.readExactly stream (Num.toU64 meta.len) |> await
+        payload = Tcp.readExactly! stream (Num.toU64 meta.len)
         protoDecode payload (Protocol.Backend.message meta.msgType)
     else
         protoDecode [] (Protocol.Backend.message meta.msgType)
@@ -425,7 +418,7 @@ messageLoop : Tcp.Stream, state, (Protocol.Backend.Message, state -> Task [Done 
 messageLoop = \stream, initState, stepFn ->
     state <- Task.loop initState
 
-    message <- readMessage stream |> await
+    message = readMessage! stream
 
     when message is
         ErrorResponse error ->
@@ -449,14 +442,11 @@ unexpected : a -> Task * [PgProtoErr [UnexpectedMsg a]]
 unexpected = \msg ->
     Task.err (PgProtoErr (UnexpectedMsg msg))
 
-send : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
-send = \bytes, stream, callback ->
-    Tcp.write stream bytes |> await callback
-
-sendWithSync : List U8, Tcp.Stream, ({} -> Task a _) -> Task a _
-sendWithSync = \bytes, stream, callback ->
-    Bytes.Encode.sequence [
+sendWithSync : Tcp.Stream, List U8 -> Task {} _
+sendWithSync = \stream, bytes ->
+    content = Bytes.Encode.sequence [
         bytes,
         Protocol.Frontend.sync,
     ]
-    |> send stream callback
+
+    Tcp.write stream content
