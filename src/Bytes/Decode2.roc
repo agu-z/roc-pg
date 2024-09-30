@@ -7,6 +7,7 @@ module [
     readI16,
     readI32,
     readI64,
+    readNullTerminatedUtf8,
 ]
 
 Endianness : [LE]
@@ -164,3 +165,23 @@ readI64 = \bytes, LE ->
 
         _ ->
             Err TooShort
+
+## Read a UTF-8 encoded string until a null byte is found
+readNullTerminatedUtf8 : List U8 -> Result (Str, List U8) [TooShort, BadUtf8 _ _]
+readNullTerminatedUtf8 = \bytes ->
+    when List.findFirstIndex bytes (\byte -> byte == 0x00) is
+        Ok index ->
+            { before, others } = List.split bytes index
+            str = Str.fromUtf8? before
+            after = List.dropFirst others 1
+
+            Ok (str, after)
+
+        Err NotFound ->
+            Err TooShort
+
+expect readNullTerminatedUtf8 [0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x00, 0x57, 0x00] == Ok ("Hello", [0x57, 0x00])
+expect readNullTerminatedUtf8 [0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x00] == Ok ("Hello", [])
+expect readNullTerminatedUtf8 [0x48, 0x65, 0x6C, 0x6C, 0x6F] == Err TooShort
+expect readNullTerminatedUtf8 [0x48, 0x65, 0x6C, 0x6C, 0x6F, 0xC0, 0x00] == Err (BadUtf8 UnexpectedEndOfSequence 5)
+expect readNullTerminatedUtf8 [0x53, 0x6F, 0x75, 0x6E, 0x64, 0x73, 0x20, 0x67, 0x6F, 0x6F, 0x64, 0x20, 0xF0, 0x9F, 0x91, 0x8D, 0x00] == Ok ("Sounds good 👍", [])
