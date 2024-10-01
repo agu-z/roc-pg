@@ -35,11 +35,11 @@ new = Cmd.fromSql
 
 # Result
 
-expectN : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
+#expectN : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
 expectN = \cmd, decoder ->
     Cmd.withDecode cmd \r -> Pg.Result.decode r decoder
 
-expect1 : Cmd CmdResult [], Pg.Result.Decode a [EmptyResult]err -> Cmd a [EmptyResult, FieldNotFound Str]err
+#expect1 : Cmd CmdResult [], Pg.Result.Decode a [EmptyResult]err -> Cmd a [EmptyResult, FieldNotFound Str]err
 expect1 = \cmd, decoder ->
     cmdResult <- cmd |> Cmd.withLimit 1 |> Cmd.withDecode
     rows <- Pg.Result.decode cmdResult decoder |> Result.try
@@ -128,4 +128,3 @@ num = \value ->
 bytes : List U8 -> Binding
 bytes = \value ->
     @Binding (Binary value)
-

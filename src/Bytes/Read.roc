@@ -8,6 +8,7 @@ module [
     readI32,
     readI64,
     readNullTerminatedUtf8,
+    Utf8ByteProblem,
 ]
 
 ## Read an 8-bit unsigned integer
@@ -164,8 +165,17 @@ readI64 = \bytes ->
         _ ->
             Err TooShort
 
+Utf8ByteProblem : [
+    InvalidStartByte,
+    UnexpectedEndOfSequence,
+    ExpectedContinuation,
+    OverlongEncoding,
+    CodepointTooLarge,
+    EncodesSurrogateHalf,
+]
+
 ## Read a UTF-8 encoded string until a null byte is found
-readNullTerminatedUtf8 : List U8 -> Result (Str, List U8) [TooShort, BadUtf8 _ _]
+readNullTerminatedUtf8 : List U8 -> Result (Str, List U8) [TooShort, BadUtf8 Utf8ByteProblem U64]
 readNullTerminatedUtf8 = \bytes ->
     when List.findFirstIndex bytes (\byte -> byte == 0x00) is
         Ok index ->

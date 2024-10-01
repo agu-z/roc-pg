@@ -6,20 +6,16 @@ module [
     Status,
     RowField,
     Error,
+    ReadResult,
+    ReadErr,
 ]
 
-import Bytes.Decode exposing [
-    Decode,
-    await,
-    map,
-    succeed,
-    fail,
-    loop,
-    u8,
-    i16,
-    i32,
-    cStr,
-    take,
+import Bytes.Read exposing [
+    readU8,
+    readI16,
+    readI32,
+    readNullTerminatedUtf8,
+    Utf8ByteProblem,
 ]
 
 Message : [
@@ -42,197 +38,205 @@ Message : [
     CloseComplete,
 ]
 
-header : Decode { msgType : U8, len : I32 } _
-header =
-    msgType <- await u8
-    len <- map i32
+ReadErr : [
+    TooShort,
+    BadUtf8 Utf8ByteProblem U64,
+    UnrecognizedBackendMessage U8,
+    UnrecognizedBackendStatus U8,
+    MissingErrorField U8,
+    InvalidErrorSeverity Str,
+    InvalidErrorPosition,
+]
 
-    { msgType, len: len - 4 }
+ReadResult a : Result (a, List U8) ReadErr
 
-message : U8 -> Decode Message _
-message = \msgType ->
+header : List U8 -> ReadResult { msgType : U8, len : I32 }
+header = \bytes ->
+    (msgType, afterType) = readU8? bytes
+    (len, afterLen) = readI32? afterType
+
+    Ok ({ msgType, len: len - 4 }, afterLen)
+
+message : List U8, U8 -> ReadResult Message
+message = \bytes, msgType ->
     when msgType is
         'R' ->
-            authRequest
+            authRequest bytes
 
         'S' ->
-            paramStatus
+            paramStatus bytes
 
         'K' ->
-            backendKeyData
+            backendKeyData bytes
 
         'Z' ->
-            readyForQuery
+            readyForQuery bytes
 
         'E' ->
-            errorResponse
+            errorResponse bytes
 
         '1' ->
-            succeed ParseComplete
+            Ok (ParseComplete, bytes)
 
         '2' ->
-            succeed BindComplete
+            Ok (BindComplete, bytes)
 
         'n' ->
-            succeed NoData
+            Ok (NoData, bytes)
 
         'T' ->
-            rowDescription
+            rowDescription bytes
 
         't' ->
-            succeed ParameterDescription
+            Ok (ParameterDescription, bytes)
 
         'D' ->
-            dataRow
+            dataRow bytes
 
         's' ->
-            succeed PortalSuspended
+            Ok (PortalSuspended, bytes)
 
         'C' ->
-            commandComplete
+            commandComplete bytes
 
         'I' ->
-            succeed EmptyQueryResponse
+            Ok (EmptyQueryResponse, bytes)
 
         '3' ->
-            succeed CloseComplete
+            Ok (CloseComplete, bytes)
 
         _ ->
-            fail (UnrecognizedBackendMessage msgType)
+            Err (UnrecognizedBackendMessage msgType)
 
-authRequest : Decode Message _
-authRequest =
-    authType <- map i32
+authRequest : List U8 -> ReadResult Message
+authRequest = \bytes ->
+    (authType, after) = readI32? bytes
 
     when authType is
         0 ->
-            AuthOk
+            Ok (AuthOk, after)
 
         3 ->
-            AuthCleartextPassword
+            Ok (AuthCleartextPassword, after)
 
         _ ->
-            AuthUnsupported
+            Ok (AuthUnsupported, after)
 
-paramStatus : Decode Message _
-paramStatus =
-    name <- await cStr
-    value <- await cStr
-    succeed (ParameterStatus { name, value })
+paramStatus : List U8 -> ReadResult Message
+paramStatus = \bytes ->
+    (name, afterName) = readNullTerminatedUtf8? bytes
+    (value, afterValue) = readNullTerminatedUtf8? afterName
+
+    Ok (ParameterStatus { name, value }, afterValue)
 
 KeyData : { processId : I32, secretKey : I32 }
 
-backendKeyData : Decode Message _
-backendKeyData =
-    processId <- await i32
-    secretKey <- await i32
-    succeed (BackendKeyData { processId, secretKey })
+backendKeyData : List U8 -> ReadResult Message
+backendKeyData = \bytes ->
+    (processId, afterProcessId) = readI32? bytes
+    (secretKey, afterSecretId) = readI32? afterProcessId
+
+    Ok (BackendKeyData { processId, secretKey }, afterSecretId)
 
 Status : [Idle, TransactionBlock, FailedTransactionBlock]
 
-readyForQuery : Decode Message _
-readyForQuery =
-    status <- await u8
+readyForQuery : List U8 -> ReadResult Message
+readyForQuery = \bytes ->
+    (status, after) = readU8? bytes
 
     when status is
         'I' ->
-            succeed (ReadyForQuery Idle)
+            Ok (ReadyForQuery Idle, after)
 
         'T' ->
-            succeed (ReadyForQuery TransactionBlock)
+            Ok (ReadyForQuery TransactionBlock, after)
 
         'E' ->
-            succeed (ReadyForQuery FailedTransactionBlock)
+            Ok (ReadyForQuery FailedTransactionBlock, after)
 
         _ ->
-            fail (UnrecognizedBackendStatus status)
+            Err (UnrecognizedBackendStatus status)
 
 Error : {
     localizedSeverity : Str,
-    severity : Result ErrorSeverity {},
+    severity : Result ErrorSeverity [Missing],
     code : Str,
     message : Str,
-    detail : Result Str {},
-    hint : Result Str {},
-    position : Result U32 {},
-    internalPosition : Result U32 {},
-    internalQuery : Result Str {},
-    ewhere : Result Str {},
-    schemaName : Result Str {},
-    tableName : Result Str {},
-    columnName : Result Str {},
-    dataTypeName : Result Str {},
-    constraintName : Result Str {},
-    file : Result Str {},
-    line : Result Str {},
-    routine : Result Str {},
+    detail : Result Str [Missing],
+    hint : Result Str [Missing],
+    position : Result U32 [Missing],
+    internalPosition : Result U32 [Missing],
+    internalQuery : Result Str [Missing],
+    ewhere : Result Str [Missing],
+    schemaName : Result Str [Missing],
+    tableName : Result Str [Missing],
+    columnName : Result Str [Missing],
+    dataTypeName : Result Str [Missing],
+    constraintName : Result Str [Missing],
+    file : Result Str [Missing],
+    line : Result Str [Missing],
+    routine : Result Str [Missing],
 }
 
-errorResponse : Decode Message _
-errorResponse =
-    dict <- await knownStrFields
+errorResponse : List U8 -> ReadResult Message
+errorResponse = \bytes ->
+    (dict, afterDict) = readDict? bytes (Dict.withCapacity 16)
 
-    localizedSeverity <- 'S' |> requiredField dict
-    severity <- 'V' |> optionalFieldWith dict decodeSeverity
-    code <- 'C' |> requiredField dict
-    msg <- 'M' |> requiredField dict
-    position <- 'P' |> optionalFieldWith dict Str.toU32
-    internalPosition <- 'p' |> optionalFieldWith dict Str.toU32
+    getRequired = \field ->
+        Dict.get dict field |> Result.mapErr \KeyNotFound -> MissingErrorField field
 
-    ErrorResponse {
+    getOptional = \field ->
+        Dict.get dict field |> Result.mapErr \KeyNotFound -> Missing
+
+    onOk = \result, fn ->
+        when result is
+            Err err -> Ok (Err err)
+            Ok value -> Ok (Ok (fn? value))
+
+    localizedSeverity = getRequired? 'S'
+    severity = getOptional 'V' |> onOk? decodeSeverity
+    code = getRequired? 'C'
+    msg = getRequired? 'M'
+    position =
+        getOptional 'P'
+            |> onOk Str.toU32
+            |> Result.mapErr? \InvalidNumStr -> InvalidErrorPosition
+    internalPosition = getOptional 'p' |> onOk Str.toU32 |> Result.mapErr? \InvalidNumStr -> InvalidErrorPosition
+
+    res = ErrorResponse {
         localizedSeverity,
         severity,
         code,
         message: msg,
-        detail: 'D' |> optionalField dict,
-        hint: 'H' |> optionalField dict,
+        detail: getOptional 'D',
+        hint: getOptional 'H',
         position,
         internalPosition,
-        internalQuery: 'q' |> optionalField dict,
-        ewhere: 'W' |> optionalField dict,
-        schemaName: 's' |> optionalField dict,
-        tableName: 't' |> optionalField dict,
-        columnName: 'c' |> optionalField dict,
-        dataTypeName: 'd' |> optionalField dict,
-        constraintName: 'n' |> optionalField dict,
-        file: 'F' |> optionalField dict,
-        line: 'L' |> optionalField dict,
-        routine: 'R' |> optionalField dict,
+        internalQuery: getOptional 'q',
+        ewhere: getOptional 'W',
+        schemaName: getOptional 's',
+        tableName: getOptional 't',
+        columnName: getOptional 'c',
+        dataTypeName: getOptional 'd',
+        constraintName: getOptional 'n',
+        file: getOptional 'F',
+        line: getOptional 'L',
+        routine: getOptional 'R',
     }
-    |> succeed
 
-optionalField = \fieldId, dict ->
-    when Dict.get dict fieldId is
-        Ok value ->
-            Ok value
+    Ok (res, afterDict)
 
-        Err _ ->
-            Err {}
+readDict : List U8, Dict U8 Str -> ReadResult (Dict U8 Str)
+readDict = \bytes, dict ->
+    (fieldId, afterFieldId) = readU8? bytes
 
-optionalFieldWith = \fieldId, dict, validate, callback ->
-    result = Dict.get dict fieldId
+    if fieldId == 0 then
+        Ok (dict, afterFieldId)
+    else
+        (value, afterValue) = readNullTerminatedUtf8? afterFieldId
+        inserted = Dict.insert dict fieldId value
 
-    when result is
-        Ok value ->
-            when validate value is
-                Ok validated ->
-                    callback (Ok validated)
-
-                Err err ->
-                    fail err
-
-        Err _ ->
-            callback (Err {})
-
-requiredField = \fieldId, dict, callback ->
-    result = Dict.get dict fieldId
-
-    when result is
-        Ok value ->
-            callback value
-
-        Err _ ->
-            fail (MissingField fieldId)
+        readDict afterValue inserted
 
 ErrorSeverity : [
     Error,
@@ -245,6 +249,7 @@ ErrorSeverity : [
     Log,
 ]
 
+decodeSeverity : Str -> Result ErrorSeverity [InvalidErrorSeverity Str]
 decodeSeverity = \str ->
     when str is
         "ERROR" ->
@@ -272,22 +277,7 @@ decodeSeverity = \str ->
             Ok Log
 
         _ ->
-            Err (InvalidSeverity str)
-
-knownStrFields : Decode (Dict U8 Str) _
-knownStrFields =
-    collected <- loop (Dict.empty {})
-
-    fieldId <- await u8
-
-    if fieldId == 0 then
-        succeed (Done collected)
-    else
-        value <- map cStr
-
-        collected
-        |> Dict.insert fieldId value
-        |> Loop
+            Err (InvalidErrorSeverity str)
 
 RowField : {
     name : Str,
@@ -298,22 +288,21 @@ RowField : {
     formatCode : I16,
 }
 
-rowDescription : Decode Message _
-rowDescription =
-    fieldCount <- await i16
+rowDescription : List U8 -> ReadResult Message
+rowDescription = \bytes ->
+    (fields, afterFields) = readList? bytes rowField
 
-    fixedList fieldCount rowField
-    |> map RowDescription
+    Ok (RowDescription fields, afterFields)
 
-rowField : Decode RowField _
-rowField =
-    name <- await cStr
-    tableOid <- await i32
-    attributeNumber <- await i16
-    dataTypeOid <- await i32
-    dataTypeSize <- await i16
-    typeModifier <- await i32
-    formatCode <- map i16
+rowField : List U8 -> ReadResult RowField
+rowField = \bytes ->
+    (name, afterName) = readNullTerminatedUtf8? bytes
+    (tableOid, afterTableOid) = readI32? afterName
+    (attributeNumber, afterAttributeNumber) = readI16? afterTableOid
+    (dataTypeOid, afterDataTypeOid) = readI32? afterAttributeNumber
+    (dataTypeSize, afterDataTypeSize) = readI16? afterDataTypeOid
+    (typeModifier, afterTypeModifier) = readI32? afterDataTypeSize
+    (formatCode, afterFormatCode) = readI16? afterTypeModifier
 
     column =
         if tableOid != 0 && attributeNumber != 0 then
@@ -321,7 +310,7 @@ rowField =
         else
             Err NotAColumn
 
-    {
+    field = {
         name,
         column,
         dataTypeOid,
@@ -330,34 +319,44 @@ rowField =
         formatCode,
     }
 
-dataRow : Decode Message _
-dataRow =
-    columnCount <- await i16
+    Ok (field, afterFormatCode)
 
-    fixedList
-        columnCount
-        (
-            valueLen <- await i32
+dataRow : List U8 -> ReadResult Message
+dataRow = \bytes ->
+    (values, afterValues) = readList? bytes \current ->
+        (valueLen, afterLen) = readI32? current
 
-            if valueLen == -1 then
-                succeed []
-            else
-                take (Num.toU64 valueLen) \x -> x
-        )
-    |> map DataRow
+        if valueLen == -1 then
+            Ok ([], afterLen)
+        else
+            { before, others } = List.split afterLen (Num.toU64 valueLen)
 
-fixedList = \count, itemDecode ->
-    collected <- loop (List.withCapacity (Num.toU64 count))
+            Ok (before, others)
 
-    item <- map itemDecode
+    Ok (DataRow values, afterValues)
 
-    added = List.append collected item
+readList : List U8, (List U8 -> ReadResult a) -> ReadResult (List a)
+readList = \bytes, decodeItem ->
+    (count, afterCount) = readI16? bytes
+    collected = List.withCapacity (Num.toU64 count)
 
-    if List.len added == Num.toU64 count then
-        Done added
-    else
-        Loop added
+    readListHelp afterCount count decodeItem collected
 
-commandComplete : Decode Message _
-commandComplete =
-    map cStr CommandComplete
+readListHelp : List U8, I16, (List U8 -> ReadResult a), List a -> ReadResult (List a)
+readListHelp = \bytes, count, readItem, collected ->
+    if count == 0 then
+        Ok (collected, bytes)
+        else
+
+    when readItem bytes is
+        Ok (item, afterItem) ->
+            added = List.append collected item
+            readListHelp afterItem (count - 1) readItem added
+
+        Err err ->
+            Err err
+
+commandComplete : List U8 -> ReadResult Message
+commandComplete = \bytes ->
+    (str, after) = readNullTerminatedUtf8? bytes
+    Ok (CommandComplete str, after)

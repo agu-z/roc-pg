@@ -14,7 +14,6 @@ module [
 import Protocol.Backend
 import Protocol.Frontend
 import Bytes.Encode
-import Bytes.Decode exposing [decode]
 import Pg.Result exposing [CmdResult]
 import Pg.Cmd exposing [Cmd]
 import Pg.Batch exposing [Batch]
@@ -373,7 +372,7 @@ errorToStr = \err ->
             Ok value ->
                 "$(str)\n$(name): $(value)"
 
-            Err {} ->
+            Err Missing ->
                 str
 
     fieldsStr =
@@ -400,19 +399,23 @@ errorToStr = \err ->
 readMessage : Tcp.Stream -> Task Protocol.Backend.Message [PgProtoErr _, TcpReadErr _, TcpUnexpectedEOF]
 readMessage = \stream ->
     headerBytes = Tcp.readExactly! stream 5
-
-    protoDecode = \bytes, dec ->
-        decode bytes dec
-        |> Result.mapErr PgProtoErr
-        |> Task.fromResult
-
-    meta = headerBytes |> protoDecode! Protocol.Backend.header
+    meta = Protocol.Backend.header headerBytes |> handleReadResult!
 
     if meta.len > 0 then
         payload = Tcp.readExactly! stream (Num.toU64 meta.len)
-        protoDecode payload (Protocol.Backend.message meta.msgType)
+        Protocol.Backend.message payload meta.msgType |> handleReadResult!
     else
-        protoDecode [] (Protocol.Backend.message meta.msgType)
+        Protocol.Backend.message [] meta.msgType |> handleReadResult!
+
+handleReadResult = \result ->
+    result
+    |> Result.mapErr PgProtoErr
+    |> Result.try \(read, remaining) ->
+        if List.isEmpty remaining then
+            Ok read
+        else
+            Err (PgProtoErr (RemainingBytes remaining))
+    |> Task.fromResult
 
 messageLoop : Tcp.Stream, state, (Protocol.Backend.Message, state -> Task [Done done, Step state] _) -> Task done _
 messageLoop = \stream, initState, stepFn ->

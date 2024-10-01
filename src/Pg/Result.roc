@@ -53,17 +53,17 @@ Decode a err :=
     Result
         (List (List U8)
         ->
-        Result a [FieldNotFound Str]err)
-        [FieldNotFound Str]
+        Result a [FieldNotFound Str (List RowField)]err)
+        [FieldNotFound Str (List RowField)]
 
-decode : CmdResult, Decode a err -> Result (List a) [FieldNotFound Str]err
+decode : CmdResult, Decode a err -> Result (List a) [FieldNotFound Str _]err
 decode = \@CmdResult r, @Decode getDecode ->
     when getDecode r.fields is
         Ok fn ->
             List.mapTry r.rows fn
 
-        Err (FieldNotFound name) ->
-            Err (FieldNotFound name)
+        Err (FieldNotFound name _) ->
+            Err (FieldNotFound name r.fields)
 
 str = decoder Ok
 
@@ -110,10 +110,10 @@ decoder = \fn -> \name ->
                                 Err err
 
                     Err OutOfBounds ->
-                        Err (FieldNotFound name)
+                        Err (FieldNotFound name rowFields)
 
             Err NotFound ->
-                Err (FieldNotFound name)
+                Err (FieldNotFound name rowFields)
 
 map2 = \@Decode a, @Decode b, cb ->
     rowFields <- @Decode
