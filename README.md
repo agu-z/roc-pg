@@ -33,13 +33,13 @@ Connecting and performing a query
 ```roc
 task : Task (List { name: Str, price: Dec }) _
 task =
-    client <- Pg.Client.withConnect {
-              host: "localhost",
-              port: 5432,
-              user: "postgres",
-              database: "postgres",
-              auth: Password "password"
-          }
+    client = Pg.Client.connect! {
+        host: "localhost",
+        port: 5432,
+        user: "postgres",
+        database: "postgres",
+        auth: Password "password"
+    }
 
     Pg.Cmd.new "select name, price from products"
     |> Pg.Cmd.expectN { Pg.Result.combine <-
