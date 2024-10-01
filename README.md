@@ -6,7 +6,7 @@
 
 Interface with PostgreSQL databases from Roc.
 
-This package implements a PostgreSQL client on pure Roc that depends only on a TCP effect from the platform. 
+This package implements a PostgreSQL client on pure Roc that depends only on a TCP effect from the platform.
 
 It exposes a simple API that allows you to run SQL commands as strings and a query builder that helps you write composable type-safe queries against your schema.
 
@@ -30,7 +30,7 @@ The plan is to support all the other SQL commands, but that's coming later. In t
 
 Connecting and performing a query
 
-```haskell
+```roc
 task : Task (List { name: Str, price: Dec }) _
 task =
     client <- Pg.Client.withConnect {
@@ -42,12 +42,10 @@ task =
           }
 
     Pg.Cmd.new "select name, price from products"
-    |> Pg.Cmd.expectN (
-        Pg.Result.succeed { 
-            name: <- Pg.Result.str "name" |> Pg.Result.apply, 
-            price: <- Pg.Result.dec "price" |> Pg.Result.apply
-        }
-    ) 
+    |> Pg.Cmd.expectN { Pg.Result.combine <-
+        name: <- Pg.Result.str "name" |> Pg.Result.apply,
+        price: <- Pg.Result.dec "price" |> Pg.Result.apply
+    }
     |> Pg.Client.command client
 ```
 
@@ -56,15 +54,13 @@ task =
 Parameterized queries
 </summary>
 
-```elm
+```roc
 Pg.Cmd.new "select name, price from products where id = $1"
 |> Pg.Cmd.bind [ Pg.Cmd.u32 productId ]
-|> Pg.Cmd.expect1 (
-    Pg.Result.succeed { 
-        name: <- Pg.Result.str "name" |> Pg.Result.apply, 
-        price: <- Pg.Result.dec "price" |> Pg.Result.apply
-    }
-) 
+|> Pg.Cmd.expect1 { Pg.Result.combine <-
+    name: <- Pg.Result.str "name" |> Pg.Result.apply,
+    price: <- Pg.Result.dec "price" |> Pg.Result.apply
+}
 |> Pg.Client.command client
 ```
 
@@ -75,7 +71,7 @@ Pg.Cmd.new "select name, price from products where id = $1"
 Prepared statements
 </summary>
 
-```elm
+```roc
 selectUser <-
     "select email from users where id = $1"
     |> Pg.Client.prepare { client, name: "selectUser" }
@@ -85,7 +81,6 @@ selectUser
 |> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
 |> Pg.Cmd.expect1 (Pg.Result.str "email")
 |> Pg.Client.command client
-
 ```
 
 </details>
@@ -113,11 +108,11 @@ Pg.Batch.succeed \email -> \products -> { email, products }
             """
         |> Pg.Cmd.bind [ Pg.Cmd.u32 orderId ]
         |> Pg.Cmd.expectN (
-            Pg.Result.succeed { 
-                name: <- Pg.Result.str "name" |> Pg.Result.apply, 
+            Pg.Result.succeed {
+                name: <- Pg.Result.str "name" |> Pg.Result.apply,
                 price: <- Pg.Result.dec "price" |> Pg.Result.apply
             }
-        ) 
+        )
     )
 |> Pg.Client.batch client
 ```
@@ -152,36 +147,34 @@ The API has been in a state of flux until recently. I have now started working o
 
 Feel free to DM me at [Roc's Zulip](https://roc.zulipchat.com/#narrow/dm/489294-Agus-Zubiaga), though!
 
-
 ## Features
 
-- [x] Connection handling
-- [x] Parameterized queries
-- [x] Decoding results
-- [x] Decoding errors
-- [ ] Authentication methods
-  - [x] Cleartext password
-  - [ ] MD5 password \*
-  - [ ] SASL / SCRAM-SHA-256 \*
-- [x] Prepared statements
-- [ ] Close prepared statements
-- [x] Pipelining
-  - [x] Applicative batches
-  - [x] Sequence list of commands expecting same type
-  - [x] 🚀 Parse and Describe once per unique SQL string
-- [ ] Bulk copying
-- [ ] Cursors
-- [ ] SSL \*
-- [ ] Connection pooling \*
-- [ ] Notifications (listen/notify)
-- [ ] Notices
+-   [x] Connection handling
+-   [x] Parameterized queries
+-   [x] Decoding results
+-   [x] Decoding errors
+-   [ ] Authentication methods
+    -   [x] Cleartext password
+    -   [ ] MD5 password \*
+    -   [ ] SASL / SCRAM-SHA-256 \*
+-   [x] Prepared statements
+-   [ ] Close prepared statements
+-   [x] Pipelining
+    -   [x] Applicative batches
+    -   [x] Sequence list of commands expecting same type
+    -   [x] 🚀 Parse and Describe once per unique SQL string
+-   [ ] Bulk copying
+-   [ ] Cursors
+-   [ ] SSL \*
+-   [ ] Connection pooling \*
+-   [ ] Notifications (listen/notify)
+-   [ ] Notices
 
 \* Requires new platform primitives
 
 This list does not include features of the query builder as I'm still figuring out those.
 
-
 ## Resources
 
-- [PostgreSQL Protocol Flow](https://www.postgresql.org/docs/current/protocol-flow.html)
-- [PostgreSQL Message Formats](https://www.postgresql.org/docs/current/protocol-message-formats.html)
+-   [PostgreSQL Protocol Flow](https://www.postgresql.org/docs/current/protocol-flow.html)
+-   [PostgreSQL Message Formats](https://www.postgresql.org/docs/current/protocol-message-formats.html)

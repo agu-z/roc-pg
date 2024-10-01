@@ -28,16 +28,13 @@ main =
             """
             |> Pg.Cmd.bind [Pg.Cmd.str "John", Pg.Cmd.u8 32]
             |> Pg.Cmd.expectN
-                (
-                    Pg.Result.succeed
-                        (\name -> \age ->
-                                ageStr = Num.toStr age
-
-                                "$(name): $(ageStr)"
-                        )
-                    |> Pg.Result.with (Pg.Result.str "name")
-                    |> Pg.Result.with (Pg.Result.u8 "age")
-                )
+                { Pg.Result.combine <-
+                    name: Pg.Result.str "name",
+                    age: Pg.Result.u8 "age",
+                }
             |> Pg.BasicCliClient.command! client
 
-    Stdout.line (Str.joinWith rows "\n")
+    rows
+    |> List.map \row -> "$(row.name): $(Num.toStr row.age)"
+    |> Str.joinWith "\n"
+    |> Stdout.line

@@ -21,9 +21,8 @@ module [
     f32,
     f64,
     dec,
-    with,
-    apply,
-    succeed,
+    hardcode,
+    combine,
 ]
 
 import Protocol.Backend
@@ -47,8 +46,7 @@ len : CmdResult -> U64
 len = \@CmdResult result ->
     List.len result.rows
 
-Decode a err :=
-    List RowField
+Decode a err := List RowField
     ->
     Result
         (List (List U8)
@@ -93,36 +91,38 @@ f64 = decoder Str.toF64
 
 dec = decoder Str.toDec
 
-decoder = \fn -> \name -> @Decode \rowFields ->
-    when List.findFirstIndex rowFields \f -> f.name == name is
-        Ok index -> Ok \row ->
-            when List.get row index is
-                Ok bytes ->
-                    when Str.fromUtf8 bytes is
-                        Ok strValue ->
-                            fn strValue
+decoder = \fn ->
+    \name ->
+        @Decode \rowFields ->
+            when List.findFirstIndex rowFields \f -> f.name == name is
+                Ok index ->
+                    Ok \row ->
+                        when List.get row index is
+                            Ok bytes ->
+                                when Str.fromUtf8 bytes is
+                                    Ok strValue ->
+                                        fn strValue
 
-                        Err err ->
-                            Err err
+                                    Err err ->
+                                        Err err
 
-                Err OutOfBounds ->
+                            Err OutOfBounds ->
+                                Err (FieldNotFound name)
+
+                Err NotFound ->
                     Err (FieldNotFound name)
 
-        Err NotFound ->
-            Err (FieldNotFound name )
+combine : Decode a err, Decode b err, (a, b -> c) -> Decode c err
+combine = \@Decode a, @Decode b, cb ->
+    @Decode \rowFields ->
+        decodeA = a? rowFields
+        decodeB = b? rowFields
 
-map2 = \@Decode a, @Decode b, cb -> @Decode \rowFields ->
-    decodeA = a? rowFields
-    decodeB = b? rowFields
+        Ok \row ->
+            valueA = decodeA? row
+            valueB = decodeB? row
 
-    Ok \row ->
-        valueA = decodeA? row
-        valueB = decodeB? row
+            Ok (cb valueA valueB)
 
-        Ok (cb valueA valueB)
-
-succeed = \value -> @Decode \_ -> Ok \_ -> Ok value
-
-with = \a, b -> map2 a b (\fn, val -> fn val)
-
-apply = \a -> \fn -> with fn a
+hardcode : a -> Decode a *
+hardcode = \value -> @Decode \_ -> Ok \_ -> Ok value
