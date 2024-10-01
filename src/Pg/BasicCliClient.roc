@@ -40,41 +40,42 @@ connect = \{ host, port, database, auth ? None, user } ->
 
     Tcp.write! stream (Protocol.Frontend.startup { user, database })
 
-    msg, state <- messageLoop stream {
-            parameters: Dict.empty {},
-            backendKey: Err Pending,
-        }
+    initState = {
+        parameters: Dict.empty {},
+        backendKey: Err Pending,
+    }
 
-    when msg is
-        AuthOk ->
-            next state
+    messageLoop stream initState \msg, state ->
+        when msg is
+            AuthOk ->
+                next state
 
-        AuthCleartextPassword ->
-            when auth is
-                None ->
-                    Task.err PasswordRequired
+            AuthCleartextPassword ->
+                when auth is
+                    None ->
+                        Task.err PasswordRequired
 
-                Password pwd ->
-                    Tcp.write! stream (Protocol.Frontend.passwordMessage pwd)
+                    Password pwd ->
+                        Tcp.write! stream (Protocol.Frontend.passwordMessage pwd)
 
-                    next state
+                        next state
 
-        AuthUnsupported ->
-            Task.err UnsupportedAuth
+            AuthUnsupported ->
+                Task.err UnsupportedAuth
 
-        BackendKeyData backendKey ->
-            next { state & backendKey: Ok backendKey }
+            BackendKeyData backendKey ->
+                next { state & backendKey: Ok backendKey }
 
-        ReadyForQuery _ ->
-            client = @Client {
-                stream,
-                backendKey: state.backendKey,
-            }
+            ReadyForQuery _ ->
+                client = @Client {
+                    stream,
+                    backendKey: state.backendKey,
+                }
 
-            return client
+                return client
 
-        _ ->
-            unexpected msg
+            _ ->
+                unexpected msg
 
 # Single command
 
@@ -289,39 +290,39 @@ batchedCmdFields = \results, fieldsMethod ->
 # Execute helpers
 
 readCmdResult = \initFields, stream ->
-    msg, state <- messageLoop stream {
-            fields: initFields,
-            rows: [],
-        }
+    initState = {
+        fields: initFields,
+        rows: [],
+    }
 
-    when msg is
-        ParseComplete | BindComplete | ParameterDescription | NoData ->
-            next state
+    messageLoop stream initState \msg, state ->
+        when msg is
+            ParseComplete | BindComplete | ParameterDescription | NoData ->
+                next state
 
-        RowDescription fields ->
-            next { state & fields: fields }
+            RowDescription fields ->
+                next { state & fields: fields }
 
-        DataRow row ->
-            next { state & rows: List.append state.rows row }
+            DataRow row ->
+                next { state & rows: List.append state.rows row }
 
-        CommandComplete _ | EmptyQueryResponse | PortalSuspended ->
-            return (Pg.Result.create state)
+            CommandComplete _ | EmptyQueryResponse | PortalSuspended ->
+                return (Pg.Result.create state)
 
-        _ ->
-            unexpected msg
+            _ ->
+                unexpected msg
 
 readReadyForQuery = \stream ->
-    msg, {} <- messageLoop stream {}
+    messageLoop stream {} \msg, {} ->
+        when msg is
+            CloseComplete ->
+                next {}
 
-    when msg is
-        CloseComplete ->
-            next {}
+            ReadyForQuery _ ->
+                return {}
 
-        ReadyForQuery _ ->
-            return {}
-
-        _ ->
-            unexpected msg
+            _ ->
+                unexpected msg
 
 # Prepared Statements
 
@@ -346,20 +347,19 @@ prepare = \sql, { name, client } ->
 
     Tcp.write! stream parseAndDescribe
 
-    msg, state <- messageLoop stream []
+    messageLoop stream [] \msg, state ->
+        when msg is
+            ParseComplete | ParameterDescription | NoData ->
+                next state
 
-    when msg is
-        ParseComplete | ParameterDescription | NoData ->
-            next state
+            RowDescription fields ->
+                next fields
 
-        RowDescription fields ->
-            next fields
+            ReadyForQuery _ ->
+                return (Cmd.prepared { name, fields: state })
 
-        ReadyForQuery _ ->
-            return (Cmd.prepared { name, fields: state })
-
-        _ ->
-            unexpected msg
+            _ ->
+                unexpected msg
 
 # Errors
 
@@ -419,19 +419,18 @@ handleReadResult = \result ->
 
 messageLoop : Tcp.Stream, state, (Protocol.Backend.Message, state -> Task [Done done, Step state] _) -> Task done _
 messageLoop = \stream, initState, stepFn ->
-    state <- Task.loop initState
+    Task.loop initState \state ->
+        message = readMessage! stream
 
-    message = readMessage! stream
+        when message is
+            ErrorResponse error ->
+                Task.err (PgErr error)
 
-    when message is
-        ErrorResponse error ->
-            Task.err (PgErr error)
+            ParameterStatus _ ->
+                Task.ok (Step state)
 
-        ParameterStatus _ ->
-            Task.ok (Step state)
-
-        _ ->
-            stepFn message state
+            _ ->
+                stepFn message state
 
 next : a -> Task [Step a] *
 next = \state ->

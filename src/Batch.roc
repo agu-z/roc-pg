@@ -53,13 +53,11 @@ with = \@Batch batch, cmd ->
     commands = batch.commands |> List.append newCmd
 
     decode = \results ->
-        { value: fn, rest } <- batch.decode results |> Result.try
+        { value: fn, rest } = batch.decode? results
 
         when rest is
             [next, ..] ->
-                a <- Cmd.decode next cmd
-                    |> Result.mapErr ExpectErr
-                    |> Result.try
+                a = Cmd.decode next cmd |> Result.mapErr? ExpectErr
 
                 Ok {
                     value: fn a,

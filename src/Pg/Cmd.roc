@@ -35,21 +35,23 @@ new = Cmd.fromSql
 
 # Result
 
-#expectN : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
+expectN : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
 expectN = \cmd, decoder ->
     Cmd.withDecode cmd \r -> Pg.Result.decode r decoder
 
-#expect1 : Cmd CmdResult [], Pg.Result.Decode a [EmptyResult]err -> Cmd a [EmptyResult, FieldNotFound Str]err
+expect1 : Cmd CmdResult [], Pg.Result.Decode a [EmptyResult]err -> Cmd a [EmptyResult, FieldNotFound Str]err
 expect1 = \cmd, decoder ->
-    cmdResult <- cmd |> Cmd.withLimit 1 |> Cmd.withDecode
-    rows <- Pg.Result.decode cmdResult decoder |> Result.try
+    cmd
+        |> Cmd.withLimit 1
+        |> Cmd.withDecode \cmdResult ->
+            rows = Pg.Result.decode? cmdResult decoder
 
-    when rows is
-        [row] ->
-            Ok row
+            when rows is
+                [row] ->
+                    Ok row
 
-        _ ->
-            Err EmptyResult
+                _ ->
+                    Err EmptyResult
 
 map : Cmd a err, (a -> b) -> Cmd b err
 map = Cmd.map

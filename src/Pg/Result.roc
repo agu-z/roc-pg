@@ -53,17 +53,17 @@ Decode a err :=
     Result
         (List (List U8)
         ->
-        Result a [FieldNotFound Str (List RowField)]err)
-        [FieldNotFound Str (List RowField)]
+        Result a [FieldNotFound Str]err)
+        [FieldNotFound Str]
 
-decode : CmdResult, Decode a err -> Result (List a) [FieldNotFound Str _]err
+decode : CmdResult, Decode a err -> Result (List a) [FieldNotFound Str]err
 decode = \@CmdResult r, @Decode getDecode ->
     when getDecode r.fields is
         Ok fn ->
             List.mapTry r.rows fn
 
-        Err (FieldNotFound name _) ->
-            Err (FieldNotFound name r.fields)
+        Err (FieldNotFound name) ->
+            Err (FieldNotFound name)
 
 str = decoder Ok
 
@@ -93,43 +93,35 @@ f64 = decoder Str.toF64
 
 dec = decoder Str.toDec
 
-decoder = \fn -> \name ->
-        rowFields <- @Decode
+decoder = \fn -> \name -> @Decode \rowFields ->
+    when List.findFirstIndex rowFields \f -> f.name == name is
+        Ok index -> Ok \row ->
+            when List.get row index is
+                Ok bytes ->
+                    when Str.fromUtf8 bytes is
+                        Ok strValue ->
+                            fn strValue
 
-        when List.findFirstIndex rowFields \f -> f.name == name is
-            Ok index ->
-                row <- Ok
+                        Err err ->
+                            Err err
 
-                when List.get row index is
-                    Ok bytes ->
-                        when Str.fromUtf8 bytes is
-                            Ok strValue ->
-                                fn strValue
+                Err OutOfBounds ->
+                    Err (FieldNotFound name)
 
-                            Err err ->
-                                Err err
+        Err NotFound ->
+            Err (FieldNotFound name )
 
-                    Err OutOfBounds ->
-                        Err (FieldNotFound name rowFields)
+map2 = \@Decode a, @Decode b, cb -> @Decode \rowFields ->
+    decodeA = a? rowFields
+    decodeB = b? rowFields
 
-            Err NotFound ->
-                Err (FieldNotFound name rowFields)
+    Ok \row ->
+        valueA = decodeA? row
+        valueB = decodeB? row
 
-map2 = \@Decode a, @Decode b, cb ->
-    rowFields <- @Decode
+        Ok (cb valueA valueB)
 
-    decodeA <- Result.try (a rowFields)
-    decodeB <- Result.try (b rowFields)
-
-    row <- Ok
-
-    valueA <- Result.try (decodeA row)
-    valueB <- Result.try (decodeB row)
-
-    Ok (cb valueA valueB)
-
-succeed = \value ->
-    @Decode \_ -> Ok \_ -> Ok value
+succeed = \value -> @Decode \_ -> Ok \_ -> Ok value
 
 with = \a, b -> map2 a b (\fn, val -> fn val)
 
