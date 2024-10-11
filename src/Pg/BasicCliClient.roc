@@ -293,11 +293,15 @@ readCmdResult = \initFields, stream ->
     msg, state <- messageLoop stream {
             fields: initFields,
             rows: [],
+            parameters: [],
         }
 
     when msg is
-        ParseComplete | BindComplete | ParameterDescription | NoData ->
+        ParseComplete | BindComplete | NoData ->
             next state
+
+        ParameterDescription parameters ->
+            next { state & parameters: parameters }
 
         RowDescription fields ->
             next { state & fields: fields }
@@ -347,17 +351,20 @@ prepare = \sql, { name, client } ->
 
     Tcp.write! stream parseAndDescribe
 
-    msg, state <- messageLoop stream []
+    msg, state <- messageLoop stream { fields: [], parameters: [] }
 
     when msg is
-        ParseComplete | ParameterDescription | NoData ->
+        ParseComplete | NoData ->
             next state
 
+        ParameterDescription parameters ->
+            next { state & parameters: parameters }
+
         RowDescription fields ->
-            next fields
+            next { state & fields: fields }
 
         ReadyForQuery _ ->
-            return (Cmd.prepared { name, fields: state })
+            return (Cmd.prepared { name, fields: state.fields, parameters: state.parameters })
 
         _ ->
             unexpected msg

@@ -1,6 +1,7 @@
 module [
     CmdResult,
     RowField,
+    ParameterField,
     create,
     len,
     fields,
@@ -29,10 +30,12 @@ module [
 import Protocol.Backend
 
 RowField : Protocol.Backend.RowField
+ParameterField : Protocol.Backend.ParameterField
 
 CmdResult := {
     fields : List RowField,
     rows : List (List (List U8)),
+    parameters: List ParameterField,
 }
 
 create = @CmdResult
