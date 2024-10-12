@@ -1,8 +1,8 @@
 ## Unfortunately, the regular `Pg.Client` module  runs into the
 ## infamous "Error during alias analysis" compiler bug when used from basic-cli.
 ## This version does not.
-module [
-    connect,
+module { streamWrite, streamReadExactly } -> [
+    new,
     command,
     batch,
     prepare,
@@ -17,28 +17,24 @@ import Bytes.Encode
 import Pg.Result exposing [CmdResult]
 import Pg.Cmd exposing [Cmd]
 import Pg.Batch exposing [Batch]
-import pf.Tcp
 import Cmd
 import Batch
 
-Client := {
-    stream : Tcp.Stream,
+Client stream := {
+    stream : stream,
     backendKey : Result Protocol.Backend.KeyData [Pending],
 }
 
-connect :
+new :
     {
-        host : Str,
-        port : U16,
         user : Str,
         auth ? [None, Password Str],
         database : Str,
+        stream : stream,
     }
-    -> Task Client _
-connect = \{ host, port, database, auth ? None, user } ->
-    stream = Tcp.connect! host port
-
-    Tcp.write! stream (Protocol.Frontend.startup { user, database })
+    -> Task (Client stream) _
+new = \{ database, auth ? None, user, stream } ->
+    streamWrite! stream (Protocol.Frontend.startup { user, database })
 
     initState = {
         parameters: Dict.empty {},
@@ -56,7 +52,7 @@ connect = \{ host, port, database, auth ? None, user } ->
                         Task.err PasswordRequired
 
                     Password pwd ->
-                        Tcp.write! stream (Protocol.Frontend.passwordMessage pwd)
+                        streamWrite! stream (Protocol.Frontend.passwordMessage pwd)
 
                         next state
 
@@ -79,18 +75,7 @@ connect = \{ host, port, database, auth ? None, user } ->
 
 # Single command
 
-command : Cmd a err,
-    Client
-    -> Task
-        a
-        [
-            PgExpectErr err,
-            PgErr Error,
-            PgProtoErr _,
-            TcpReadErr _,
-            TcpUnexpectedEOF,
-            TcpWriteErr _,
-        ]
+command : Cmd a err, Client _ -> Task a [PgExpectErr err, PgErr Error, PgProtoErr _]_
 command = \cmd, @Client { stream } ->
     { kind, limit, bindings } = Cmd.params cmd
     { formatCodes, paramValues } = Cmd.encodeBindings bindings
@@ -136,18 +121,7 @@ command = \cmd, @Client { stream } ->
 
 # Batches
 
-batch : Batch a err,
-    Client
-    -> Task
-        a
-        [
-            PgExpectErr err,
-            PgErr Error,
-            PgProtoErr _,
-            TcpReadErr _,
-            TcpUnexpectedEOF,
-            TcpWriteErr _,
-        ]
+batch : Batch a _, Client _ -> Task a [PgExpectErr _, PgErr Error, PgProtoErr _]_
 batch = \cmdBatch, @Client { stream } ->
     { commands, seenSql, decode: batchDecode } = Batch.params cmdBatch
 
@@ -326,16 +300,7 @@ readReadyForQuery = \stream ->
 
 # Prepared Statements
 
-prepare : Str,{ name : Str, client : Client }
-    -> Task
-        (Cmd CmdResult [])
-        [
-            PgErr Error,
-            PgProtoErr _,
-            TcpReadErr _,
-            TcpUnexpectedEOF,
-            TcpWriteErr _,
-        ]
+prepare : Str, { name : Str, client : Client _ } -> Task (Cmd CmdResult []) [PgErr Error, PgProtoErr _]_
 prepare = \sql, { name, client } ->
     (@Client { stream }) = client
 
@@ -345,7 +310,7 @@ prepare = \sql, { name, client } ->
         Protocol.Frontend.sync,
     ]
 
-    Tcp.write! stream parseAndDescribe
+    streamWrite! stream parseAndDescribe
 
     messageLoop stream [] \msg, state ->
         when msg is
@@ -396,13 +361,13 @@ errorToStr = \err ->
 
 # Helpers
 
-readMessage : Tcp.Stream -> Task Protocol.Backend.Message [PgProtoErr _, TcpReadErr _, TcpUnexpectedEOF]
+readMessage : _ -> Task Protocol.Backend.Message _
 readMessage = \stream ->
-    headerBytes = Tcp.readExactly! stream 5
+    headerBytes = streamReadExactly! stream 5
     meta = Protocol.Backend.header headerBytes |> handleReadResult!
 
     if meta.len > 0 then
-        payload = Tcp.readExactly! stream (Num.toU64 meta.len)
+        payload = streamReadExactly! stream (Num.toU64 meta.len)
         Protocol.Backend.message payload meta.msgType |> handleReadResult!
     else
         Protocol.Backend.message [] meta.msgType |> handleReadResult!
@@ -417,7 +382,7 @@ handleReadResult = \result ->
             Err (PgProtoErr (RemainingBytes remaining))
     |> Task.fromResult
 
-messageLoop : Tcp.Stream, state, (Protocol.Backend.Message, state -> Task [Done done, Step state] _) -> Task done _
+messageLoop : _, state, (Protocol.Backend.Message, state -> Task [Done done, Step state] _) -> Task done _
 messageLoop = \stream, initState, stepFn ->
     Task.loop initState \state ->
         message = readMessage! stream
@@ -444,11 +409,11 @@ unexpected : a -> Task * [PgProtoErr [UnexpectedMsg a]]
 unexpected = \msg ->
     Task.err (PgProtoErr (UnexpectedMsg msg))
 
-sendWithSync : Tcp.Stream, List U8 -> Task {} _
+sendWithSync : _, List U8 -> Task {} _
 sendWithSync = \stream, bytes ->
     content = Bytes.Encode.sequence [
         bytes,
         Protocol.Frontend.sync,
     ]
 
-    Tcp.write stream content
+    streamWrite stream content

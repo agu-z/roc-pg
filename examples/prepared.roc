@@ -4,17 +4,22 @@ app [main] {
 }
 
 import pf.Stdout
+import pf.Tcp
 import pg.Pg.Cmd
-import pg.Pg.BasicCliClient
+import pg.Pg.BasicCliClient {
+   streamWrite: Tcp.write,
+   streamReadExactly: Tcp.readExactly,
+}
 import pg.Pg.Result
 
 main =
-    client = Pg.BasicCliClient.connect! {
-        host: "localhost",
-        port: 5432,
+    stream = Tcp.connect! "localhost" 5432
+
+    client = Pg.BasicCliClient.new! {
         user: "postgres",
         auth: None,
         database: "postgres",
+        stream,
     }
 
     Stdout.line! "Connected!"
