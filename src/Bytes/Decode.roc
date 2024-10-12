@@ -10,6 +10,7 @@ module [
     i32,
     i64,
     cStr,
+    bool,
     take,
     map,
     succeed,
@@ -19,8 +20,9 @@ module [
     loop,
 ]
 
-Decode value err :=
-    List U8
+import Bool exposing [Bool]
+
+Decode value err := List U8
     -> Result
         {
             decoded : value,
@@ -144,6 +146,19 @@ cStr =
 
         Err _ ->
             Err TerminatorNotFound
+
+# Bools
+
+bool : Decode Bool [UnexpectedEnd]
+bool =
+    bytes <- @Decode
+
+    when bytes is
+        [byte, ..] ->
+            Ok { decoded: byte == 1, remaining: List.dropFirst bytes 1 }
+
+        _ ->
+            Err UnexpectedEnd
 
 # Mapping
 
