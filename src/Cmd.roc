@@ -16,7 +16,7 @@ module [
 ]
 
 import Protocol.Frontend exposing [FormatCode]
-import Protocol.Backend exposing [RowField]
+import Protocol.Backend exposing [RowField, ParameterField]
 import Pg.Result exposing [CmdResult]
 
 Cmd a err := Params { decode : CmdResult -> Result a err } []
@@ -35,6 +35,7 @@ Kind k : [
         {
             name : Str,
             fields : List RowField,
+            parameters : List ParameterField,
         },
 ]k
 
@@ -42,7 +43,7 @@ fromSql : Str -> Cmd CmdResult []
 fromSql = \sql ->
     new (SqlCmd sql)
 
-prepared : { name : Str, fields : List RowField } -> Cmd CmdResult []
+prepared : { name : Str, fields : List RowField, parameters : List ParameterField } -> Cmd CmdResult []
 prepared = \prep ->
     new (PreparedCmd prep)
 
@@ -135,4 +136,3 @@ encodeSingle = \binding ->
                 value: Value (Str.toUtf8 value),
                 format: Text,
             }
-
