@@ -21,6 +21,7 @@ module [
     f32,
     f64,
     bytes,
+    bool,
     withCustomDecode,
     inspect,
 ]
@@ -125,7 +126,10 @@ num : Num * -> Binding
 num = \value ->
     @Binding (Text (Num.toStr value))
 
+bool : Bool -> Binding
+bool = \value ->
+    @Binding (Binary [(if value then 1 else 0)])
+
 bytes : List U8 -> Binding
 bytes = \value ->
     @Binding (Binary value)
-

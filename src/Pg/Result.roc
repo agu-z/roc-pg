@@ -21,6 +21,7 @@ module [
     f32,
     f64,
     dec,
+    bool,
     with,
     apply,
     succeed,
@@ -92,6 +93,12 @@ f32 = decoder Str.toF32
 f64 = decoder Str.toF64
 
 dec = decoder Str.toDec
+
+bool = decoder \v ->
+    when v is
+        "t" -> Ok Bool.true
+        "f" -> Ok Bool.false
+        _ -> Err InvalidBoolStr
 
 decoder = \fn -> \name ->
         rowFields <- @Decode
