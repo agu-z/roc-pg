@@ -32,6 +32,7 @@ Message : [
     ErrorResponse Error,
     ParseComplete,
     BindComplete,
+    NoticeResponse (List { code : U8, value : Str }),
     NoData,
     RowDescription (List RowField),
     ParameterDescription,
@@ -72,6 +73,9 @@ message = \msgType ->
 
         '2' ->
             succeed BindComplete
+
+        'N' ->
+            noticeResponse
 
         'n' ->
             succeed NoData
@@ -146,6 +150,24 @@ readyForQuery =
 
         _ ->
             fail (UnrecognizedBackendStatus status)
+
+readNoticeResponses : Decode (List { code : U8, value : Str }) _
+readNoticeResponses =
+    collected <- loop []
+
+    code <- await u8
+
+    if code == 0 then
+        succeed (Done collected)
+    else
+        value <- map cStr
+
+        Loop (List.append collected { code, value })
+
+noticeResponse =
+    notices <- await readNoticeResponses
+
+    succeed (NoticeResponse notices)
 
 Error : {
     localizedSeverity : Str,
@@ -245,6 +267,7 @@ ErrorSeverity : [
     Log,
 ]
 
+decodeSeverity : Str -> Result ErrorSeverity [InvalidSeverity Str]
 decodeSeverity = \str ->
     when str is
         "ERROR" ->
