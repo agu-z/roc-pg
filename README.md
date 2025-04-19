@@ -27,24 +27,26 @@ The plan is to support all the other SQL commands, but that's coming later. In t
 Connecting and performing a query
 
 ```haskell
-task : Task (List { name: Str, price: Dec }) _
-task =
-    client <- Pg.Client.withConnect {
-              host: "localhost",
-              port: 5432,
-              user: "postgres",
-              database: "postgres",
-              auth: Password "password"
-          }
+products! : {} => Result (List { name : Str, price : Dec }) _
+products! = |_|
+    client = Pg.Client.connect!(
+        {
+            host: "localhost",
+            port: 5432,
+            user: "postgres",
+            auth: None,
+            database: "postgres",
+        },
+    )?
 
-    Pg.Cmd.new "select name, price from products"
-    |> Pg.Cmd.expectN (
-        Pg.Result.succeed { 
-            name: <- Pg.Result.str "name" |> Pg.Result.apply, 
-            price: <- Pg.Result.dec "price" |> Pg.Result.apply
-        }
-    ) 
-    |> Pg.Client.command client
+    Pg.Cmd.new("select name, price from products")
+    |> Pg.Cmd.expect_n(
+        { Pg.Result.record_builder <-
+            name: Pg.Result.str("name"),
+            price: Pg.Result.dec("price"),
+        },
+    )
+    |> Pg.Client.command!(client)
 ```
 
 <details>
@@ -53,15 +55,15 @@ Parameterized queries
 </summary>
 
 ```elm
-Pg.Cmd.new "select name, price from products where id = $1"
-|> Pg.Cmd.bind [ Pg.Cmd.u32 productId ]
-|> Pg.Cmd.expect1 (
-    Pg.Result.succeed { 
-        name: <- Pg.Result.str "name" |> Pg.Result.apply, 
-        price: <- Pg.Result.dec "price" |> Pg.Result.apply
-    }
-) 
-|> Pg.Client.command client
+Pg.Cmd.new("select name, price from products where id = $1")
+|> Pg.Cmd.bind([ Pg.Cmd.u32(product_id) ])
+|> Pg.Cmd.expect1(
+    { Pg.Result.record_builder <-
+        name: Pg.Result.str("name"),
+        price: Pg.Result.dec("price"),
+    },
+)
+|> Pg.Client.command!(client)?
 ```
 
 </details>
@@ -72,16 +74,14 @@ Prepared statements
 </summary>
 
 ```elm
-selectUser <-
+select_user =
     "select email from users where id = $1"
-    |> Pg.Client.prepare { client, name: "selectUser" }
-    |> await
+    |> Pg.Client.prepare!({ client, name: "select_user" })?
 
-selectUser
-|> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
-|> Pg.Cmd.expect1 (Pg.Result.str "email")
-|> Pg.Client.command client
-
+select_user
+|> Pg.Cmd.bind([Pg.Cmd.u32(user_id)])
+|> Pg.Cmd.expect1(Pg.Result.str("email"))
+|> Pg.Client.command!(client)?
 ```
 
 </details>
@@ -92,33 +92,36 @@ Batch commands in a single roundtrip (applicative)
 </summary>
 
 ```elm
-Pg.Batch.succeed \email -> \products -> { email, products }
-|> Pg.Batch.with
+Pg.Batch.succeed(|email| |products| { email, products })
+|> Pg.Batch.with(
     (
-        selectUser
-        |> Pg.Cmd.bind [ Pg.Cmd.u32 userId ]
-        |> Pg.Cmd.expect1 (Pg.Result.str "email")
-    )
-|> Pg.Batch.with
+        select_user
+        |> Pg.Cmd.bind([Pg.Cmd.u32(user_id)])
+        |> Pg.Cmd.expect1(Pg.Result.str("email"))
+    ),
+)
+|> Pg.Batch.with(
     (
-        Pg.Cmd.new
+        Pg.Cmd.new(
             """
             select name, price from products
             inner join orders on orders.product_id = products.id
             where orders.id = $1
-            """
-        |> Pg.Cmd.bind [ Pg.Cmd.u32 orderId ]
-        |> Pg.Cmd.expectN (
-            Pg.Result.succeed { 
-                name: <- Pg.Result.str "name" |> Pg.Result.apply, 
-                price: <- Pg.Result.dec "price" |> Pg.Result.apply
-            }
-        ) 
-    )
-|> Pg.Client.batch client
+            """,
+        )
+        |> Pg.Cmd.bind([Pg.Cmd.u32(order_id)])
+        |> Pg.Cmd.expect_n(
+            { Pg.Result.record_builder <-
+                name: Pg.Result.str("name"),
+                price: Pg.Result.dec("price"),
+            },
+        )
+    ),
+)
+|> Pg.Client.batch!(client)?
 ```
 
-Note: `selectUser` referes to prepared statement in the previous example
+Note: `select_user` referes to prepared statement in the previous example
 
 </details>
 
@@ -128,14 +131,14 @@ Batch commands in a single roundtrip (list)
 </summary>
 
 ```elm
-updateCmd = \product ->
-    Pg.Cmd.new "update products set desc = $1 where id = $2"
-    |> Pg.Cmd.bind [ Pg.Cmd.str product.desc, Pg.Cmd.u32 product.id ]
+update_cmd = |product|
+    Pg.Cmd.new("update products set desc = $1 where id = $2")
+    |> Pg.Cmd.bind([Pg.Cmd.str(product.desc), Pg.Cmd.u32(product.id)])
 
-productsToUpdate
-|> List.map updateCmd
+products_to_update
+|> List.map(update_cmd)
 |> Pg.Batch.sequence
-|> Pg.Client.batch client
+|> Pg.Client.batch!(client)?
 ```
 
 Note: `roc-pg` automatically reuses statements in a batch by only parsing (and describing) once per unique SQL string. This also works with applicative batches.

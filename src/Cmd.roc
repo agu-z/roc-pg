@@ -3,20 +3,20 @@ module [
     Params,
     Limit,
     Kind,
-    fromSql,
+    from_sql,
     prepared,
     params,
-    withLimit,
+    with_limit,
     decode,
-    withDecode,
+    with_decode,
     map,
     bind,
     Binding,
-    encodeBindings,
+    encode_bindings,
 ]
 
 import Protocol.Frontend exposing [FormatCode]
-import Protocol.Backend exposing [RowField]
+import Protocol.Backend exposing [RowField, ParameterField]
 import Pg.Result exposing [CmdResult]
 
 Cmd a err := Params { decode : CmdResult -> Result a err } []
@@ -35,59 +35,66 @@ Kind k : [
         {
             name : Str,
             fields : List RowField,
+            parameters : List ParameterField,
         },
 ]k
 
-fromSql : Str -> Cmd CmdResult []
-fromSql = \sql ->
-    new (SqlCmd sql)
+from_sql : Str -> Cmd CmdResult []
+from_sql = |sql|
+    new(SqlCmd(sql))
 
-prepared : { name : Str, fields : List RowField } -> Cmd CmdResult []
-prepared = \prep ->
-    new (PreparedCmd prep)
+prepared : { name : Str, fields : List RowField, parameters : List ParameterField } -> Cmd CmdResult []
+prepared = |prep|
+    new(PreparedCmd(prep))
 
 new : Kind [] -> Cmd CmdResult []
-new = \kind ->
-    @Cmd {
-        kind,
-        limit: None,
-        bindings: [],
-        decode: Ok,
-    }
+new = |kind|
+    @Cmd(
+        {
+            kind,
+            limit: None,
+            bindings: [],
+            decode: Ok,
+        },
+    )
 
 params : Cmd a err -> Params {} []
-params = \@Cmd { kind, bindings, limit } ->
+params = |@Cmd({ kind, bindings, limit })|
     { kind, bindings, limit }
 
-withLimit : Cmd a err, I32 -> Cmd a err
-withLimit = \@Cmd cmd, limit ->
-    @Cmd { cmd & limit: Limit limit }
+with_limit : Cmd a err, I32 -> Cmd a err
+with_limit = |@Cmd(cmd), limit|
+    @Cmd({ cmd & limit: Limit(limit) })
 
 decode : CmdResult, Cmd a err -> Result a err
-decode = \r, @Cmd cmd ->
-    cmd.decode r
+decode = |r, @Cmd(cmd)|
+    cmd.decode(r)
 
-withDecode : Cmd * *, (CmdResult -> Result a err) -> Cmd a err
-withDecode = \@Cmd cmd, fn ->
-    @Cmd {
-        kind: cmd.kind,
-        limit: cmd.limit,
-        bindings: cmd.bindings,
-        decode: fn,
-    }
+with_decode : Cmd * *, (CmdResult -> Result a err) -> Cmd a err
+with_decode = |@Cmd(cmd), fn|
+    @Cmd(
+        {
+            kind: cmd.kind,
+            limit: cmd.limit,
+            bindings: cmd.bindings,
+            decode: fn,
+        },
+    )
 
 map : Cmd a err, (a -> b) -> Cmd b err
-map = \@Cmd cmd, fn ->
-    @Cmd {
-        kind: cmd.kind,
-        limit: cmd.limit,
-        bindings: cmd.bindings,
-        decode: \r -> cmd.decode r |> Result.map fn,
-    }
+map = |@Cmd(cmd), fn|
+    @Cmd(
+        {
+            kind: cmd.kind,
+            limit: cmd.limit,
+            bindings: cmd.bindings,
+            decode: |r| cmd.decode(r) |> Result.map_ok(fn),
+        },
+    )
 
 bind : Cmd a err, List Binding -> Cmd a err
-bind = \@Cmd cmd, bindings ->
-    @Cmd { cmd & bindings }
+bind = |@Cmd(cmd), bindings|
+    @Cmd({ cmd & bindings })
 
 Binding : [
     Null,
@@ -95,28 +102,33 @@ Binding : [
     Binary (List U8),
 ]
 
-encodeBindings : List Binding
+encode_bindings :
+    List Binding
     -> {
-        formatCodes : List FormatCode,
-        paramValues : List [Null, Value (List U8)],
+        format_codes : List FormatCode,
+        param_values : List [Null, Value (List U8)],
     }
-encodeBindings = \bindings ->
-    count = List.len bindings
+encode_bindings = |bindings|
+    count = List.len(bindings)
 
     empty = {
-        formatCodes: List.withCapacity count,
-        paramValues: List.withCapacity count,
+        format_codes: List.with_capacity(count),
+        param_values: List.with_capacity(count),
     }
 
-    List.walk bindings empty \state, binding ->
-        { format, value } = encodeSingle binding
+    List.walk(
+        bindings,
+        empty,
+        |state, binding|
+            { format, value } = encode_single(binding)
 
-        {
-            formatCodes: state.formatCodes |> List.append format,
-            paramValues: state.paramValues |> List.append value,
-        }
+            {
+                format_codes: state.format_codes |> List.append(format),
+                param_values: state.param_values |> List.append(value),
+            },
+    )
 
-encodeSingle = \binding ->
+encode_single = |binding|
     when binding is
         Null ->
             {
@@ -124,15 +136,15 @@ encodeSingle = \binding ->
                 format: Binary,
             }
 
-        Binary value ->
+        Binary(value) ->
             {
-                value: Value value,
+                value: Value(value),
                 format: Binary,
             }
 
-        Text value ->
+        Text(value) ->
             {
-                value: Value (Str.toUtf8 value),
+                value: Value(Str.to_utf8(value)),
                 format: Text,
             }
 

@@ -1,11 +1,11 @@
 module [
-    isReserved,
+    is_reserved,
 ]
 
 # Reserved Keywords: https://www.postgresql.org/docs/current/sql-keywords-appendix.html
 
-isReserved : List U8 -> Bool
-isReserved = \value ->
+is_reserved : List U8 -> Bool
+is_reserved = |value|
     when value is
         ['a', 'l', 'l']
         | ['a', 'n', 'a', 'l', 'y', 's', 'e']

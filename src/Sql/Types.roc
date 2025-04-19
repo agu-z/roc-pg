@@ -6,7 +6,7 @@ module [
     succeed,
     fail,
     nullable,
-    discardPhantom,
+    discard_phantom,
     i16,
     i32,
     i64,
@@ -45,134 +45,146 @@ DecodeErr : [
 ]
 
 decode : List U8, Decode pg a -> Result a DecodeErr
-decode = \bytes, @Decode fn ->
-    fn bytes
+decode = |bytes, @Decode(fn)|
+    fn(bytes)
 
 map : Decode pg a, (a -> b) -> Decode pg b
-map = \@Decode a, toB -> @Decode \bytes -> a bytes |> Result.map toB
+map = |@Decode(a), to_b| @Decode(|bytes| a(bytes) |> Result.map_ok(to_b))
 
 succeed : a -> Decode pg a
-succeed = \value -> @Decode \_ -> Ok value
+succeed = |value| @Decode(|_| Ok(value))
 
 fail : Str -> Decode pg a
-fail = \message -> @Decode \_ -> Err (Error message)
+fail = |message| @Decode(|_| Err(Error(message)))
 
 nullable : Decode pg a -> Decode (Nullable pg) (Nullable a)
-nullable = \@Decode sub ->
-    bytes <- @Decode
+nullable = |@Decode(sub)|
+    @Decode(
+        |bytes|
+            if List.is_empty(bytes) then
+                # TODO: Use Null tag instead of empty list
+                Ok(Null)
+            else
+                sub(bytes)
+                |> Result.map_ok(NotNull),
+    )
 
-    if List.isEmpty bytes then
-        # TODO: Use Null tag instead of empty list
-        Ok Null
-    else
-        sub bytes
-        |> Result.map NotNull
+discard_phantom : Decode * a -> Decode * a
+discard_phantom = |@Decode(sub)| @Decode(sub)
 
-discardPhantom : Decode * a -> Decode * a
-discardPhantom = \@Decode sub -> @Decode sub
+i16 : Decode (PgI16 _) I16
+i16 = text_format(Str.to_i16)
 
-i16 : Decode (PgI16 *) I16
-i16 = textFormat Str.toI16
+i32 : Decode (PgI32 _) I32
+i32 = text_format(Str.to_i32)
 
-i32 : Decode (PgI32 *) I32
-i32 = textFormat Str.toI32
+i64 : Decode (PgI64 _) I64
+i64 = text_format(Str.to_i64)
 
-i64 : Decode (PgI64 *) I64
-i64 = textFormat Str.toI64
+f32 : Decode (PgF32 _) F32
+f32 = text_format(Str.to_f32)
 
-f32 : Decode (PgF32 *) F32
-f32 = textFormat Str.toF32
+f64 : Decode (PgF64 _) F64
+f64 = text_format(Str.to_f64)
 
-f64 : Decode (PgF64 *) F64
-f64 = textFormat Str.toF64
+dec : Decode (PgDec _) Dec
+dec = text_format(Str.to_dec)
 
-dec : Decode (PgDec *) Dec
-dec = textFormat Str.toDec
-
-str : Decode (PgText *) Str
-str = textFormat Ok
+str : Decode (PgText _) Str
+str = text_format(Ok)
 
 # TODO: Make a proper uuid type
-uuid : Decode (PgUuid *) Str
-uuid = textFormat Ok
+uuid : Decode (PgUuid _) Str
+uuid = text_format(Ok)
 
 bool : Decode (PgBool *) Bool
 bool =
-    bytes <- @Decode
+    @Decode(
+        |bytes|
+            when bytes is
+                ['t'] ->
+                    Ok(Bool.true)
 
-    when bytes is
-        ['t'] ->
-            Ok Bool.true
+                ['f'] ->
+                    Ok(Bool.false)
 
-        ['f'] ->
-            Ok Bool.false
-
-        _ ->
-            Err (InvalidBool bytes)
+                _ ->
+                    Err(InvalidBool(bytes)),
+    )
 
 Raw : {
     bytes : List U8,
-    typeName : Str,
+    type_name : Str,
 }
 
 unsupported : Str -> Decode * Raw
-unsupported = \typeName ->
-    bytes <- @Decode
-
-    Ok {
-        bytes,
-        typeName,
-    }
+unsupported = |type_name|
+    @Decode(
+        |bytes|
+            Ok(
+                {
+                    bytes,
+                    type_name,
+                },
+            ),
+    )
 
 array : Decode pg a -> Decode (PgArray pg *) (List a)
-array = \@Decode decodeItem ->
-    arrayBytes <- @Decode
+array = |@Decode(decode_item)|
+    @Decode(
+        |array_bytes|
+            array_bytes
+            |> parse_array
+            |> List.map_try(
+                |item|
+                    when item is
+                        Null ->
+                            decode_item([])
 
-    arrayBytes
-    |> parseArray
-    |> List.mapTry \item ->
-        when item is
-            Null ->
-                decodeItem []
-
-            NotNull val ->
-                decodeItem val
+                        NotNull(val) ->
+                            decode_item(val),
+            ),
+    )
 
 row : (List (List U8) -> Result a DecodeErr) -> Decode pg a
-row = \decodeRow ->
-    rowBytes <- @Decode
+row = |decode_row|
+    @Decode(
+        |row_bytes|
+            row_bytes
+            |> parse_row
+            |> List.map(
+                |field|
+                    when field is
+                        Null ->
+                            []
 
-    rowBytes
-    |> parseRow
-    |> List.map \field ->
-        when field is
-            Null ->
-                []
+                        NotNull(val) ->
+                            val,
+            )
+            |> decode_row,
+    )
 
-            NotNull val ->
-                val
-    |> decodeRow
-
-parseRow = \bytes ->
+parse_row = |bytes|
     bytes
-    |> List.dropFirst 1
-    |> List.walk
+    |> List.drop_first(1)
+    |> List.walk(
         {
-            items: List.withCapacity 6,
-            curr: List.withCapacity 32,
+            items: List.with_capacity(6),
+            curr: List.with_capacity(32),
             quote: Pending,
             escaped: Bool.false,
-        }
-        rowChar
+        },
+        row_char,
+    )
     |> .items
 
-rowChar = \state, byte ->
+row_char = |state, byte|
     # This parser assumes postgres won't respond with malformed syntax
     when byte is
         _ if state.escaped ->
             { state &
                 escaped: Bool.false,
-                curr: state.curr |> List.append byte,
+                curr: state.curr |> List.append(byte),
             }
 
         '"' ->
@@ -187,7 +199,7 @@ rowChar = \state, byte ->
                     { state &
                         quote: Open,
                         # reopening means the string contains a literal quote
-                        curr: state.curr |> List.append byte,
+                        curr: state.curr |> List.append(byte),
                     }
 
         '\\' ->
@@ -195,74 +207,77 @@ rowChar = \state, byte ->
 
         ',' | ')' if state.quote != Open ->
             item =
-                if List.isEmpty state.curr && state.quote == Pending then
+                if List.is_empty(state.curr) and state.quote == Pending then
                     Null
                 else
-                    NotNull state.curr
+                    NotNull(state.curr)
 
             { state &
-                items: state.items |> List.append item,
-                curr: List.withCapacity 32,
+                items: state.items |> List.append(item),
+                curr: List.with_capacity(32),
                 quote: Pending,
             }
 
         _ ->
-            { state & curr: state.curr |> List.append byte }
+            { state & curr: state.curr |> List.append(byte) }
 
-prs = \input ->
+prs = |input|
     input
-    |> Str.toUtf8
-    |> parseRow
-    |> List.map \item ->
-        when item is
-            Null -> Null
-            NotNull present ->
-                present
-                |> Str.fromUtf8
-                |> Result.withDefault ""
-                |> NotNull
+    |> Str.to_utf8
+    |> parse_row
+    |> List.map(
+        |item|
+            when item is
+                Null -> Null
+                NotNull(present) ->
+                    present
+                    |> Str.from_utf8
+                    |> Result.with_default("")
+                    |> NotNull,
+    )
 
-expect prs "(42)" == [NotNull "42"]
-expect prs "(42,hi)" == [NotNull "42", NotNull "hi"]
-expect prs "(42,\" hi\")" == [NotNull "42", NotNull " hi"]
-expect prs "(\"hello world\",hi)" == [NotNull "hello world", NotNull "hi"]
-expect prs "(\"hello \\\"Agus\\\"\",21)" == [NotNull "hello \"Agus\"", NotNull "21"]
-expect prs "(\"hello \"\"Agus\"\"\",21)" == [NotNull "hello \"Agus\"", NotNull "21"]
-expect prs "(\"a\"\"\")" == [NotNull "a\""]
-expect prs "(\"a\\\\b\")" == [NotNull "a\\b"]
-expect prs "(\"a\nb\")" == [NotNull "a\nb"]
-expect prs "(\"hi, world!\",\"hello, agus\")" == [NotNull "hi, world!", NotNull "hello, agus"]
-expect prs "(spaces,no quotes)" == [NotNull "spaces", NotNull "no quotes"]
-expect prs "(,prev is null)" == [Null, NotNull "prev is null"]
-expect prs "(next is null,)" == [NotNull "next is null", Null]
-expect prs "(next is null,,prev is null)" == [NotNull "next is null", Null, NotNull "prev is null"]
-expect prs "()" == [Null]
-expect prs "(,)" == [Null, Null]
-expect prs "(,,)" == [Null, Null, Null]
-expect prs "(\"\")" == [NotNull ""]
-expect prs "(\"\",)" == [NotNull "", Null]
+expect prs("(42)") == [NotNull("42")]
+expect prs("(42,hi)") == [NotNull("42"), NotNull("hi")]
+expect prs("(42,\" hi\")") == [NotNull("42"), NotNull(" hi")]
+expect prs("(\"hello world\",hi)") == [NotNull("hello world"), NotNull("hi")]
+expect prs("(\"hello \\\"Agus\\\"\",21)") == [NotNull("hello \"Agus\""), NotNull("21")]
+expect prs("(\"hello \"\"Agus\"\"\",21)") == [NotNull("hello \"Agus\""), NotNull("21")]
+expect prs("(\"a\"\"\")") == [NotNull("a\"")]
+expect prs("(\"a\\\\b\")") == [NotNull("a\\b")]
+expect prs("(\"a\nb\")") == [NotNull("a\nb")]
+expect prs("(\"hi, world!\",\"hello, agus\")") == [NotNull("hi, world!"), NotNull("hello, agus")]
+expect prs("(spaces,no quotes)") == [NotNull("spaces"), NotNull("no quotes")]
+expect prs("(,prev is null)") == [Null, NotNull("prev is null")]
+expect prs("(next is null,)") == [NotNull("next is null"), Null]
+expect prs("(next is null,,prev is null)") == [NotNull("next is null"), Null, NotNull("prev is null")]
+expect prs("()") == [Null]
+expect prs("(,)") == [Null, Null]
+expect prs("(,,)") == [Null, Null, Null]
+expect prs("(\"\")") == [NotNull("")]
+expect prs("(\"\",)") == [NotNull(""), Null]
 
-parseArray = \bytes ->
+parse_array = |bytes|
     bytes
-    |> List.dropFirst 1
-    |> List.walk
+    |> List.drop_first(1)
+    |> List.walk(
         {
-            items: List.withCapacity 16,
-            curr: List.withCapacity 32,
+            items: List.with_capacity(16),
+            curr: List.with_capacity(32),
             quote: Pending,
             escaped: Bool.false,
-        }
-        arrayChar
+        },
+        array_char,
+    )
     |> .items
 
-arrayChar = \state, byte ->
+array_char = |state, byte|
     # This parser assumes postgres won't respond with malformed syntax
     ## TODO: Handle null
     when byte is
         _ if state.escaped ->
             { state &
                 escaped: Bool.false,
-                curr: state.curr |> List.append byte,
+                curr: state.curr |> List.append(byte),
             }
 
         '"' ->
@@ -277,7 +292,7 @@ arrayChar = \state, byte ->
                     { state &
                         quote: Open,
                         # reopening means the string contains a literal quote
-                        curr: state.curr |> List.append byte,
+                        curr: state.curr |> List.append(byte),
                     }
 
         '\\' ->
@@ -285,58 +300,63 @@ arrayChar = \state, byte ->
 
         ',' | '}' if state.quote != Open ->
             items =
-                if List.isEmpty state.curr && state.quote == Pending then
+                if List.is_empty(state.curr) and state.quote == Pending then
                     state.items
                 else
-                    state.items |> List.append (NotNull state.curr)
+                    state.items |> List.append(NotNull(state.curr))
 
             { state &
                 items,
-                curr: List.withCapacity 32,
+                curr: List.with_capacity(32),
                 quote: Pending,
             }
 
         _ ->
-            { state & curr: state.curr |> List.append byte }
+            { state & curr: state.curr |> List.append(byte) }
 
-pas = \input ->
+pas = |input|
     input
-    |> Str.toUtf8
-    |> parseArray
-    |> List.map \item ->
-        when item is
-            Null -> Null
-            NotNull present ->
-                present
-                |> Str.fromUtf8
-                |> Result.withDefault ""
-                |> NotNull
+    |> Str.to_utf8
+    |> parse_array
+    |> List.map(
+        |item|
+            when item is
+                Null -> Null
+                NotNull(present) ->
+                    present
+                    |> Str.from_utf8
+                    |> Result.with_default("")
+                    |> NotNull,
+    )
 
-expect pas "{}" == []
-expect pas "{42}" == [NotNull "42"]
+expect pas("{}") == []
+expect pas("{42}") == [NotNull("42")]
 expect
     result =
-        pas "{\"(hi,\\\"lala\\\"\\\"\\\")\"}"
-        |> List.map \item ->
-            when item is
-                NotNull p ->
-                    NotNull (prs p)
+        pas("{\"(hi,\\\"lala\\\"\\\"\\\")\"}")
+        |> List.map(
+            |item|
+                when item is
+                    NotNull(p) ->
+                        NotNull(prs(p))
 
-                Null ->
-                    Null
+                    Null ->
+                        Null,
+        )
 
-    result == [NotNull [NotNull "hi", NotNull "lala\""]]
+    result == [NotNull([NotNull("hi"), NotNull("lala\"")])]
 
-textFormat : (Str -> Result a DecodeErr) -> Decode pg a
-textFormat = \fn ->
-    bytes <- @Decode
+text_format : (Str -> Result a DecodeErr) -> Decode pg a
+text_format = |fn|
+    @Decode(
+        |bytes|
+            when Str.from_utf8(bytes) is
+                Ok(text) ->
+                    fn(text)
 
-    when Str.fromUtf8 bytes is
-        Ok text ->
-            fn text
-
-        Err (BadUtf8 _ _) ->
-            Err InvalidUtf8
+                Err(BadUtf8(_)) ->
+                    Err(InvalidUtf8),
+    )
 
 # Types
 
