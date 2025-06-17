@@ -1,0 +1,23 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Check Examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Roc
+        uses: hasnep/setup-roc@main
+        with:
+          roc-version: nightly
+
+      - name: Check all example files
+        run: make check-examples
