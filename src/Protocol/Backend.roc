@@ -1,11 +1,12 @@
 module [
+    Error,
+    KeyData,
+    Message,
+    ParameterField,
+    RowField,
+    Status,
     header,
     message,
-    Message,
-    KeyData,
-    Status,
-    RowField,
-    Error,
 ]
 
 import Bytes.Decode exposing [
@@ -18,7 +19,7 @@ import Bytes.Decode exposing [
     u8,
     i16,
     i32,
-    cStr,
+    c_str,
     take,
 ]
 
@@ -32,9 +33,10 @@ Message : [
     ErrorResponse Error,
     ParseComplete,
     BindComplete,
+    NoticeResponse (List { code : U8, value : Str }),
     NoData,
     RowDescription (List RowField),
-    ParameterDescription,
+    ParameterDescription (List ParameterField),
     DataRow (List (List U8)),
     PortalSuspended,
     CommandComplete Str,
@@ -42,197 +44,277 @@ Message : [
     CloseComplete,
 ]
 
-header : Decode { msgType : U8, len : I32 } _
+header : Decode { msg_type : U8, len : I32 } _
 header =
-    msgType <- await u8
-    len <- map i32
-
-    { msgType, len: len - 4 }
+    await(
+        u8,
+        |msg_type|
+            map(
+                i32,
+                |len|
+                    { msg_type, len: len - 4 },
+            ),
+    )
 
 message : U8 -> Decode Message _
-message = \msgType ->
-    when msgType is
+message = |msg_type|
+    when msg_type is
         'R' ->
-            authRequest
+            auth_request
 
         'S' ->
-            paramStatus
+            param_status
 
         'K' ->
-            backendKeyData
+            backend_key_data
 
         'Z' ->
-            readyForQuery
+            ready_for_query
 
         'E' ->
-            errorResponse
+            error_response
 
         '1' ->
-            succeed ParseComplete
+            succeed(ParseComplete)
 
         '2' ->
-            succeed BindComplete
+            succeed(BindComplete)
+
+        'N' ->
+            notice_response
 
         'n' ->
-            succeed NoData
+            succeed(NoData)
 
         'T' ->
-            rowDescription
+            row_description
 
         't' ->
-            succeed ParameterDescription
+            parameter_description
 
         'D' ->
-            dataRow
+            data_row
 
         's' ->
-            succeed PortalSuspended
+            succeed(PortalSuspended)
 
         'C' ->
-            commandComplete
+            command_complete
 
         'I' ->
-            succeed EmptyQueryResponse
+            succeed(EmptyQueryResponse)
 
         '3' ->
-            succeed CloseComplete
+            succeed(CloseComplete)
 
         _ ->
-            fail (UnrecognizedBackendMessage msgType)
+            fail(UnrecognizedBackendMessage(msg_type))
 
-authRequest : Decode Message _
-authRequest =
-    authType <- map i32
+auth_request : Decode Message _
+auth_request =
+    map(
+        i32,
+        |auth_type|
+            when auth_type is
+                0 ->
+                    AuthOk
 
-    when authType is
-        0 ->
-            AuthOk
+                3 ->
+                    AuthCleartextPassword
 
-        3 ->
-            AuthCleartextPassword
+                _ ->
+                    AuthUnsupported,
+    )
 
-        _ ->
-            AuthUnsupported
+param_status : Decode Message _
+param_status =
+    await(
+        c_str,
+        |name|
+            await(
+                c_str,
+                |value|
+                    succeed(ParameterStatus({ name, value })),
+            ),
+    )
 
-paramStatus : Decode Message _
-paramStatus =
-    name <- await cStr
-    value <- await cStr
-    succeed (ParameterStatus { name, value })
+KeyData : { process_id : I32, secret_key : I32 }
 
-KeyData : { processId : I32, secretKey : I32 }
-
-backendKeyData : Decode Message _
-backendKeyData =
-    processId <- await i32
-    secretKey <- await i32
-    succeed (BackendKeyData { processId, secretKey })
+backend_key_data : Decode Message _
+backend_key_data =
+    await(
+        i32,
+        |process_id|
+            await(
+                i32,
+                |secret_key|
+                    succeed(BackendKeyData({ process_id, secret_key })),
+            ),
+    )
 
 Status : [Idle, TransactionBlock, FailedTransactionBlock]
 
-readyForQuery : Decode Message _
-readyForQuery =
-    status <- await u8
+ready_for_query : Decode Message _
+ready_for_query =
+    await(
+        u8,
+        |status|
+            when status is
+                'I' ->
+                    succeed(ReadyForQuery(Idle))
 
-    when status is
-        'I' ->
-            succeed (ReadyForQuery Idle)
+                'T' ->
+                    succeed(ReadyForQuery(TransactionBlock))
 
-        'T' ->
-            succeed (ReadyForQuery TransactionBlock)
+                'E' ->
+                    succeed(ReadyForQuery(FailedTransactionBlock))
 
-        'E' ->
-            succeed (ReadyForQuery FailedTransactionBlock)
+                _ ->
+                    fail(UnrecognizedBackendStatus(status)),
+    )
 
-        _ ->
-            fail (UnrecognizedBackendStatus status)
+read_notice_responses : Decode (List { code : U8, value : Str }) _
+read_notice_responses =
+    loop(
+        [],
+        |collected|
+            await(
+                u8,
+                |code|
+                    if code == 0 then
+                        succeed(Done(collected))
+                    else
+                        map(
+                            c_str,
+                            |value|
+                                Loop(List.append(collected, { code, value })),
+                        ),
+            ),
+    )
+
+notice_response =
+    await(
+        read_notice_responses,
+        |notices|
+            succeed(NoticeResponse(notices)),
+    )
 
 Error : {
-    localizedSeverity : Str,
+    localized_severity : Str,
     severity : Result ErrorSeverity {},
     code : Str,
     message : Str,
     detail : Result Str {},
     hint : Result Str {},
     position : Result U32 {},
-    internalPosition : Result U32 {},
-    internalQuery : Result Str {},
+    internal_position : Result U32 {},
+    internal_query : Result Str {},
     ewhere : Result Str {},
-    schemaName : Result Str {},
-    tableName : Result Str {},
-    columnName : Result Str {},
-    dataTypeName : Result Str {},
-    constraintName : Result Str {},
+    schema_name : Result Str {},
+    table_name : Result Str {},
+    column_name : Result Str {},
+    data_type_name : Result Str {},
+    constraint_name : Result Str {},
     file : Result Str {},
     line : Result Str {},
     routine : Result Str {},
 }
 
-errorResponse : Decode Message _
-errorResponse =
-    dict <- await knownStrFields
+error_response : Decode Message _
+error_response =
+    await(
+        known_str_fields,
+        |dict|
+            'S'
+            |> required_field(
+                dict,
+                |localized_severity|
+                    'V'
+                    |> optional_field_with(
+                        dict,
+                        decode_severity,
+                        |severity|
+                            'C'
+                            |> required_field(
+                                dict,
+                                |code|
+                                    'M'
+                                    |> required_field(
+                                        dict,
+                                        |msg|
+                                            'P'
+                                            |> optional_field_with(
+                                                dict,
+                                                Str.to_u32,
+                                                |position|
+                                                    'p'
+                                                    |> optional_field_with(
+                                                        dict,
+                                                        Str.to_u32,
+                                                        |internal_position|
+                                                            ErrorResponse(
+                                                                {
+                                                                    localized_severity,
+                                                                    severity,
+                                                                    code,
+                                                                    message: msg,
+                                                                    detail: 'D' |> optional_field(dict),
+                                                                    hint: 'H' |> optional_field(dict),
+                                                                    position,
+                                                                    internal_position,
+                                                                    internal_query: 'q' |> optional_field(dict),
+                                                                    ewhere: 'W' |> optional_field(dict),
+                                                                    schema_name: 's' |> optional_field(dict),
+                                                                    table_name: 't' |> optional_field(dict),
+                                                                    column_name: 'c' |> optional_field(dict),
+                                                                    data_type_name: 'd' |> optional_field(dict),
+                                                                    constraint_name: 'n' |> optional_field(dict),
+                                                                    file: 'F' |> optional_field(dict),
+                                                                    line: 'L' |> optional_field(dict),
+                                                                    routine: 'R' |> optional_field(dict),
+                                                                },
+                                                            )
+                                                            |> succeed,
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            ),
+    )
 
-    localizedSeverity <- 'S' |> requiredField dict
-    severity <- 'V' |> optionalFieldWith dict decodeSeverity
-    code <- 'C' |> requiredField dict
-    msg <- 'M' |> requiredField dict
-    position <- 'P' |> optionalFieldWith dict Str.toU32
-    internalPosition <- 'p' |> optionalFieldWith dict Str.toU32
+optional_field = |field_id, dict|
+    when Dict.get(dict, field_id) is
+        Ok(value) ->
+            Ok(value)
 
-    ErrorResponse {
-        localizedSeverity,
-        severity,
-        code,
-        message: msg,
-        detail: 'D' |> optionalField dict,
-        hint: 'H' |> optionalField dict,
-        position,
-        internalPosition,
-        internalQuery: 'q' |> optionalField dict,
-        ewhere: 'W' |> optionalField dict,
-        schemaName: 's' |> optionalField dict,
-        tableName: 't' |> optionalField dict,
-        columnName: 'c' |> optionalField dict,
-        dataTypeName: 'd' |> optionalField dict,
-        constraintName: 'n' |> optionalField dict,
-        file: 'F' |> optionalField dict,
-        line: 'L' |> optionalField dict,
-        routine: 'R' |> optionalField dict,
-    }
-    |> succeed
+        Err(_) ->
+            Err({})
 
-optionalField = \fieldId, dict ->
-    when Dict.get dict fieldId is
-        Ok value ->
-            Ok value
-
-        Err _ ->
-            Err {}
-
-optionalFieldWith = \fieldId, dict, validate, callback ->
-    result = Dict.get dict fieldId
+optional_field_with = |field_id, dict, validate, callback|
+    result = Dict.get(dict, field_id)
 
     when result is
-        Ok value ->
-            when validate value is
-                Ok validated ->
-                    callback (Ok validated)
+        Ok(value) ->
+            when validate(value) is
+                Ok(validated) ->
+                    callback(Ok(validated))
 
-                Err err ->
-                    fail err
+                Err(err) ->
+                    fail(err)
 
-        Err _ ->
-            callback (Err {})
+        Err(_) ->
+            callback(Err({}))
 
-requiredField = \fieldId, dict, callback ->
-    result = Dict.get dict fieldId
+required_field = |field_id, dict, callback|
+    result = Dict.get(dict, field_id)
 
     when result is
-        Ok value ->
-            callback value
+        Ok(value) ->
+            callback(value)
 
-        Err _ ->
-            fail (MissingField fieldId)
+        Err(_) ->
+            fail(MissingField(field_id))
 
 ErrorSeverity : [
     Error,
@@ -245,119 +327,179 @@ ErrorSeverity : [
     Log,
 ]
 
-decodeSeverity = \str ->
+decode_severity : Str -> Result ErrorSeverity [InvalidSeverity Str]
+decode_severity = |str|
     when str is
         "ERROR" ->
-            Ok Error
+            Ok(Error)
 
         "FATAL" ->
-            Ok Fatal
+            Ok(Fatal)
 
         "PANIC" ->
-            Ok Panic
+            Ok(Panic)
 
         "WARNING" ->
-            Ok Warning
+            Ok(Warning)
 
         "NOTICE" ->
-            Ok Notice
+            Ok(Notice)
 
         "DEBUG" ->
-            Ok Debug
+            Ok(Debug)
 
         "INFO" ->
-            Ok Info
+            Ok(Info)
 
         "LOG" ->
-            Ok Log
+            Ok(Log)
 
         _ ->
-            Err (InvalidSeverity str)
+            Err(InvalidSeverity(str))
 
-knownStrFields : Decode (Dict U8 Str) _
-knownStrFields =
-    collected <- loop (Dict.empty {})
-
-    fieldId <- await u8
-
-    if fieldId == 0 then
-        succeed (Done collected)
-    else
-        value <- map cStr
-
-        collected
-        |> Dict.insert fieldId value
-        |> Loop
+known_str_fields : Decode (Dict U8 Str) _
+known_str_fields =
+    loop(
+        Dict.empty({}),
+        |collected|
+            await(
+                u8,
+                |field_id|
+                    if field_id == 0 then
+                        succeed(Done(collected))
+                    else
+                        map(
+                            c_str,
+                            |value|
+                                collected
+                                |> Dict.insert(field_id, value)
+                                |> Loop,
+                        ),
+            ),
+    )
 
 RowField : {
     name : Str,
-    column : Result { tableOid : I32, attributeNumber : I16 } [NotAColumn],
-    dataTypeOid : I32,
-    dataTypeSize : I16,
-    typeModifier : I32,
-    formatCode : I16,
+    column : Result { table_oid : I32, attribute_number : I16 } [NotAColumn],
+    data_type_oid : I32,
+    data_type_size : I16,
+    type_modifier : I32,
+    format_code : I16,
 }
 
-rowDescription : Decode Message _
-rowDescription =
-    fieldCount <- await i16
+ParameterField : {
+    data_type_oid : I32,
+}
 
-    fixedList fieldCount rowField
-    |> map RowDescription
-
-rowField : Decode RowField _
-rowField =
-    name <- await cStr
-    tableOid <- await i32
-    attributeNumber <- await i16
-    dataTypeOid <- await i32
-    dataTypeSize <- await i16
-    typeModifier <- await i32
-    formatCode <- map i16
-
-    column =
-        if tableOid != 0 && attributeNumber != 0 then
-            Ok { tableOid, attributeNumber }
-        else
-            Err NotAColumn
-
-    {
-        name,
-        column,
-        dataTypeOid,
-        dataTypeSize,
-        typeModifier,
-        formatCode,
-    }
-
-dataRow : Decode Message _
-dataRow =
-    columnCount <- await i16
-
-    fixedList
-        columnCount
-        (
-            valueLen <- await i32
-
-            if valueLen == -1 then
-                succeed []
+parameter_description : Decode Message _
+parameter_description =
+    await(
+        i16,
+        |field_count|
+            if field_count == 0 then
+                succeed(ParameterDescription([]))
             else
-                take (Num.toU64 valueLen) \x -> x
-        )
-    |> map DataRow
+                fixed_list(field_count, parameter_field)
+                |> map(ParameterDescription),
+    )
 
-fixedList = \count, itemDecode ->
-    collected <- loop (List.withCapacity (Num.toU64 count))
+parameter_field : Decode ParameterField _
+parameter_field =
+    await(
+        i32,
+        |data_type_oid|
+            succeed({ data_type_oid }),
+    )
 
-    item <- map itemDecode
+row_description : Decode Message _
+row_description =
+    await(
+        i16,
+        |field_count|
+            fixed_list(field_count, row_field)
+            |> map(RowDescription),
+    )
 
-    added = List.append collected item
+row_field : Decode RowField _
+row_field =
+    await(
+        c_str,
+        |name|
+            await(
+                i32,
+                |table_oid|
+                    await(
+                        i16,
+                        |attribute_number|
+                            await(
+                                i32,
+                                |data_type_oid|
+                                    await(
+                                        i16,
+                                        |data_type_size|
+                                            await(
+                                                i32,
+                                                |type_modifier|
+                                                    map(
+                                                        i16,
+                                                        |format_code|
+                                                            column =
+                                                                if table_oid != 0 and attribute_number != 0 then
+                                                                    Ok({ table_oid, attribute_number })
+                                                                else
+                                                                    Err(NotAColumn)
 
-    if List.len added == Num.toU64 count then
-        Done added
-    else
-        Loop added
+                                                            {
+                                                                name,
+                                                                column,
+                                                                data_type_oid,
+                                                                data_type_size,
+                                                                type_modifier,
+                                                                format_code,
+                                                            },
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            ),
+    )
 
-commandComplete : Decode Message _
-commandComplete =
-    map cStr CommandComplete
+data_row : Decode Message _
+data_row =
+    await(
+        i16,
+        |column_count|
+            fixed_list(
+                column_count,
+                await(
+                    i32,
+                    |value_len|
+                        if value_len == -1 then
+                            succeed([])
+                        else
+                            take(Num.to_u64(value_len), |x| x),
+                ),
+            )
+            |> map(DataRow),
+    )
+
+fixed_list = |count, item_decode|
+    loop(
+        List.with_capacity(Num.to_u64(count)),
+        |collected|
+            map(
+                item_decode,
+                |item|
+                    added = List.append(collected, item)
+
+                    if List.len(added) == Num.to_u64(count) then
+                        Done(added)
+                    else
+                        Loop(added),
+            ),
+    )
+
+command_complete : Decode Message _
+command_complete =
+    map(c_str, CommandComplete)

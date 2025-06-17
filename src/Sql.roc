@@ -4,37 +4,37 @@ module [
     NullableExpr,
     Select,
     Query,
-    queryAll,
-    queryOne,
-    querySelection,
-    compileQuery,
+    query_all,
+    query_one,
+    query_selection,
+    compile_query,
     from,
     select,
     where,
     join,
     on,
-    leftJoin,
-    useOuter,
+    left_join,
+    use_outer,
     limit,
     offset,
-    orderBy,
+    order_by,
     asc,
     desc,
     Order,
     identifier,
-    discardPhantom,
+    discard_phantom,
     i16,
     i32,
     i64,
     str,
     null,
-    asNullable,
-    isNull,
-    isNotNull,
-    isDistinctFrom,
-    isNotDistinctFrom,
-    nullableEq,
-    nullableNeq,
+    as_nullable,
+    is_null,
+    is_not_null,
+    is_distinct_from,
+    is_not_distinct_from,
+    nullable_eq,
+    nullable_neq,
     lt,
     lte,
     eq,
@@ -45,11 +45,11 @@ module [
     like,
     ilike,
     concat,
-    and,
-    or,
-    andList,
-    orList,
-    not,
+    and_,
+    or_,
+    and_list,
+    or_list,
+    not_,
     true,
     false,
     add,
@@ -61,10 +61,10 @@ module [
     with,
     into,
     map,
-    selectionList,
+    selection_list,
     row,
-    rowArray,
-    tryMapQuery,
+    row_array,
+    try_map_query,
 ]
 
 import pg.Pg.Cmd exposing [Binding]
@@ -86,9 +86,9 @@ Env : {
     aliases : Dict Str U8,
 }
 
-emptyEnv : Env
-emptyEnv = {
-    aliases: Dict.withCapacity 4,
+empty_env : Env
+empty_env = {
+    aliases: Dict.with_capacity(4),
 }
 
 Query a err := State Env { from : Sql, options : SelectOptions a } err
@@ -101,187 +101,217 @@ Table table : {
 }
 
 from : Table table, (table -> Select a err) -> Query a err
-from = \table, next -> @Query (fromHelp table next)
+from = |table, next| @Query(from_help(table, next))
 
-fromHelp = \table, next ->
-    alias <- addAlias table.alias |> State.bind
+from_help = |table, next|
+    add_alias(table.alias)
+    |> State.bind(
+        |alias|
+            table.columns(alias)
+            |> next
+            |> unwrap_select
+            |> State.map(
+                |options| {
+                    from: [Raw(" from ${table.schema}.${table.name} as ${alias}")],
+                    options,
+                },
+            ),
+    )
 
-    options <- table.columns alias
-        |> next
-        |> unwrapSelect
-        |> State.map
+add_alias : Str -> State Env Str err
+add_alias = |wanted|
+    State.get
+    |> State.bind(
+        |env|
+            when Dict.get(env.aliases, wanted) is
+                Ok(count) ->
+                    str_count = Num.to_str(count)
 
-    {
-        from: [Raw " from $(table.schema).$(table.name) as $(alias)"],
-        options,
-    }
+                    new_env = { env &
+                        aliases: env.aliases |> Dict.insert(wanted, (count + 1)),
+                    }
 
-addAlias : Str -> State Env Str err
-addAlias = \wanted ->
-    env <- State.get |> State.bind
+                    State.put(new_env)
+                    |> State.map(
+                        |_|
+                            "${wanted}_${str_count}",
+                    )
 
-    when Dict.get env.aliases wanted is
-        Ok count ->
-            strCount = Num.toStr count
+                Err(KeyNotFound) ->
+                    new_env = { env &
+                        aliases: env.aliases |> Dict.insert(wanted, 1),
+                    }
 
-            newEnv = { env &
-                aliases: env.aliases |> Dict.insert wanted (count + 1),
-            }
+                    State.put(new_env)
+                    |> State.map(
+                        |_|
+                            wanted,
+                    ),
+    )
 
-            _ <- State.put newEnv |> State.map
+query_all : Query (Selection a []) [] -> Pg.Cmd.Cmd _ _
+query_all = |qs|
+    query = build_bare_query(qs, empty_env)
+    { sql, params } = compile_sql(query.sql)
 
-            "$(wanted)_$(strCount)"
+    Pg.Cmd.new(sql)
+    |> Pg.Cmd.bind(params)
+    |> Pg.Cmd.with_custom_decode(
+        |result|
+            Pg.Result.rows(result)
+            |> List.map_try(
+                |cells|
+                    cells
+                    |> query.decode
+                    |> Result.map_err(DecodeErr),
+            ),
+    )
 
-        Err KeyNotFound ->
-            newEnv = { env &
-                aliases: env.aliases |> Dict.insert wanted 1,
-            }
+query_one : Query (Selection a []) [] -> Pg.Cmd.Cmd _ _
+query_one = |qs|
+    query = build_bare_query(qs, empty_env)
+    { sql, params } = compile_sql(query.sql)
 
-            _ <- State.put newEnv |> State.map
+    Pg.Cmd.new(sql)
+    |> Pg.Cmd.bind(params)
+    |> Pg.Cmd.with_custom_decode(
+        |result|
+            rows = Pg.Result.rows(result)
 
-            wanted
+            when rows |> List.take_first(1) is
+                [cells] ->
+                    cells
+                    |> query.decode
+                    |> Result.map_err(DecodeErr)
 
-queryAll : Query (Selection a []) [] -> Pg.Cmd.Cmd _ _
-queryAll = \qs ->
-    query = buildBareQuery qs emptyEnv
-    { sql, params } = compileSql query.sql
+                _ ->
+                    Err(EmptyResult),
+    )
 
-    Pg.Cmd.new sql
-    |> Pg.Cmd.bind params
-    |> Pg.Cmd.withCustomDecode \result ->
-        cells <- Pg.Result.rows result |> List.mapTry
+query_selection : Selection a err -> Result (Pg.Cmd.Cmd _ _) err
+query_selection = |@Selection(ss)|
+    State.attempt(ss, empty_env)
+    |> Result.map_ok(
+        |(sel, _)|
+            { sql, params } =
+                # TODO: Simplify to no-op cmd
+                if List.is_empty(sel.columns) then
+                    [Raw("select 1")]
+                    |> compile_sql
+                else
+                    comma_join(sel.columns)
+                    |> List.prepend(Raw("select "))
+                    |> compile_sql
 
-        cells
-        |> query.decode
-        |> Result.mapErr DecodeErr
+            Pg.Cmd.new(sql)
+            |> Pg.Cmd.bind(params)
+            |> Pg.Cmd.with_custom_decode(
+                |result|
+                    rows = Pg.Result.rows(result)
 
-queryOne : Query (Selection a []) [] -> Pg.Cmd.Cmd _ _
-queryOne = \qs ->
-    query = buildBareQuery qs emptyEnv
-    { sql, params } = compileSql query.sql
+                    when rows |> List.take_first(1) is
+                        [cells] ->
+                            cells
+                            |> sel.decode
+                            |> Result.map_err(DecodeErr)
 
-    Pg.Cmd.new sql
-    |> Pg.Cmd.bind params
-    |> Pg.Cmd.withCustomDecode \result ->
-        rows = Pg.Result.rows result
+                        _ ->
+                            Err(EmptyResult),
+            ),
+    )
 
-        when rows |> List.takeFirst 1 is
-            [cells] ->
-                cells
-                |> query.decode
-                |> Result.mapErr DecodeErr
-
-            _ ->
-                Err EmptyResult
-
-querySelection : Selection a err -> Result (Pg.Cmd.Cmd _ _) err
-querySelection = \@Selection ss ->
-    (sel, _) <- State.attempt ss emptyEnv |> Result.map
-
-    { sql, params } =
-        # TODO: Simplify to no-op cmd
-        if List.isEmpty sel.columns then
-            [Raw "select 1"]
-            |> compileSql
-        else
-            commaJoin sel.columns
-            |> List.prepend (Raw "select ")
-            |> compileSql
-
-    Pg.Cmd.new sql
-    |> Pg.Cmd.bind params
-    |> Pg.Cmd.withCustomDecode \result ->
-        rows = Pg.Result.rows result
-
-        when rows |> List.takeFirst 1 is
-            [cells] ->
-                cells
-                |> sel.decode
-                |> Result.mapErr DecodeErr
-
-            _ ->
-                Err EmptyResult
-
-buildBareQuery : Query (Selection a []) [],
+build_bare_query :
+    Query (Selection a []) [],
     Env
     -> {
         sql : Sql,
         decode : List (List U8) -> Result a Sql.Types.DecodeErr,
     }
-buildBareQuery = \@Query qs, initEnv ->
+build_bare_query = |@Query(qs), init_env|
     combined =
-        query <- State.bind qs
-        sel <- query.options.value |> unwrapSelection |> State.map
+        State.bind(
+            qs,
+            |query|
+                query.options.value
+                |> unwrap_selection
+                |> State.map(
+                    |sel|
+                        { query, sel },
+                ),
+        )
 
-        { query, sel }
-
-    (result, _) = State.perform combined initEnv
+    (result, _) = State.perform(combined, init_env)
 
     {
-        sql: querySql result.query result.sel.columns Bare,
+        sql: query_sql(result.query, result.sel.columns, Bare),
         decode: result.sel.decode,
     }
 
-querySql = \query, columns, columnWrapper ->
-    columnsSql =
-        when columnWrapper is
+query_sql = |query, columns, column_wrapper|
+    columns_sql =
+        when column_wrapper is
             Bare ->
-                commaJoin columns
+                comma_join(columns)
 
             Row ->
-                [Raw "row("]
-                |> List.concat (commaJoin columns)
-                |> List.append (Raw ")")
+                [Raw("row(")]
+                |> List.concat(comma_join(columns))
+                |> List.append(Raw(")"))
 
-    joinsSql =
-        List.join query.options.joins
+    joins_sql =
+        List.join(query.options.joins)
 
-    [Raw "select "]
-    |> List.reserve
+    [Raw("select ")]
+    |> List.reserve(
         (
-            List.len columnsSql
-            + List.len query.from
-            + List.len joinsSql
-            + List.len query.options.where
-            + List.len query.options.orderBy
-            + List.len query.options.limit
-            + List.len query.options.offset
-        )
-    |> List.concat columnsSql
-    |> List.concat query.from
-    |> List.concat joinsSql
-    |> List.concat query.options.where
-    |> List.concat query.options.orderBy
-    |> List.concat query.options.limit
-    |> List.concat query.options.offset
+            List.len(columns_sql)
+            + List.len(query.from)
+            + List.len(joins_sql)
+            + List.len(query.options.where)
+            + List.len(query.options.order_by)
+            + List.len(query.options.limit)
+            + List.len(query.options.offset)
+        ),
+    )
+    |> List.concat(columns_sql)
+    |> List.concat(query.from)
+    |> List.concat(joins_sql)
+    |> List.concat(query.options.where)
+    |> List.concat(query.options.order_by)
+    |> List.concat(query.options.limit)
+    |> List.concat(query.options.offset)
 
-compileQuery = \qs ->
-    buildBareQuery qs emptyEnv
+compile_query = |qs|
+    build_bare_query(qs, empty_env)
     |> .sql
-    |> compileSql
+    |> compile_sql
 
 # Advanced: Failable query building
 
-tryMapQuery : Query a err, (a -> Result b err) -> Query b err
-tryMapQuery = \@Query qs, fn ->
-    @Query (tryMapQueryHelp qs fn)
+try_map_query : Query a err, (a -> Result b err) -> Query b err
+try_map_query = |@Query(qs), fn|
+    @Query(try_map_query_help(qs, fn))
 
-tryMapQueryHelp = \qs, fn ->
-    query <- State.bind qs
-
-    fn query.options.value
-    |> Result.map \new -> {
-        from: query.from,
-        options: {
-            joins: query.options.joins,
-            where: query.options.where,
-            orderBy: query.options.orderBy,
-            limit: query.options.limit,
-            offset: query.options.offset,
-            value: new,
-        },
-    }
-    |> State.fromResult
+try_map_query_help = |qs, fn|
+    State.bind(
+        qs,
+        |query|
+            fn(query.options.value)
+            |> Result.map_ok(
+                |new| {
+                    from: query.from,
+                    options: {
+                        joins: query.options.joins,
+                        where: query.options.where,
+                        order_by: query.options.order_by,
+                        limit: query.options.limit,
+                        offset: query.options.offset,
+                        value: new,
+                    },
+                },
+            )
+            |> State.from_result,
+    )
 
 # Options
 
@@ -290,138 +320,153 @@ Select a err := State Env (SelectOptions a) err
 SelectOptions a : {
     joins : List Sql,
     where : Sql,
-    orderBy : Sql,
+    order_by : Sql,
     limit : Sql,
     offset : Sql,
     value : a,
 }
 
-unwrapSelect = \@Select state -> state
+unwrap_select = |@Select(state)| state
 
 join : Table table, (table -> Expr (PgBool *) *), (table -> Select a err) -> Select a err
-join = \table, onExpr, next ->
-    @Select (joinHelp table onExpr next)
+join = |table, on_expr, next|
+    @Select(join_help(table, on_expr, next))
 
-joinHelp = \table, onExpr, next ->
-    alias <- addAlias table.alias |> State.bind
-    columns = table.columns alias
+join_help = |table, on_expr, next|
+    add_alias(table.alias)
+    |> State.bind(
+        |alias|
+            columns = table.columns(alias)
 
-    (@Expr { sql: onSql }) = onExpr columns
+            @Expr({ sql: on_sql }) = on_expr(columns)
 
-    options <-
-        next columns
-        |> unwrapSelect
-        |> State.map
+            next(columns)
+            |> unwrap_select
+            |> State.map(
+                |options|
+                    join_sql =
+                        List.prepend(on_sql, Raw(" join ${table.schema}.${table.name} as ${alias} on "))
 
-    joinSql =
-        List.prepend onSql (Raw " join $(table.schema).$(table.name) as $(alias) on ")
-
-    { options & joins: options.joins |> List.prepend joinSql }
+                    { options & joins: options.joins |> List.prepend(join_sql) },
+            ),
+    )
 
 Outer table := table
 
-leftJoin : Table table, (table -> Expr (PgBool *) *), (Outer table -> Select a err) -> Select a err
-leftJoin = \table, onExpr, next ->
-    @Select (leftJoinHelp table onExpr next)
+left_join : Table table, (table -> Expr (PgBool *) *), (Outer table -> Select a err) -> Select a err
+left_join = |table, on_expr, next|
+    @Select(left_join_help(table, on_expr, next))
 
-leftJoinHelp = \table, onExpr, next ->
-    alias <- addAlias table.alias |> State.bind
-    columns = table.columns alias
+left_join_help = |table, on_expr, next|
+    add_alias(table.alias)
+    |> State.bind(
+        |alias|
+            columns = table.columns(alias)
 
-    (@Expr { sql: onSql }) = onExpr columns
+            @Expr({ sql: on_sql }) = on_expr(columns)
 
-    options <-
-        next (@Outer columns)
-        |> unwrapSelect
-        |> State.map
+            next(@Outer(columns))
+            |> unwrap_select
+            |> State.map(
+                |options|
+                    join_sql =
+                        List.prepend(on_sql, Raw(" left join ${table.schema}.${table.name} as ${alias} on "))
 
-    joinSql =
-        List.prepend onSql (Raw " left join $(table.schema).$(table.name) as $(alias) on ")
+                    { options & joins: options.joins |> List.prepend(join_sql) },
+            ),
+    )
 
-    { options & joins: options.joins |> List.prepend joinSql }
-
-useOuter : Outer table, (table -> Expr pg a) -> NullableExpr pg a
-useOuter = \@Outer table, expr ->
+use_outer : Outer table, (table -> Expr pg a) -> NullableExpr pg a
+use_outer = |@Outer(table), expr|
     # DESIGN: break into its own module? might help combine multiple outer joins
-    asNullable (expr table)
+    as_nullable(expr(table))
 
-on = \toA, b -> \table -> toA table |> eq b
+on = |to_a, b| |table| to_a(table) |> eq(b)
 
 select : a -> Select a *
-select = \a ->
+select = |a|
     {
-        joins: List.withCapacity 4,
+        joins: List.with_capacity(4),
         where: [],
         limit: [],
         offset: [],
-        orderBy: [],
+        order_by: [],
         value: a,
     }
     |> State.ok
     |> @Select
 
-where : Select a err, Expr (PgBool *) * -> Select a err
+where : Select _ _, Expr (PgBool _) _ -> Select _ _
 where =
-    options, (@Expr expr) <- updateOptions
+    update_options(
+        |options, @Expr(expr)|
+            new_where =
+                if List.is_empty(options.where) then
+                    List.prepend(expr.sql, Raw(" where "))
+                else
+                    options.where
+                    |> List.reserve((List.len(expr.sql) + 1))
+                    |> List.append(Raw(" and "))
+                    |> List.concat(expr.sql)
 
-    newWhere =
-        if List.isEmpty options.where then
-            List.prepend expr.sql (Raw " where ")
-        else
-            options.where
-            |> List.reserve (List.len expr.sql + 1)
-            |> List.append (Raw " and ")
-            |> List.concat expr.sql
+            { options & where: new_where },
+    )
 
-    { options & where: newWhere }
-
-limit : Select a err, U64 -> Select a err
+limit : Select _ _, U64 -> Select _ _
 limit =
-    options, max <- updateOptions
-    { options & limit: [Raw " limit ", Param (Pg.Cmd.u64 max)] }
+    update_options(
+        |options, max|
+            { options & limit: [Raw(" limit "), Param(Pg.Cmd.u64(max))] },
+    )
 
-offset : Select a err, U64 -> Select a err
+offset : Select _ _, U64 -> Select _ _
 offset =
-    options, start <- updateOptions
-    { options & offset: [Raw " offset ", Param (Pg.Cmd.u64 start)] }
+    update_options(
+        |options, start|
+            { options & offset: [Raw(" offset "), Param(Pg.Cmd.u64(start))] },
+    )
 
 Order := { sql : Sql, direction : [Asc, Desc] }
 
 asc : Expr (PgCmp *) * -> Order
-asc = \@Expr expr -> @Order { sql: expr.sql, direction: Asc }
+asc = |@Expr(expr)| @Order({ sql: expr.sql, direction: Asc })
 
 desc : Expr (PgCmp *) * -> Order
-desc = \@Expr expr -> @Order { sql: expr.sql, direction: Desc }
+desc = |@Expr(expr)| @Order({ sql: expr.sql, direction: Desc })
 
-orderBy : Select a err, List Order -> Select a err
-orderBy =
-    options, order <- updateOptions
+order_by : Select _ _, List Order -> Select _ _
+order_by =
+    update_options(
+        |options, order|
+            sql =
+                order
+                |> List.map(
+                    |@Order(level)|
+                        direction =
+                            when level.direction is
+                                Asc ->
+                                    " asc"
 
-    sql =
-        order
-        |> List.map \@Order level ->
-            direction =
-                when level.direction is
-                    Asc ->
-                        " asc"
+                                Desc ->
+                                    " desc"
 
-                    Desc ->
-                        " desc"
+                        level.sql |> List.append(Raw(direction)),
+                )
+                |> comma_join
+                |> List.prepend(Raw(" order by "))
 
-            level.sql |> List.append (Raw direction)
-        |> commaJoin
-        |> List.prepend (Raw " order by ")
+            { options & order_by: sql },
+    )
 
-    { options & orderBy: sql }
-
-updateOptions : (SelectOptions a, arg -> SelectOptions b) -> (Select a err, arg -> Select b err)
-updateOptions = \fn ->
-    \@Select next, arg ->
-        @Select (State.map next \options -> fn options arg)
+update_options : (SelectOptions a, arg -> SelectOptions b) -> (Select a err, arg -> Select b err)
+update_options = |fn|
+    |@Select(next), arg|
+        @Select(State.map(next, |options| fn(options, arg)))
 
 # Selection
 
-Selection a err := State
+Selection a err :=
+    State
         Env
         {
             columns : List Sql,
@@ -429,168 +474,225 @@ Selection a err := State
         }
         err
 
-unwrapSelection = \@Selection state -> state
+unwrap_selection = |@Selection(state)| state
 
-updateSelection = \@Selection sel, fn -> @Selection (State.map sel \options -> fn options)
+update_selection = |@Selection(sel), fn| @Selection(State.map(sel, |options| fn(options)))
 
 into : a -> Selection a err
-into = \value ->
+into = |value|
     {
         columns: [],
-        decode: \_ -> Ok value,
+        decode: |_| Ok(value),
     }
     |> State.ok
     |> @Selection
 
 column : Expr * a -> (Selection (a -> b) err -> Selection b err)
-column = \@Expr expr -> \ss ->
-        sel <- updateSelection ss
-        apExprSel expr sel
+column = |@Expr(expr)|
+    |ss|
+        update_selection(
+            ss,
+            |sel|
+                ap_expr_sel(expr, sel),
+        )
 
-apExprSel = \expr, sel ->
-    index = List.len sel.columns
+ap_expr_sel = |expr, sel|
+    index = List.len(sel.columns)
 
-    decode = \cells ->
-        fn <- sel.decode cells |> Result.try
-        value <- cells
-            |> List.get index
-            |> Result.mapErr \OutOfBounds -> MissingColumn index
-            |> Result.try
-        a <- value
-            |> Sql.Types.decode expr.decode
-            |> Result.map
-        fn a
+    decode = |cells|
+        sel.decode(cells)
+        |> Result.try(
+            |fn|
+                cells
+                |> List.get(index)
+                |> Result.map_err(|OutOfBounds| MissingColumn(index))
+                |> Result.try(
+                    |value|
+                        value
+                        |> Sql.Types.decode(expr.decode)
+                        |> Result.map_ok(
+                            |a|
+                                fn(a),
+                        ),
+                ),
+        )
 
     {
-        columns: sel.columns |> List.append expr.sql,
+        columns: sel.columns |> List.append(expr.sql),
         decode,
     }
 
 with : Selection a err -> (Selection (a -> b) err -> Selection b err)
-with = \@Selection toASel -> \@Selection toFnSel ->
-        @Selection (withHelp toASel toFnSel)
+with = |@Selection(to_a_sel)|
+    |@Selection(to_fn_sel)|
+        @Selection(with_help(to_a_sel, to_fn_sel))
 
-withHelp = \toASel, toFnSel ->
-    env <- State.get |> State.bind
+with_help = |to_a_sel, to_fn_sel|
+    State.get
+    |> State.bind(
+        |env|
+            result =
+                State.attempt(to_a_sel, env)
+                |> Result.try(
+                    |(a_sel, _)|
+                        State.attempt(to_fn_sel, env)
+                        |> Result.map_ok(
+                            |(fn_sel, _)|
+                                count = List.len(fn_sel.columns)
 
-    result =
-        (aSel, _) <- State.attempt toASel env |> Result.try
-        (fnSel, _) <- State.attempt toFnSel env |> Result.map
+                                decode = |cells|
+                                    fn_sel.decode(cells)
+                                    |> Result.try(
+                                        |fn|
+                                            cells
+                                            |> List.drop_first(count)
+                                            |> a_sel.decode
+                                            |> Result.map_ok(
+                                                |a|
+                                                    fn(a),
+                                            ),
+                                    )
 
-        count = List.len fnSel.columns
+                                {
+                                    columns: fn_sel.columns |> List.concat(a_sel.columns),
+                                    decode,
+                                },
+                        ),
+                )
 
-        decode = \cells ->
-            fn <- fnSel.decode cells |> Result.try
-            a <- cells
-                |> List.dropFirst count
-                |> aSel.decode
-                |> Result.map
-            fn a
-
-        {
-            columns: fnSel.columns |> List.concat aSel.columns,
-            decode,
-        }
-
-    State.fromResult result
+            State.from_result(result),
+    )
 
 row : Query (Selection a err) err -> (Selection (a -> b) err -> Selection b err)
-row = \@Query qs -> \@Selection ps ->
-        @Selection (rowHelp qs ps)
+row = |@Query(qs)|
+    |@Selection(ps)|
+        @Selection(row_help(qs, ps))
 
-rowHelp = \qs, ps ->
-    sel <- State.bind ps
-    env <- State.get |> State.bind
+row_help = |qs, ps|
+    State.bind(
+        ps,
+        |sel|
+            State.get
+            |> State.bind(
+                |env|
+                    row_state =
+                        State.bind(
+                            qs,
+                            |query|
+                                query.options.value
+                                |> unwrap_selection
+                                |> State.map(
+                                    |row_sel|
+                                        limited =
+                                            options = query.options
+                                            { query & options: { options & limit: [Raw(" limit 1")] } }
 
-    rowState =
-        query <- State.bind qs
-        rowSel <- query.options.value |> unwrapSelection |> State.map
+                                        { query: limited, sel: row_sel },
+                                ),
+                        )
 
-        limited =
-            options = query.options
-            { query & options: { options & limit: [Raw " limit 1"] } }
+                    State.attempt(row_state, env)
+                    |> Result.map_ok(
+                        |(row_q, _)|
+                            sql =
+                                [Raw("(")]
+                                |> List.concat(query_sql(row_q.query, row_q.sel.columns, Row))
+                                |> List.append(Raw(")"))
 
-        { query: limited, sel: rowSel }
+                            {
+                                sql,
+                                decode: Sql.Types.row(row_q.sel.decode),
+                            }
+                            |> ap_expr_sel(sel),
+                    )
+                    |> State.from_result,
+            ),
+    )
 
-    State.attempt rowState env
-    |> Result.map \(rowQ, _) ->
-        sql =
-            [Raw "("]
-            |> List.concat (querySql rowQ.query rowQ.sel.columns Row)
-            |> List.append (Raw ")")
+row_array : Query (Selection a err) err -> (Selection (List a -> b) err -> Selection b err)
+row_array = |@Query(qs)| |@Selection(ps)| @Selection(row_array_help(qs, ps))
 
-        {
-            sql,
-            decode: Sql.Types.row rowQ.sel.decode,
-        }
-        |> apExprSel sel
-    |> State.fromResult
+row_array_help = |qs, ps|
+    State.bind(
+        ps,
+        |sel|
+            State.get
+            |> State.bind(
+                |env|
+                    row_state =
+                        State.bind(
+                            qs,
+                            |query|
+                                query.options.value
+                                |> unwrap_selection
+                                |> State.map(
+                                    |row_sel| {
+                                        sql: query_sql(query, row_sel.columns, Row),
+                                        decode: row_sel.decode,
+                                    },
+                                ),
+                        )
 
-rowArray : Query (Selection a err) err -> (Selection (List a -> b) err -> Selection b err)
-rowArray = \@Query qs -> \@Selection ps -> @Selection (rowArrayHelp qs ps)
+                    State.attempt(row_state, env)
+                    |> Result.map_ok(
+                        |(row_q, _)|
+                            sql =
+                                [Raw("(select array(")]
+                                |> List.concat(row_q.sql)
+                                |> List.append(Raw("))"))
 
-rowArrayHelp = \qs, ps ->
-    sel <- State.bind ps
-    env <- State.get |> State.bind
+                            decode = Sql.Types.array(Sql.Types.row(row_q.decode))
 
-    rowState =
-        query <- State.bind qs
-        rowSel <- query.options.value |> unwrapSelection |> State.map
+                            expr = { sql, decode }
 
-        {
-            sql: querySql query rowSel.columns Row,
-            decode: rowSel.decode,
-        }
+                            ap_expr_sel(expr, sel),
+                    )
+                    |> State.from_result,
+            ),
+    )
 
-    State.attempt rowState env
-    |> Result.map \(rowQ, _) ->
-        sql =
-            [Raw "(select array("]
-            |> List.concat rowQ.sql
-            |> List.append (Raw "))")
+selection_list : List (Selection a err) -> Selection (List a) err
+selection_list = |sels| @Selection(selection_list_help(sels))
 
-        decode = Sql.Types.array (Sql.Types.row rowQ.decode)
+selection_list_help = |sels|
+    State.get
+    |> State.bind(
+        |env|
+            sels
+            |> List.map_try(|@Selection(sel)| State.attempt(sel, env) |> Result.map_ok(.0))
+            |> Result.map_ok(
+                |all_sels|
+                    decode = |cells|
+                        all_sels
+                        |> List.walk_try((cells, List.with_capacity(List.len(sels))), decode_sel)
+                        |> Result.map_ok(.1)
 
-        expr = { sql, decode }
+                    decode_sel = |(remaining_cells, decoded_sels), sel|
+                        { before, others } = List.split_at(remaining_cells, List.len(sel.columns))
 
-        apExprSel expr sel
-    |> State.fromResult
+                        sel.decode(before)
+                        |> Result.map_ok(
+                            |decoded|
+                                (others, List.append(decoded_sels, decoded)),
+                        )
 
-selectionList : List (Selection a err) -> Selection (List a) err
-selectionList = \sels -> @Selection (selectionListHelp sels)
-
-selectionListHelp = \sels ->
-    env <- State.get |> State.bind
-
-    sels
-    |> List.mapTry \@Selection sel -> State.attempt sel env |> Result.map .0
-    |> Result.map \allSels ->
-        decode = \cells ->
-            allSels
-            |> List.walkTry (cells, List.withCapacity (List.len sels)) decodeSel
-            |> Result.map .1
-
-        decodeSel = \(remainingCells, decodedSels), sel ->
-            { before, others } = List.split remainingCells (List.len sel.columns)
-
-            decoded <- sel.decode before |> Result.map
-
-            (others, List.append decodedSels decoded)
-
-        {
-            columns: allSels |> List.joinMap .columns,
-            decode,
-        }
-    |> State.fromResult
+                    {
+                        columns: all_sels |> List.join_map(.columns),
+                        decode,
+                    },
+            )
+            |> State.from_result,
+    )
 
 map : Selection a err, (a -> b) -> Selection b err
-map = \ss, fn ->
-    sel <- updateSelection ss
-
-    {
-        columns: sel.columns,
-        decode: \cells -> Result.map (sel.decode cells) fn,
-    }
+map = |ss, fn|
+    update_selection(
+        ss,
+        |sel| {
+            columns: sel.columns,
+            decode: |cells| Result.map_ok(sel.decode(cells), fn),
+        },
+    )
 
 # Expr
 
@@ -602,10 +704,13 @@ Expr pg roc := {
 NullableExpr pg roc : Expr (Nullable pg) (Nullable roc)
 
 identifier : Str, Str, Decode pg roc -> Expr pg roc
-identifier = \table, col, decode -> @Expr {
-        sql: [Raw "$(table).$(col)"],
-        decode,
-    }
+identifier = |table, col, decode|
+    @Expr(
+        {
+            sql: [Raw("${table}.${col}")],
+            decode,
+        },
+    )
 
 ## Discards the phantom type variable that represents the SQL-level type.
 ##
@@ -613,248 +718,300 @@ identifier = \table, col, decode -> @Expr {
 ## from writing an expression that you know it's valid.
 ##
 ## IMPORTANT: The compiled expression won't include a SQL cast!
-discardPhantom : Expr * roc -> Expr * roc
-discardPhantom = \@Expr expr -> @Expr {
-        sql: expr.sql,
-        decode: Sql.Types.discardPhantom expr.decode,
-    }
+discard_phantom : Expr * roc -> Expr * roc
+discard_phantom = |@Expr(expr)|
+    @Expr(
+        {
+            sql: expr.sql,
+            decode: Sql.Types.discard_phantom(expr.decode),
+        },
+    )
 
 # Expr: Literals
 
 i16 : I16 -> Expr (PgI16 *) I16
-i16 = \value -> @Expr {
-        sql: [Param (Pg.Cmd.i16 value)],
-        decode: Sql.Types.i16,
-    }
+i16 = |value|
+    @Expr(
+        {
+            sql: [Param(Pg.Cmd.i16(value))],
+            decode: Sql.Types.i16,
+        },
+    )
 
 i32 : I32 -> Expr (PgI32 *) I32
-i32 = \value -> @Expr {
-        sql: [Param (Pg.Cmd.i32 value)],
-        decode: Sql.Types.i32,
-    }
+i32 = |value|
+    @Expr(
+        {
+            sql: [Param(Pg.Cmd.i32(value))],
+            decode: Sql.Types.i32,
+        },
+    )
 
 i64 : I64 -> Expr (PgI64 *) I64
-i64 = \value -> @Expr {
-        sql: [Param (Pg.Cmd.i64 value)],
-        decode: Sql.Types.i64,
-    }
+i64 = |value|
+    @Expr(
+        {
+            sql: [Param(Pg.Cmd.i64(value))],
+            decode: Sql.Types.i64,
+        },
+    )
 
 str : Str -> Expr (PgText *) Str
-str = \value ->
-    @Expr {
-        sql: [Param (Pg.Cmd.str value)],
-        decode: Sql.Types.str,
-    }
+str = |value|
+    @Expr(
+        {
+            sql: [Param(Pg.Cmd.str(value))],
+            decode: Sql.Types.str,
+        },
+    )
 
-null : NullableExpr * []
-null = @Expr {
-    sql: [Raw "null"],
-    decode: Sql.Types.nullable (Sql.Types.fail "not null"),
-}
+null : NullableExpr _ []
+null = @Expr(
+    {
+        sql: [Raw("null")],
+        decode: Sql.Types.nullable(Sql.Types.fail("not null")),
+    },
+)
 
-asNullable : Expr pg roc -> NullableExpr pg roc
-asNullable = \@Expr a ->
-    @Expr {
-        sql: a.sql,
-        decode: Sql.Types.nullable a.decode,
-    }
+as_nullable : Expr pg roc -> NullableExpr pg roc
+as_nullable = |@Expr(a)|
+    @Expr(
+        {
+            sql: a.sql,
+            decode: Sql.Types.nullable(a.decode),
+        },
+    )
 
 # Expr: Comparison
 
-isNull : NullableExpr * * -> Expr (PgBool *) Bool
-isNull = \@Expr a ->
-    @Expr {
-        sql: a.sql |> List.append (Raw " is null"),
-        decode: Sql.Types.bool,
-    }
+is_null : NullableExpr _ _ -> Expr (PgBool _) Bool
+is_null = |@Expr(a)|
+    @Expr(
+        {
+            sql: a.sql |> List.append(Raw(" is null")),
+            decode: Sql.Types.bool,
+        },
+    )
 
-isNotNull : NullableExpr * * -> Expr (PgBool *) Bool
-isNotNull = \@Expr a ->
-    @Expr {
-        sql: a.sql |> List.append (Raw " is not null"),
-        decode: Sql.Types.bool,
-    }
+is_not_null : NullableExpr _ _ -> Expr (PgBool _) Bool
+is_not_null = |@Expr(a)|
+    @Expr(
+        {
+            sql: a.sql |> List.append(Raw(" is not null")),
+            decode: Sql.Types.bool,
+        },
+    )
 
-isDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr (PgBool *) Bool
-isDistinctFrom = \a, b -> boolOp a "is distinct from" b
+is_distinct_from : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr (PgBool *) Bool
+is_distinct_from = |a, b| bool_op(a, "is distinct from", b)
 
-isNotDistinctFrom : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr (PgBool *) Bool
-isNotDistinctFrom = \a, b -> boolOp a "is not distinct from" b
+is_not_distinct_from : NullableExpr (PgCmp a) *, NullableExpr (PgCmp a) * -> Expr (PgBool *) Bool
+is_not_distinct_from = |a, b| bool_op(a, "is not distinct from", b)
 
-nullableEq = isNotDistinctFrom
+nullable_eq = is_not_distinct_from
 
-nullableNeq = isDistinctFrom
+nullable_neq = is_distinct_from
 
 concat : Expr (PgText *) *, Expr (PgText *) * -> Expr (PgText *) Str
-concat = \@Expr a, @Expr b ->
-    @Expr {
-        sql: binOp a.sql "||" b.sql,
-        decode: Sql.Types.str,
-    }
+concat = |@Expr(a), @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op(a.sql, "||", b.sql),
+            decode: Sql.Types.str,
+        },
+    )
 
 lt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
-lt = \a, b -> boolOp a "<" b
+lt = |a, b| bool_op(a, "<", b)
 
 lte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
-lte = \a, b -> boolOp a "<=" b
+lte = |a, b| bool_op(a, "<=", b)
 
 eq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
-eq = \a, b -> boolOp a "=" b
+eq = |a, b| bool_op(a, "=", b)
 
 neq : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
-neq = \a, b -> boolOp a "<>" b
+neq = |a, b| bool_op(a, "<>", b)
 
 gte : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
-gte = \a, b -> boolOp a ">=" b
+gte = |a, b| bool_op(a, ">=", b)
 
 gt : Expr (PgCmp a) *, Expr (PgCmp a) * -> Expr (PgBool *) Bool
-gt = \a, b -> boolOp a ">" b
+gt = |a, b| bool_op(a, ">", b)
 
 in : Expr (PgCmp a) *, (item -> Expr (PgCmp a) *), List item -> Expr (PgBool *) Bool
-in = \@Expr needle, toExpr, haystack ->
-    itemToSql = \item ->
-        (@Expr { sql }) = toExpr item
+in = |@Expr(needle), to_expr, haystack|
+    item_to_sql = |item|
+        @Expr({ sql }) = to_expr(item)
         sql
 
-    listItems =
+    list_items =
         haystack
-        |> List.map itemToSql
-        |> commaJoin
+        |> List.map(item_to_sql)
+        |> comma_join
 
-    inSql =
+    in_sql =
         needle.sql
-        |> List.reserve (List.len listItems + 2)
-        |> List.append (Raw " in (")
-        |> List.concat listItems
-        |> List.append (Raw ")")
+        |> List.reserve((List.len(list_items) + 2))
+        |> List.append(Raw(" in ("))
+        |> List.concat(list_items)
+        |> List.append(Raw(")"))
 
-    @Expr {
-        sql: inSql,
-        decode: Sql.Types.bool,
-    }
+    @Expr(
+        {
+            sql: in_sql,
+            decode: Sql.Types.bool,
+        },
+    )
 
 like : Expr (PgText *) *, Expr (PgText *) * -> Expr (PgBool *) Bool
-like = \a, b ->
-    boolOp a "like" b
+like = |a, b|
+    bool_op(a, "like", b)
 
 ilike : Expr (PgText *) *, Expr (PgText *) * -> Expr (PgBool *) Bool
-ilike = \a, b ->
-    boolOp a "ilike" b
+ilike = |a, b|
+    bool_op(a, "ilike", b)
 
-boolOp : Expr * *, Str, Expr * * -> Expr (PgBool *) Bool
-boolOp = \@Expr a, op, @Expr b ->
-    @Expr {
-        sql: binOp a.sql op b.sql,
-        decode: Sql.Types.bool,
-    }
+bool_op : Expr * *, Str, Expr * * -> Expr (PgBool *) Bool
+bool_op = |@Expr(a), op, @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op(a.sql, op, b.sql),
+            decode: Sql.Types.bool,
+        },
+    )
 
 # Expr: Logical
 # TODO: Test precendence is ok!
 
-and : Expr (PgBool *) *, Expr (PgBool *) * -> Expr (PgBool *) Bool
-and = \a, b -> boolOp a "and" b
+and_ : Expr (PgBool *) *, Expr (PgBool *) * -> Expr (PgBool *) Bool
+and_ = |a, b| bool_op(a, "and", b)
 
-or : Expr (PgBool *) *, Expr (PgBool a) * -> Expr (PgBool *) Bool
-or = \@Expr a, @Expr b ->
-    @Expr {
-        sql: binOpParens a.sql "or" b.sql,
-        decode: Sql.Types.bool,
-    }
+or_ : Expr (PgBool *) *, Expr (PgBool a) * -> Expr (PgBool *) Bool
+or_ = |@Expr(a), @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op_parens(a.sql, "or", b.sql),
+            decode: Sql.Types.bool,
+        },
+    )
 
-not : Expr (PgBool *) * -> Expr (PgBool *) Bool
-not = \@Expr a ->
-    @Expr {
-        sql: [Raw "not ("]
-        |> List.reserve (List.len a.sql + 1)
-        |> List.concat a.sql
-        |> List.append (Raw ")"),
-        decode: Sql.Types.bool,
-    }
+not_ : Expr (PgBool *) * -> Expr (PgBool *) Bool
+not_ = |@Expr(a)|
+    @Expr(
+        {
+            sql: [Raw("not (")]
+            |> List.reserve((List.len(a.sql) + 1))
+            |> List.concat(a.sql)
+            |> List.append(Raw(")")),
+            decode: Sql.Types.bool,
+        },
+    )
 
-andList : List (Expr (PgBool a) Bool) -> Expr (PgBool a) Bool
-andList = \exprs ->
-    joinBool openTrue and exprs
+and_list : List (Expr (PgBool _) Bool) -> Expr (PgBool _) Bool
+and_list = |exprs|
+    join_bool(open_true, and_, exprs)
 
-orList : List (Expr (PgBool a) Bool) -> Expr (PgBool a) Bool
-orList = \exprs ->
-    joinBool openFalse or exprs
+or_list : List (Expr (PgBool _) Bool) -> Expr (PgBool _) Bool
+or_list = |exprs|
+    join_bool(open_false, or_, exprs)
 
 BoolOp a : Expr (PgBool a) Bool, Expr (PgBool a) Bool -> Expr (PgBool a) Bool
 
-joinBool : Expr (PgBool a) Bool, BoolOp a, List (Expr (PgBool a) Bool) -> Expr (PgBool a) Bool
-joinBool = \default, operator, exprs ->
+join_bool : Expr (PgBool _) Bool, BoolOp _, List (Expr (PgBool _) Bool) -> Expr (PgBool _) Bool
+join_bool = |default, operator, exprs|
     # We could simplify this by using default as the initial value,
     # but in most cases we would produce something like (true and ...),
     # which is not very nice to read.
     result =
-        List.walk exprs Empty \acc, rhs ->
-            when acc is
-                Empty ->
-                    NotEmpty rhs
+        List.walk(
+            exprs,
+            Empty,
+            |acc, rhs|
+                when acc is
+                    Empty ->
+                        NotEmpty(rhs)
 
-                NotEmpty lhs ->
-                    NotEmpty (operator lhs rhs)
+                    NotEmpty(lhs) ->
+                        NotEmpty(operator(lhs, rhs)),
+        )
 
     when result is
         Empty ->
             default
 
-        NotEmpty expr ->
+        NotEmpty(expr) ->
             expr
 
-true : Expr (PgBool a) Bool
-true = @Expr {
-    sql: [Raw "true"],
-    decode: Sql.Types.bool,
-}
+true : Expr (PgBool _) Bool
+true = @Expr(
+    {
+        sql: [Raw("true")],
+        decode: Sql.Types.bool,
+    },
+)
 
-false : Expr (PgBool *) Bool
-false = @Expr {
-    sql: [Raw "false"],
-    decode: Sql.Types.bool,
-}
+false : Expr (PgBool _) Bool
+false = @Expr(
+    {
+        sql: [Raw("false")],
+        decode: Sql.Types.bool,
+    },
+)
 
 # These are needed for `andList` and `orList`
 
-openTrue = @Expr {
-    sql: [Raw "true"],
-    decode: Sql.Types.bool,
-}
+open_true = @Expr(
+    {
+        sql: [Raw("true")],
+        decode: Sql.Types.bool,
+    },
+)
 
-openFalse = @Expr {
-    sql: [Raw "false"],
-    decode: Sql.Types.bool,
-}
+open_false = @Expr(
+    {
+        sql: [Raw("false")],
+        decode: Sql.Types.bool,
+    },
+)
 
 # Expr: Num
 
 add : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
-add = \@Expr a, @Expr b ->
-    @Expr {
-        sql: binOpParens a.sql "+" b.sql,
-        decode: a.decode,
-    }
+add = |@Expr(a), @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op_parens(a.sql, "+", b.sql),
+            decode: a.decode,
+        },
+    )
 
 sub : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
-sub = \@Expr a, @Expr b ->
-    @Expr {
-        sql: binOpParens a.sql "-" b.sql,
-        decode: a.decode,
-    }
+sub = |@Expr(a), @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op_parens(a.sql, "-", b.sql),
+            decode: a.decode,
+        },
+    )
 
 mul : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
-mul = \@Expr a, @Expr b ->
-    @Expr {
-        sql: binOp a.sql "*" b.sql,
-        decode: a.decode,
-    }
+mul = |@Expr(a), @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op(a.sql, "*", b.sql),
+            decode: a.decode,
+        },
+    )
 
 div : Expr (PgNum pg) roc, Expr (PgNum pg) roc -> Expr (PgNum pg) roc
-div = \@Expr a, @Expr b ->
-    @Expr {
-        sql: binOp a.sql "/" b.sql,
-        decode: a.decode,
-    }
+div = |@Expr(a), @Expr(b)|
+    @Expr(
+        {
+            sql: bin_op(a.sql, "/", b.sql),
+            decode: a.decode,
+        },
+    )
 
 # Sql helpers
 
@@ -870,69 +1027,70 @@ Compiled : {
     params : List Binding,
 }
 
-joinWith : List Sql, Sql -> Sql
-joinWith = \items, sep ->
+join_with : List Sql, Sql -> Sql
+join_with = |items, sep|
     items
-    |> List.intersperse sep
+    |> List.intersperse(sep)
     |> List.join
 
-commaJoin : List Sql -> Sql
-commaJoin = \items ->
-    joinWith items [Raw ", "]
+comma_join : List Sql -> Sql
+comma_join = |items|
+    join_with(items, [Raw(", ")])
 
-binOp = \a, op, b ->
+bin_op = |a, op, b|
     a
-    |> List.reserve (List.len b + 1)
-    |> List.append (Raw " $(op) ")
-    |> List.concat b
+    |> List.reserve((List.len(b) + 1))
+    |> List.append(Raw(" ${op} "))
+    |> List.concat(b)
 
-binOpParens = \a, op, b ->
-    [Raw "("]
-    |> List.reserve (List.len a + List.len b + 2)
-    |> List.concat a
-    |> List.append (Raw " $(op) ")
-    |> List.concat b
-    |> List.append (Raw ")")
+bin_op_parens = |a, op, b|
+    [Raw("(")]
+    |> List.reserve((List.len(a) + List.len(b) + 2))
+    |> List.concat(a)
+    |> List.append(Raw(" ${op} "))
+    |> List.concat(b)
+    |> List.append(Raw(")"))
 
-compileSql : Sql -> Compiled
-compileSql = \sql ->
+compile_sql : Sql -> Compiled
+compile_sql = |sql|
     sql
-    |> List.walk
+    |> List.walk(
         {
-            params: List.withCapacity 8,
-            sql: Str.withCapacity (List.len sql * 12),
-        }
-        addPart
+            params: List.with_capacity(8),
+            sql: Str.with_capacity((List.len(sql) * 12)),
+        },
+        add_part,
+    )
 
-addPart : Compiled, Part -> Compiled
-addPart = \{ params, sql }, part ->
+add_part : Compiled, Part -> Compiled
+add_part = |{ params, sql }, part|
     when part is
-        Param param ->
-            paramCount = List.len params
+        Param(param) ->
+            param_count = List.len(params)
 
-            { newParams, index } =
+            { new_params, index } =
                 # TODO: Use a dict
-                indexResult = params |> List.findFirstIndex \p -> p == param
+                index_result = params |> List.find_first_index(|p| p == param)
 
-                when indexResult is
-                    Ok existingIndex ->
+                when index_result is
+                    Ok(existing_index) ->
                         {
-                            newParams: params,
-                            index: existingIndex,
+                            new_params: params,
+                            index: existing_index,
                         }
 
-                    Err NotFound ->
+                    Err(NotFound) ->
                         {
-                            newParams: params |> List.append param,
-                            index: paramCount,
+                            new_params: params |> List.append(param),
+                            index: param_count,
                         }
 
-            binding = Num.toStr (index + 1)
+            binding = Num.to_str((index + 1))
 
-            { sql: "$(sql)$$(binding)", params: newParams }
+            { sql: "${sql}$${binding}", params: new_params }
 
-        Raw raw ->
-            { sql: Str.concat sql raw, params }
+        Raw(raw) ->
+            { sql: Str.concat(sql, raw), params }
 
 # Tests
 

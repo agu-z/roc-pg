@@ -8,8 +8,8 @@ module [
     i16,
     i32,
     i64,
-    cStr,
-    nullTerminate,
+    c_str,
+    null_terminate,
 ]
 
 sequence : List (List U8) -> List U8
@@ -24,62 +24,62 @@ u8 =
 
 u16 : U16 -> List U8
 u16 =
-    sized 16
+    sized(16)
 
 u32 : U32 -> List U8
 u32 =
-    sized 32
+    sized(32)
 
 u64 : U64 -> List U8
 u64 =
-    sized 64
+    sized(64)
 
 # Signed integers
 
 i8 : I8 -> List U8
-i8 = \value ->
-    [Num.toU8 value]
+i8 = |value|
+    [Num.to_u8(value)]
 
 i16 : I16 -> List U8
 i16 =
-    sized 16
+    sized(16)
 
 i32 : I32 -> List U8
 i32 =
-    sized 32
+    sized(32)
 
 i64 : I64 -> List U8
 i64 =
-    sized 64
+    sized(64)
 
 sized : U8 -> (Int * -> List U8)
-sized = \size ->
-    \value ->
-        sizedHelp value (size - 8) []
+sized = |size|
+    |value|
+        sized_help(value, (size - 8), [])
 
-sizedHelp : Int *, U8, List U8 -> List U8
-sizedHelp = \value, offset, collected ->
+sized_help : Int *, U8, List U8 -> List U8
+sized_help = |value, offset, collected|
     part =
         value
-        |> Num.shiftRightBy offset
-        |> Num.toU8
+        |> Num.shift_right_by(offset)
+        |> Num.to_u8
 
     added =
-        List.append collected part
+        List.append(collected, part)
 
     if offset == 0 then
         added
     else
-        sizedHelp value (offset - 8) added
+        sized_help(value, (offset - 8), added)
 
 # Strings
 
-cStr : Str -> List U8
-cStr = \value ->
+c_str : Str -> List U8
+c_str = |value|
     value
-    |> Str.toUtf8
-    |> nullTerminate
+    |> Str.to_utf8
+    |> null_terminate
 
-nullTerminate : List U8 -> List U8
-nullTerminate = \bytes ->
-    List.append bytes 0
+null_terminate : List U8 -> List U8
+null_terminate = |bytes|
+    List.append(bytes, 0)

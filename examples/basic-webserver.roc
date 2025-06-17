@@ -1,14 +1,20 @@
-app [main!] {
-    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.19.0/Hj-J_zxz7V9YurCSTFcFdu6cQJie4guzsPMUi5kBYUk.tar.br",
+app [Model, init!, respond!] {
+    pf: platform "https://github.com/roc-lang/basic-webserver/releases/download/0.12.0/Q4h_In-sz1BqAvlpmCsBHhEJnn_YvfRRMiNACB_fBbk.tar.br",
     pg: "../src/main.roc",
 }
 
 import pf.Stdout
+import pg.Pg.Client exposing [Client]
 import pg.Pg.Cmd
-import pg.Pg.Client
 import pg.Pg.Result
 
-main! = |_|
+Model : {
+    client : Client,
+}
+
+init! = |_|
+    _ = Stdout.line!("Start!")
+
     client = Pg.Client.connect!(
         {
             host: "localhost",
@@ -21,6 +27,9 @@ main! = |_|
 
     _ = Stdout.line!("Connected!")
 
+    Ok({ client })
+
+respond! = |_request, model|
     rows =
         Pg.Cmd.new(
             """
@@ -36,11 +45,19 @@ main! = |_|
                 age: Pg.Result.u8("age"),
             },
         )
-        |> Pg.Client.command!(client)?
+        |> Pg.Client.command!(model.client)?
 
-    str =
+    response_body =
         rows
         |> List.map(Inspect.to_str)
         |> Str.join_with("\n")
 
-    Stdout.line!("Got records:\n${str}")
+    Stdout.line!("Responding with: ${response_body}")?
+
+    Ok(
+        {
+            status: 200,
+            headers: [],
+            body: Str.to_utf8(response_body),
+        },
+    )

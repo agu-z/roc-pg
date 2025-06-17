@@ -1,29 +1,29 @@
 module [
-    Cmd,
-    new,
-    expectN,
-    expect1,
-    map,
-    bind,
     Binding,
-    null,
-    str,
-    u8,
-    u16,
-    u32,
-    u64,
-    u128,
-    i8,
+    Cmd,
+    bind,
+    bool,
+    bytes,
+    expect1,
+    expect_n,
+    f32,
+    f64,
+    i128,
     i16,
     i32,
     i64,
-    i128,
-    f32,
-    f64,
-    bytes,
-    bool,
-    withCustomDecode,
+    i8,
     inspect,
+    map,
+    new,
+    null,
+    str,
+    u128,
+    u16,
+    u32,
+    u64,
+    u8,
+    with_custom_decode,
 ]
 
 import Cmd
@@ -32,82 +32,89 @@ import Pg.Result exposing [CmdResult]
 Cmd a err : Cmd.Cmd a err
 
 new : Str -> Cmd CmdResult []
-new = Cmd.fromSql
+new = Cmd.from_sql
 
 # Result
 
-expectN : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
-expectN = \cmd, decoder ->
-    Cmd.withDecode cmd \r -> Pg.Result.decode r decoder
+expect_n : Cmd CmdResult [], Pg.Result.Decode a err -> Cmd (List a) [FieldNotFound Str]err
+expect_n = |cmd, decoder|
+    Cmd.with_decode(cmd, |r| Pg.Result.decode(r, decoder))
 
 expect1 : Cmd CmdResult [], Pg.Result.Decode a [EmptyResult]err -> Cmd a [EmptyResult, FieldNotFound Str]err
-expect1 = \cmd, decoder ->
-    cmdResult <- cmd |> Cmd.withLimit 1 |> Cmd.withDecode
-    rows <- Pg.Result.decode cmdResult decoder |> Result.try
+expect1 = |cmd, decoder|
+    cmd
+    |> Cmd.with_limit(1)
+    |> Cmd.with_decode(
+        |cmd_result|
+            Pg.Result.decode(cmd_result, decoder)
+            |> Result.try(
+                |rows|
+                    when rows is
+                        [row] ->
+                            Ok(row)
 
-    when rows is
-        [row] ->
-            Ok row
+                        _ ->
+                            Err(EmptyResult),
+            ),
+    )
 
-        _ ->
-            Err EmptyResult
-
-map : Cmd a err, (a -> b) -> Cmd b err
+map : Cmd _ _, (_ -> _) -> Cmd _ _
 map = Cmd.map
 
-withCustomDecode : Cmd * *, (CmdResult -> Result a err) -> Cmd a err
-withCustomDecode = Cmd.withDecode
+with_custom_decode : Cmd _ _, (CmdResult -> Result _ _) -> Cmd _ _
+with_custom_decode = Cmd.with_decode
 
 inspect : Cmd a err -> Str
-inspect = \cmd ->
-    { kind, bindings } = Cmd.params cmd
+inspect = |cmd|
+    { kind, bindings } = Cmd.params(cmd)
 
-    kindStr = inspectKind kind
-    bindingsStr =
+    kind_str = inspect_kind(kind)
+    bindings_str =
         bindings
-        |> List.mapWithIndex
-            \val, index ->
+        |> List.map_with_index(
+            |val, index|
                 n = index + 1
-                "$$(Num.toStr n) = $(inspectBinding val)"
-        |> Str.joinWith "\n"
+                "$${Num.to_str(n)} = ${inspect_binding(val)}",
+        )
+        |> Str.join_with("\n")
 
-    "$(kindStr)\n$(bindingsStr)"
+    "${kind_str}\n${bindings_str}"
 
-inspectKind = \kind ->
+inspect_kind = |kind|
     when kind is
-        SqlCmd sql ->
-            "SQL: $(sql)"
+        SqlCmd(sql) ->
+            "SQL: ${sql}"
 
-        PreparedCmd { name } ->
-            "Prepared: $(name)"
+        PreparedCmd({ name }) ->
+            "Prepared: ${name}"
 
-inspectBinding = \binding ->
+inspect_binding = |binding|
     when binding is
         Null ->
             "NULL"
 
-        Text text ->
+        Text(text) ->
             text
 
-        Binary bin ->
+        Binary(bin) ->
             bin
-            |> List.map Num.toStr
-            |> Str.joinWith ","
+            |> List.map(Num.to_str)
+            |> Str.join_with(",")
 
 # Bindings
 
 Binding := Cmd.Binding implements [Eq]
 
 bind : Cmd a err, List Binding -> Cmd a err
-bind = \cmd, bindings ->
-    Cmd.bind cmd (bindings |> List.map \@Binding binding -> binding)
+bind = |cmd, bindings|
+    Cmd.bind(cmd, (bindings |> List.map(|@Binding(binding)| binding)))
 
 null : Binding
-null = @Binding Null
+null = @Binding(Null)
 
 str : Str -> Binding
-str = \value ->
-    @Binding (Text value)
+str = |value|
+    @Binding(Text(value))
 
 u8 = num
 u16 = num
@@ -123,13 +130,13 @@ f32 = num
 f64 = num
 
 num : Num * -> Binding
-num = \value ->
-    @Binding (Text (Num.toStr value))
+num = |value|
+    @Binding(Text(Num.to_str(value)))
 
 bool : Bool -> Binding
-bool = \value ->
-    @Binding (Binary [(if value then 1 else 0)])
+bool = |value|
+    @Binding(Binary([(if value then 1 else 0)]))
 
 bytes : List U8 -> Binding
-bytes = \value ->
-    @Binding (Binary value)
+bytes = |value|
+    @Binding(Binary(value))

@@ -157,7 +157,7 @@ pgStatistic = {
     schema: "pg_catalog",
     name: "pg_statistic",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         stainherit: identifier alias "stainherit" pgStatisticStainherit,
         stakind5: identifier alias "stakind5" Sql.Types.i16,
         stakind4: identifier alias "stakind4" Sql.Types.i16,
@@ -199,7 +199,7 @@ pgType = {
     schema: "pg_catalog",
     name: "pg_type",
     alias: "pt",
-    columns: \alias -> {
+    columns: |alias| {
         typnotnull: identifier alias "typnotnull" Sql.Types.bool,
         typisdefined: identifier alias "typisdefined" Sql.Types.bool,
         typispreferred: identifier alias "typispreferred" Sql.Types.bool,
@@ -242,7 +242,7 @@ pgForeignTable = {
     schema: "pg_catalog",
     name: "pg_foreign_table",
     alias: "pft",
-    columns: \alias -> {
+    columns: |alias| {
         ftserver: identifier alias "ftserver" Sql.Types.i32,
         ftrelid: identifier alias "ftrelid" pgForeignTableFtrelid,
         ftoptions: identifier alias "ftoptions" (Sql.Types.nullable (Sql.Types.array (Sql.Types.nullable Sql.Types.str))),
@@ -256,7 +256,7 @@ pgAuthid = {
     schema: "pg_catalog",
     name: "pg_authid",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         rolbypassrls: identifier alias "rolbypassrls" Sql.Types.bool,
         rolreplication: identifier alias "rolreplication" Sql.Types.bool,
         rolcanlogin: identifier alias "rolcanlogin" Sql.Types.bool,
@@ -276,7 +276,7 @@ pgShadow = {
     schema: "pg_catalog",
     name: "pg_shadow",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         usebypassrls: identifier alias "usebypassrls" (Sql.Types.nullable Sql.Types.bool),
         userepl: identifier alias "userepl" (Sql.Types.nullable Sql.Types.bool),
         usesuper: identifier alias "usesuper" (Sql.Types.nullable Sql.Types.bool),
@@ -293,7 +293,7 @@ pgRoles = {
     schema: "pg_catalog",
     name: "pg_roles",
     alias: "pr",
-    columns: \alias -> {
+    columns: |alias| {
         rolbypassrls: identifier alias "rolbypassrls" (Sql.Types.nullable Sql.Types.bool),
         rolreplication: identifier alias "rolreplication" (Sql.Types.nullable Sql.Types.bool),
         rolcanlogin: identifier alias "rolcanlogin" (Sql.Types.nullable Sql.Types.bool),
@@ -320,7 +320,7 @@ pgStatisticExtData = {
     schema: "pg_catalog",
     name: "pg_statistic_ext_data",
     alias: "psed",
-    columns: \alias -> {
+    columns: |alias| {
         stxdinherit: identifier alias "stxdinherit" pgStatisticExtDataStxdinherit,
         stxoid: identifier alias "stxoid" pgStatisticExtDataStxoid,
         stxdndistinct: identifier alias "stxdndistinct" (Sql.Types.nullable (Sql.Types.unsupported "pg_ndistinct")),
@@ -334,7 +334,7 @@ pgSettings = {
     schema: "pg_catalog",
     name: "pg_settings",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         pendingRestart: identifier alias "pending_restart" (Sql.Types.nullable Sql.Types.bool),
         sourceline: identifier alias "sourceline" (Sql.Types.nullable Sql.Types.i32),
         sourcefile: identifier alias "sourcefile" (Sql.Types.nullable Sql.Types.str),
@@ -359,7 +359,7 @@ pgFileSettings = {
     schema: "pg_catalog",
     name: "pg_file_settings",
     alias: "pfs",
-    columns: \alias -> {
+    columns: |alias| {
         applied: identifier alias "applied" (Sql.Types.nullable Sql.Types.bool),
         seqno: identifier alias "seqno" (Sql.Types.nullable Sql.Types.i32),
         sourceline: identifier alias "sourceline" (Sql.Types.nullable Sql.Types.i32),
@@ -374,7 +374,7 @@ pgHbaFileRules = {
     schema: "pg_catalog",
     name: "pg_hba_file_rules",
     alias: "phfr",
-    columns: \alias -> {
+    columns: |alias| {
         lineNumber: identifier alias "line_number" (Sql.Types.nullable Sql.Types.i32),
         error: identifier alias "error" (Sql.Types.nullable Sql.Types.str),
         authMethod: identifier alias "auth_method" (Sql.Types.nullable Sql.Types.str),
@@ -391,7 +391,7 @@ pgIdentFileMappings = {
     schema: "pg_catalog",
     name: "pg_ident_file_mappings",
     alias: "pifm",
-    columns: \alias -> {
+    columns: |alias| {
         lineNumber: identifier alias "line_number" (Sql.Types.nullable Sql.Types.i32),
         error: identifier alias "error" (Sql.Types.nullable Sql.Types.str),
         pgUsername: identifier alias "pg_username" (Sql.Types.nullable Sql.Types.str),
@@ -404,7 +404,7 @@ pgConfig = {
     schema: "pg_catalog",
     name: "pg_config",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         setting: identifier alias "setting" (Sql.Types.nullable Sql.Types.str),
         name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
     },
@@ -414,7 +414,7 @@ pgShmemAllocations = {
     schema: "pg_catalog",
     name: "pg_shmem_allocations",
     alias: "psa",
-    columns: \alias -> {
+    columns: |alias| {
         allocatedSize: identifier alias "allocated_size" (Sql.Types.nullable Sql.Types.i64),
         size: identifier alias "size" (Sql.Types.nullable Sql.Types.i64),
         off: identifier alias "off" (Sql.Types.nullable Sql.Types.i64),
@@ -426,7 +426,7 @@ pgBackendMemoryContexts = {
     schema: "pg_catalog",
     name: "pg_backend_memory_contexts",
     alias: "pbmc",
-    columns: \alias -> {
+    columns: |alias| {
         usedBytes: identifier alias "used_bytes" (Sql.Types.nullable Sql.Types.i64),
         freeChunks: identifier alias "free_chunks" (Sql.Types.nullable Sql.Types.i64),
         freeBytes: identifier alias "free_bytes" (Sql.Types.nullable Sql.Types.i64),
@@ -446,7 +446,7 @@ pgUserMapping = {
     schema: "pg_catalog",
     name: "pg_user_mapping",
     alias: "pum",
-    columns: \alias -> {
+    columns: |alias| {
         umserver: identifier alias "umserver" Sql.Types.i32,
         umuser: identifier alias "umuser" Sql.Types.i32,
         oid: identifier alias "oid" pgUserMappingOid,
@@ -458,7 +458,7 @@ pgStatActivity = {
     schema: "pg_catalog",
     name: "pg_stat_activity",
     alias: "psa",
-    columns: \alias -> {
+    columns: |alias| {
         usename: identifier alias "usename" (Sql.Types.nullable Sql.Types.str),
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         queryId: identifier alias "query_id" (Sql.Types.nullable Sql.Types.i64),
@@ -488,7 +488,7 @@ pgReplicationOriginStatus = {
     schema: "pg_catalog",
     name: "pg_replication_origin_status",
     alias: "pros",
-    columns: \alias -> {
+    columns: |alias| {
         externalId: identifier alias "external_id" (Sql.Types.nullable Sql.Types.str),
         localId: identifier alias "local_id" (Sql.Types.nullable Sql.Types.i32),
         localLsn: identifier alias "local_lsn" (Sql.Types.nullable (Sql.Types.unsupported "pg_lsn")),
@@ -503,7 +503,7 @@ pgSubscription = {
     schema: "pg_catalog",
     name: "pg_subscription",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         subdisableonerr: identifier alias "subdisableonerr" Sql.Types.bool,
         substream: identifier alias "substream" Sql.Types.bool,
         subbinary: identifier alias "subbinary" Sql.Types.bool,
@@ -531,7 +531,7 @@ pgAttribute = {
     schema: "pg_catalog",
     name: "pg_attribute",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         attislocal: identifier alias "attislocal" Sql.Types.bool,
         attisdropped: identifier alias "attisdropped" Sql.Types.bool,
         atthasmissing: identifier alias "atthasmissing" Sql.Types.bool,
@@ -568,7 +568,7 @@ pgProc = {
     schema: "pg_catalog",
     name: "pg_proc",
     alias: "pp",
-    columns: \alias -> {
+    columns: |alias| {
         proretset: identifier alias "proretset" Sql.Types.bool,
         proisstrict: identifier alias "proisstrict" Sql.Types.bool,
         proleakproof: identifier alias "proleakproof" Sql.Types.bool,
@@ -609,7 +609,7 @@ pgClass = {
     schema: "pg_catalog",
     name: "pg_class",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         relispartition: identifier alias "relispartition" Sql.Types.bool,
         relispopulated: identifier alias "relispopulated" Sql.Types.bool,
         relforcerowsecurity: identifier alias "relforcerowsecurity" Sql.Types.bool,
@@ -653,7 +653,7 @@ pgAttrdef = {
     schema: "pg_catalog",
     name: "pg_attrdef",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         adnum: identifier alias "adnum" Sql.Types.i16,
         adrelid: identifier alias "adrelid" Sql.Types.i32,
         oid: identifier alias "oid" pgAttrdefOid,
@@ -668,7 +668,7 @@ pgConstraint = {
     schema: "pg_catalog",
     name: "pg_constraint",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         connoinherit: identifier alias "connoinherit" Sql.Types.bool,
         conislocal: identifier alias "conislocal" Sql.Types.bool,
         convalidated: identifier alias "convalidated" Sql.Types.bool,
@@ -708,7 +708,7 @@ pgInherits = {
     schema: "pg_catalog",
     name: "pg_inherits",
     alias: "pi",
-    columns: \alias -> {
+    columns: |alias| {
         inhdetachpending: identifier alias "inhdetachpending" Sql.Types.bool,
         inhseqno: identifier alias "inhseqno" pgInheritsInhseqno,
         inhparent: identifier alias "inhparent" Sql.Types.i32,
@@ -723,7 +723,7 @@ pgIndex = {
     schema: "pg_catalog",
     name: "pg_index",
     alias: "pi",
-    columns: \alias -> {
+    columns: |alias| {
         indisreplident: identifier alias "indisreplident" Sql.Types.bool,
         indislive: identifier alias "indislive" Sql.Types.bool,
         indisready: identifier alias "indisready" Sql.Types.bool,
@@ -752,7 +752,7 @@ pgStatReplication = {
     schema: "pg_catalog",
     name: "pg_stat_replication",
     alias: "psr",
-    columns: \alias -> {
+    columns: |alias| {
         usename: identifier alias "usename" (Sql.Types.nullable Sql.Types.str),
         syncPriority: identifier alias "sync_priority" (Sql.Types.nullable Sql.Types.i32),
         clientPort: identifier alias "client_port" (Sql.Types.nullable Sql.Types.i32),
@@ -780,7 +780,7 @@ pgStatSlru = {
     schema: "pg_catalog",
     name: "pg_stat_slru",
     alias: "pss",
-    columns: \alias -> {
+    columns: |alias| {
         truncates: identifier alias "truncates" (Sql.Types.nullable Sql.Types.i64),
         flushes: identifier alias "flushes" (Sql.Types.nullable Sql.Types.i64),
         blksExists: identifier alias "blks_exists" (Sql.Types.nullable Sql.Types.i64),
@@ -797,7 +797,7 @@ pgStatWalReceiver = {
     schema: "pg_catalog",
     name: "pg_stat_wal_receiver",
     alias: "pswr",
-    columns: \alias -> {
+    columns: |alias| {
         senderPort: identifier alias "sender_port" (Sql.Types.nullable Sql.Types.i32),
         receivedTli: identifier alias "received_tli" (Sql.Types.nullable Sql.Types.i32),
         receiveStartTli: identifier alias "receive_start_tli" (Sql.Types.nullable Sql.Types.i32),
@@ -820,7 +820,7 @@ pgStatRecoveryPrefetch = {
     schema: "pg_catalog",
     name: "pg_stat_recovery_prefetch",
     alias: "psrp",
-    columns: \alias -> {
+    columns: |alias| {
         skipRep: identifier alias "skip_rep" (Sql.Types.nullable Sql.Types.i64),
         skipFpw: identifier alias "skip_fpw" (Sql.Types.nullable Sql.Types.i64),
         skipNew: identifier alias "skip_new" (Sql.Types.nullable Sql.Types.i64),
@@ -841,7 +841,7 @@ pgOperator = {
     schema: "pg_catalog",
     name: "pg_operator",
     alias: "po",
-    columns: \alias -> {
+    columns: |alias| {
         oprcanhash: identifier alias "oprcanhash" Sql.Types.bool,
         oprcanmerge: identifier alias "oprcanmerge" Sql.Types.bool,
         oprkind: identifier alias "oprkind" Sql.Types.str,
@@ -867,7 +867,7 @@ pgOpfamily = {
     schema: "pg_catalog",
     name: "pg_opfamily",
     alias: "po",
-    columns: \alias -> {
+    columns: |alias| {
         opfname: identifier alias "opfname" Sql.Types.str,
         opfowner: identifier alias "opfowner" Sql.Types.i32,
         opfnamespace: identifier alias "opfnamespace" Sql.Types.i32,
@@ -883,7 +883,7 @@ pgOpclass = {
     schema: "pg_catalog",
     name: "pg_opclass",
     alias: "po",
-    columns: \alias -> {
+    columns: |alias| {
         opcdefault: identifier alias "opcdefault" Sql.Types.bool,
         opcname: identifier alias "opcname" Sql.Types.str,
         opckeytype: identifier alias "opckeytype" Sql.Types.i32,
@@ -903,7 +903,7 @@ pgAm = {
     schema: "pg_catalog",
     name: "pg_am",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         amtype: identifier alias "amtype" Sql.Types.str,
         amname: identifier alias "amname" Sql.Types.str,
         amhandler: identifier alias "amhandler" (Sql.Types.unsupported "regproc"),
@@ -918,7 +918,7 @@ pgAmop = {
     schema: "pg_catalog",
     name: "pg_amop",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         amoppurpose: identifier alias "amoppurpose" Sql.Types.str,
         amopstrategy: identifier alias "amopstrategy" Sql.Types.i16,
         amopsortfamily: identifier alias "amopsortfamily" Sql.Types.i32,
@@ -938,7 +938,7 @@ pgAmproc = {
     schema: "pg_catalog",
     name: "pg_amproc",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         amprocnum: identifier alias "amprocnum" Sql.Types.i16,
         amproc: identifier alias "amproc" (Sql.Types.unsupported "regproc"),
         amprocrighttype: identifier alias "amprocrighttype" Sql.Types.i32,
@@ -955,7 +955,7 @@ pgLanguage = {
     schema: "pg_catalog",
     name: "pg_language",
     alias: "pl",
-    columns: \alias -> {
+    columns: |alias| {
         lanpltrusted: identifier alias "lanpltrusted" Sql.Types.bool,
         lanispl: identifier alias "lanispl" Sql.Types.bool,
         lanname: identifier alias "lanname" Sql.Types.str,
@@ -975,7 +975,7 @@ pgLargeobjectMetadata = {
     schema: "pg_catalog",
     name: "pg_largeobject_metadata",
     alias: "plm",
-    columns: \alias -> {
+    columns: |alias| {
         lomowner: identifier alias "lomowner" Sql.Types.i32,
         oid: identifier alias "oid" pgLargeobjectMetadataOid,
         lomacl: identifier alias "lomacl" (Sql.Types.nullable (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem")))),
@@ -989,7 +989,7 @@ pgAggregate = {
     schema: "pg_catalog",
     name: "pg_aggregate",
     alias: "pa",
-    columns: \alias -> {
+    columns: |alias| {
         aggmfinalextra: identifier alias "aggmfinalextra" Sql.Types.bool,
         aggfinalextra: identifier alias "aggfinalextra" Sql.Types.bool,
         aggmfinalmodify: identifier alias "aggmfinalmodify" Sql.Types.str,
@@ -1022,7 +1022,7 @@ pgStatisticExt = {
     schema: "pg_catalog",
     name: "pg_statistic_ext",
     alias: "pse",
-    columns: \alias -> {
+    columns: |alias| {
         stxname: identifier alias "stxname" Sql.Types.str,
         stxkeys: identifier alias "stxkeys" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
         stxstattarget: identifier alias "stxstattarget" Sql.Types.i32,
@@ -1042,7 +1042,7 @@ pgRewrite = {
     schema: "pg_catalog",
     name: "pg_rewrite",
     alias: "pr",
-    columns: \alias -> {
+    columns: |alias| {
         isInstead: identifier alias "is_instead" Sql.Types.bool,
         evEnabled: identifier alias "ev_enabled" Sql.Types.str,
         evType: identifier alias "ev_type" Sql.Types.str,
@@ -1061,7 +1061,7 @@ pgTrigger = {
     schema: "pg_catalog",
     name: "pg_trigger",
     alias: "pt",
-    columns: \alias -> {
+    columns: |alias| {
         tginitdeferred: identifier alias "tginitdeferred" Sql.Types.bool,
         tgdeferrable: identifier alias "tgdeferrable" Sql.Types.bool,
         tgisinternal: identifier alias "tgisinternal" Sql.Types.bool,
@@ -1091,7 +1091,7 @@ pgEventTrigger = {
     schema: "pg_catalog",
     name: "pg_event_trigger",
     alias: "pet",
-    columns: \alias -> {
+    columns: |alias| {
         evtenabled: identifier alias "evtenabled" Sql.Types.str,
         evtevent: identifier alias "evtevent" Sql.Types.str,
         evtname: identifier alias "evtname" Sql.Types.str,
@@ -1115,7 +1115,7 @@ pgDescription = {
     schema: "pg_catalog",
     name: "pg_description",
     alias: "pd",
-    columns: \alias -> {
+    columns: |alias| {
         objsubid: identifier alias "objsubid" pgDescriptionObjsubid,
         description: identifier alias "description" Sql.Types.str,
         classoid: identifier alias "classoid" pgDescriptionClassoid,
@@ -1130,7 +1130,7 @@ pgCast = {
     schema: "pg_catalog",
     name: "pg_cast",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         castmethod: identifier alias "castmethod" Sql.Types.str,
         castcontext: identifier alias "castcontext" Sql.Types.str,
         castfunc: identifier alias "castfunc" Sql.Types.i32,
@@ -1147,7 +1147,7 @@ pgEnum = {
     schema: "pg_catalog",
     name: "pg_enum",
     alias: "pe",
-    columns: \alias -> {
+    columns: |alias| {
         enumlabel: identifier alias "enumlabel" Sql.Types.str,
         enumtypid: identifier alias "enumtypid" Sql.Types.i32,
         oid: identifier alias "oid" pgEnumOid,
@@ -1162,7 +1162,7 @@ pgNamespace = {
     schema: "pg_catalog",
     name: "pg_namespace",
     alias: "pn",
-    columns: \alias -> {
+    columns: |alias| {
         nspname: identifier alias "nspname" Sql.Types.str,
         nspowner: identifier alias "nspowner" Sql.Types.i32,
         oid: identifier alias "oid" pgNamespaceOid,
@@ -1177,7 +1177,7 @@ pgConversion = {
     schema: "pg_catalog",
     name: "pg_conversion",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         condefault: identifier alias "condefault" Sql.Types.bool,
         conname: identifier alias "conname" Sql.Types.str,
         contoencoding: identifier alias "contoencoding" Sql.Types.i32,
@@ -1193,7 +1193,7 @@ pgDepend = {
     schema: "pg_catalog",
     name: "pg_depend",
     alias: "pd",
-    columns: \alias -> {
+    columns: |alias| {
         deptype: identifier alias "deptype" Sql.Types.str,
         refobjsubid: identifier alias "refobjsubid" Sql.Types.i32,
         objsubid: identifier alias "objsubid" Sql.Types.i32,
@@ -1211,7 +1211,7 @@ pgDatabase = {
     schema: "pg_catalog",
     name: "pg_database",
     alias: "pd",
-    columns: \alias -> {
+    columns: |alias| {
         datallowconn: identifier alias "datallowconn" Sql.Types.bool,
         datistemplate: identifier alias "datistemplate" Sql.Types.bool,
         datlocprovider: identifier alias "datlocprovider" Sql.Types.str,
@@ -1241,7 +1241,7 @@ pgDbRoleSetting = {
     schema: "pg_catalog",
     name: "pg_db_role_setting",
     alias: "pdrs",
-    columns: \alias -> {
+    columns: |alias| {
         setrole: identifier alias "setrole" pgDbRoleSettingSetrole,
         setdatabase: identifier alias "setdatabase" pgDbRoleSettingSetdatabase,
         setconfig: identifier alias "setconfig" (Sql.Types.nullable (Sql.Types.array (Sql.Types.nullable Sql.Types.str))),
@@ -1255,7 +1255,7 @@ pgTablespace = {
     schema: "pg_catalog",
     name: "pg_tablespace",
     alias: "pt",
-    columns: \alias -> {
+    columns: |alias| {
         spcname: identifier alias "spcname" Sql.Types.str,
         spcowner: identifier alias "spcowner" Sql.Types.i32,
         oid: identifier alias "oid" pgTablespaceOid,
@@ -1274,7 +1274,7 @@ pgAuthMembers = {
     schema: "pg_catalog",
     name: "pg_auth_members",
     alias: "pam",
-    columns: \alias -> {
+    columns: |alias| {
         adminOption: identifier alias "admin_option" Sql.Types.bool,
         grantor: identifier alias "grantor" Sql.Types.i32,
         member: identifier alias "member" pgAuthMembersMember,
@@ -1286,7 +1286,7 @@ pgShdepend = {
     schema: "pg_catalog",
     name: "pg_shdepend",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         deptype: identifier alias "deptype" Sql.Types.str,
         objsubid: identifier alias "objsubid" Sql.Types.i32,
         refobjid: identifier alias "refobjid" Sql.Types.i32,
@@ -1307,7 +1307,7 @@ pgShdescription = {
     schema: "pg_catalog",
     name: "pg_shdescription",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         description: identifier alias "description" Sql.Types.str,
         classoid: identifier alias "classoid" pgShdescriptionClassoid,
         objoid: identifier alias "objoid" pgShdescriptionObjoid,
@@ -1321,7 +1321,7 @@ pgTsConfig = {
     schema: "pg_catalog",
     name: "pg_ts_config",
     alias: "ptc",
-    columns: \alias -> {
+    columns: |alias| {
         cfgname: identifier alias "cfgname" Sql.Types.str,
         cfgparser: identifier alias "cfgparser" Sql.Types.i32,
         cfgowner: identifier alias "cfgowner" Sql.Types.i32,
@@ -1343,7 +1343,7 @@ pgTsConfigMap = {
     schema: "pg_catalog",
     name: "pg_ts_config_map",
     alias: "ptcm",
-    columns: \alias -> {
+    columns: |alias| {
         mapseqno: identifier alias "mapseqno" pgTsConfigMapMapseqno,
         maptokentype: identifier alias "maptokentype" pgTsConfigMapMaptokentype,
         mapdict: identifier alias "mapdict" Sql.Types.i32,
@@ -1358,7 +1358,7 @@ pgTsDict = {
     schema: "pg_catalog",
     name: "pg_ts_dict",
     alias: "ptd",
-    columns: \alias -> {
+    columns: |alias| {
         dictname: identifier alias "dictname" Sql.Types.str,
         dictinitoption: identifier alias "dictinitoption" (Sql.Types.nullable Sql.Types.str),
         dicttemplate: identifier alias "dicttemplate" Sql.Types.i32,
@@ -1375,7 +1375,7 @@ pgTsParser = {
     schema: "pg_catalog",
     name: "pg_ts_parser",
     alias: "ptp",
-    columns: \alias -> {
+    columns: |alias| {
         prsname: identifier alias "prsname" Sql.Types.str,
         prslextype: identifier alias "prslextype" (Sql.Types.unsupported "regproc"),
         prsheadline: identifier alias "prsheadline" (Sql.Types.unsupported "regproc"),
@@ -1394,7 +1394,7 @@ pgTsTemplate = {
     schema: "pg_catalog",
     name: "pg_ts_template",
     alias: "ptt",
-    columns: \alias -> {
+    columns: |alias| {
         tmplname: identifier alias "tmplname" Sql.Types.str,
         tmpllexize: identifier alias "tmpllexize" (Sql.Types.unsupported "regproc"),
         tmplinit: identifier alias "tmplinit" (Sql.Types.unsupported "regproc"),
@@ -1410,7 +1410,7 @@ pgExtension = {
     schema: "pg_catalog",
     name: "pg_extension",
     alias: "pe",
-    columns: \alias -> {
+    columns: |alias| {
         extrelocatable: identifier alias "extrelocatable" Sql.Types.bool,
         extname: identifier alias "extname" Sql.Types.str,
         extversion: identifier alias "extversion" Sql.Types.str,
@@ -1429,7 +1429,7 @@ pgForeignDataWrapper = {
     schema: "pg_catalog",
     name: "pg_foreign_data_wrapper",
     alias: "pfdw",
-    columns: \alias -> {
+    columns: |alias| {
         fdwname: identifier alias "fdwname" Sql.Types.str,
         fdwvalidator: identifier alias "fdwvalidator" Sql.Types.i32,
         fdwhandler: identifier alias "fdwhandler" Sql.Types.i32,
@@ -1447,7 +1447,7 @@ pgForeignServer = {
     schema: "pg_catalog",
     name: "pg_foreign_server",
     alias: "pfs",
-    columns: \alias -> {
+    columns: |alias| {
         srvname: identifier alias "srvname" Sql.Types.str,
         srvversion: identifier alias "srvversion" (Sql.Types.nullable Sql.Types.str),
         srvtype: identifier alias "srvtype" (Sql.Types.nullable Sql.Types.str),
@@ -1466,7 +1466,7 @@ pgPolicy = {
     schema: "pg_catalog",
     name: "pg_policy",
     alias: "pp",
-    columns: \alias -> {
+    columns: |alias| {
         polpermissive: identifier alias "polpermissive" Sql.Types.bool,
         polcmd: identifier alias "polcmd" Sql.Types.str,
         polname: identifier alias "polname" Sql.Types.str,
@@ -1485,7 +1485,7 @@ pgReplicationOrigin = {
     schema: "pg_catalog",
     name: "pg_replication_origin",
     alias: "pro",
-    columns: \alias -> {
+    columns: |alias| {
         roname: identifier alias "roname" Sql.Types.str,
         roident: identifier alias "roident" pgReplicationOriginRoident,
     },
@@ -1498,7 +1498,7 @@ pgDefaultAcl = {
     schema: "pg_catalog",
     name: "pg_default_acl",
     alias: "pda",
-    columns: \alias -> {
+    columns: |alias| {
         defaclobjtype: identifier alias "defaclobjtype" Sql.Types.str,
         defaclnamespace: identifier alias "defaclnamespace" Sql.Types.i32,
         defaclrole: identifier alias "defaclrole" Sql.Types.i32,
@@ -1520,7 +1520,7 @@ pgInitPrivs = {
     schema: "pg_catalog",
     name: "pg_init_privs",
     alias: "pip",
-    columns: \alias -> {
+    columns: |alias| {
         privtype: identifier alias "privtype" Sql.Types.str,
         objsubid: identifier alias "objsubid" pgInitPrivsObjsubid,
         classoid: identifier alias "classoid" pgInitPrivsClassoid,
@@ -1545,7 +1545,7 @@ pgSeclabel = {
     schema: "pg_catalog",
     name: "pg_seclabel",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         objsubid: identifier alias "objsubid" pgSeclabelObjsubid,
         label: identifier alias "label" Sql.Types.str,
         provider: identifier alias "provider" pgSeclabelProvider,
@@ -1567,7 +1567,7 @@ pgShseclabel = {
     schema: "pg_catalog",
     name: "pg_shseclabel",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         label: identifier alias "label" Sql.Types.str,
         provider: identifier alias "provider" pgShseclabelProvider,
         classoid: identifier alias "classoid" pgShseclabelClassoid,
@@ -1582,7 +1582,7 @@ pgCollation = {
     schema: "pg_catalog",
     name: "pg_collation",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         collisdeterministic: identifier alias "collisdeterministic" Sql.Types.bool,
         collprovider: identifier alias "collprovider" Sql.Types.str,
         collname: identifier alias "collname" Sql.Types.str,
@@ -1604,7 +1604,7 @@ pgParameterAcl = {
     schema: "pg_catalog",
     name: "pg_parameter_acl",
     alias: "ppa",
-    columns: \alias -> {
+    columns: |alias| {
         parname: identifier alias "parname" Sql.Types.str,
         oid: identifier alias "oid" pgParameterAclOid,
         paracl: identifier alias "paracl" (Sql.Types.nullable (Sql.Types.array (Sql.Types.nullable (Sql.Types.unsupported "aclitem")))),
@@ -1618,7 +1618,7 @@ pgPartitionedTable = {
     schema: "pg_catalog",
     name: "pg_partitioned_table",
     alias: "ppt",
-    columns: \alias -> {
+    columns: |alias| {
         partstrat: identifier alias "partstrat" Sql.Types.str,
         partnatts: identifier alias "partnatts" Sql.Types.i16,
         partattrs: identifier alias "partattrs" (Sql.Types.array (Sql.Types.nullable Sql.Types.i16)),
@@ -1637,7 +1637,7 @@ pgRange = {
     schema: "pg_catalog",
     name: "pg_range",
     alias: "pr",
-    columns: \alias -> {
+    columns: |alias| {
         rngsubdiff: identifier alias "rngsubdiff" (Sql.Types.unsupported "regproc"),
         rngcanonical: identifier alias "rngcanonical" (Sql.Types.unsupported "regproc"),
         rngsubopc: identifier alias "rngsubopc" Sql.Types.i32,
@@ -1655,7 +1655,7 @@ pgTransform = {
     schema: "pg_catalog",
     name: "pg_transform",
     alias: "pt",
-    columns: \alias -> {
+    columns: |alias| {
         trftosql: identifier alias "trftosql" (Sql.Types.unsupported "regproc"),
         trffromsql: identifier alias "trffromsql" (Sql.Types.unsupported "regproc"),
         trflang: identifier alias "trflang" Sql.Types.i32,
@@ -1671,7 +1671,7 @@ pgSequence = {
     schema: "pg_catalog",
     name: "pg_sequence",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         seqcycle: identifier alias "seqcycle" Sql.Types.bool,
         seqcache: identifier alias "seqcache" Sql.Types.i64,
         seqmin: identifier alias "seqmin" Sql.Types.i64,
@@ -1690,7 +1690,7 @@ pgPublication = {
     schema: "pg_catalog",
     name: "pg_publication",
     alias: "pp",
-    columns: \alias -> {
+    columns: |alias| {
         pubviaroot: identifier alias "pubviaroot" Sql.Types.bool,
         pubtruncate: identifier alias "pubtruncate" Sql.Types.bool,
         pubdelete: identifier alias "pubdelete" Sql.Types.bool,
@@ -1710,7 +1710,7 @@ pgPublicationNamespace = {
     schema: "pg_catalog",
     name: "pg_publication_namespace",
     alias: "ppn",
-    columns: \alias -> {
+    columns: |alias| {
         pnnspid: identifier alias "pnnspid" Sql.Types.i32,
         pnpubid: identifier alias "pnpubid" Sql.Types.i32,
         oid: identifier alias "oid" pgPublicationNamespaceOid,
@@ -1724,7 +1724,7 @@ pgPublicationRel = {
     schema: "pg_catalog",
     name: "pg_publication_rel",
     alias: "ppr",
-    columns: \alias -> {
+    columns: |alias| {
         prattrs: identifier alias "prattrs" (Sql.Types.nullable (Sql.Types.array (Sql.Types.nullable Sql.Types.i16))),
         prrelid: identifier alias "prrelid" Sql.Types.i32,
         prpubid: identifier alias "prpubid" Sql.Types.i32,
@@ -1743,7 +1743,7 @@ pgSubscriptionRel = {
     schema: "pg_catalog",
     name: "pg_subscription_rel",
     alias: "psr",
-    columns: \alias -> {
+    columns: |alias| {
         srsubstate: identifier alias "srsubstate" Sql.Types.str,
         srrelid: identifier alias "srrelid" pgSubscriptionRelSrrelid,
         srsubid: identifier alias "srsubid" pgSubscriptionRelSrsubid,
@@ -1755,7 +1755,7 @@ pgGroup = {
     schema: "pg_catalog",
     name: "pg_group",
     alias: "pg",
-    columns: \alias -> {
+    columns: |alias| {
         groname: identifier alias "groname" (Sql.Types.nullable Sql.Types.str),
         grosysid: identifier alias "grosysid" (Sql.Types.nullable Sql.Types.i32),
         grolist: identifier alias "grolist" (Sql.Types.nullable (Sql.Types.array (Sql.Types.nullable Sql.Types.i32))),
@@ -1766,7 +1766,7 @@ pgUser = {
     schema: "pg_catalog",
     name: "pg_user",
     alias: "pu",
-    columns: \alias -> {
+    columns: |alias| {
         usebypassrls: identifier alias "usebypassrls" (Sql.Types.nullable Sql.Types.bool),
         userepl: identifier alias "userepl" (Sql.Types.nullable Sql.Types.bool),
         usesuper: identifier alias "usesuper" (Sql.Types.nullable Sql.Types.bool),
@@ -1783,7 +1783,7 @@ pgPolicies = {
     schema: "pg_catalog",
     name: "pg_policies",
     alias: "pp",
-    columns: \alias -> {
+    columns: |alias| {
         policyname: identifier alias "policyname" (Sql.Types.nullable Sql.Types.str),
         tablename: identifier alias "tablename" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -1799,7 +1799,7 @@ pgRules = {
     schema: "pg_catalog",
     name: "pg_rules",
     alias: "pr",
-    columns: \alias -> {
+    columns: |alias| {
         rulename: identifier alias "rulename" (Sql.Types.nullable Sql.Types.str),
         tablename: identifier alias "tablename" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -1811,7 +1811,7 @@ pgViews = {
     schema: "pg_catalog",
     name: "pg_views",
     alias: "pv",
-    columns: \alias -> {
+    columns: |alias| {
         viewowner: identifier alias "viewowner" (Sql.Types.nullable Sql.Types.str),
         viewname: identifier alias "viewname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -1823,7 +1823,7 @@ pgTables = {
     schema: "pg_catalog",
     name: "pg_tables",
     alias: "pt",
-    columns: \alias -> {
+    columns: |alias| {
         rowsecurity: identifier alias "rowsecurity" (Sql.Types.nullable Sql.Types.bool),
         hastriggers: identifier alias "hastriggers" (Sql.Types.nullable Sql.Types.bool),
         hasrules: identifier alias "hasrules" (Sql.Types.nullable Sql.Types.bool),
@@ -1839,7 +1839,7 @@ pgMatviews = {
     schema: "pg_catalog",
     name: "pg_matviews",
     alias: "pm",
-    columns: \alias -> {
+    columns: |alias| {
         ispopulated: identifier alias "ispopulated" (Sql.Types.nullable Sql.Types.bool),
         hasindexes: identifier alias "hasindexes" (Sql.Types.nullable Sql.Types.bool),
         tablespace: identifier alias "tablespace" (Sql.Types.nullable Sql.Types.str),
@@ -1854,7 +1854,7 @@ pgIndexes = {
     schema: "pg_catalog",
     name: "pg_indexes",
     alias: "pi",
-    columns: \alias -> {
+    columns: |alias| {
         tablespace: identifier alias "tablespace" (Sql.Types.nullable Sql.Types.str),
         indexname: identifier alias "indexname" (Sql.Types.nullable Sql.Types.str),
         tablename: identifier alias "tablename" (Sql.Types.nullable Sql.Types.str),
@@ -1867,7 +1867,7 @@ pgSequences = {
     schema: "pg_catalog",
     name: "pg_sequences",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         cycle: identifier alias "cycle" (Sql.Types.nullable Sql.Types.bool),
         sequenceowner: identifier alias "sequenceowner" (Sql.Types.nullable Sql.Types.str),
         sequencename: identifier alias "sequencename" (Sql.Types.nullable Sql.Types.str),
@@ -1886,7 +1886,7 @@ pgStats = {
     schema: "pg_catalog",
     name: "pg_stats",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         inherited: identifier alias "inherited" (Sql.Types.nullable Sql.Types.bool),
         attname: identifier alias "attname" (Sql.Types.nullable Sql.Types.str),
         tablename: identifier alias "tablename" (Sql.Types.nullable Sql.Types.str),
@@ -1908,7 +1908,7 @@ pgStatsExt = {
     schema: "pg_catalog",
     name: "pg_stats_ext",
     alias: "pse",
-    columns: \alias -> {
+    columns: |alias| {
         inherited: identifier alias "inherited" (Sql.Types.nullable Sql.Types.bool),
         statisticsOwner: identifier alias "statistics_owner" (Sql.Types.nullable Sql.Types.str),
         statisticsName: identifier alias "statistics_name" (Sql.Types.nullable Sql.Types.str),
@@ -1931,7 +1931,7 @@ pgStatsExtExprs = {
     schema: "pg_catalog",
     name: "pg_stats_ext_exprs",
     alias: "psee",
-    columns: \alias -> {
+    columns: |alias| {
         inherited: identifier alias "inherited" (Sql.Types.nullable Sql.Types.bool),
         statisticsOwner: identifier alias "statistics_owner" (Sql.Types.nullable Sql.Types.str),
         statisticsName: identifier alias "statistics_name" (Sql.Types.nullable Sql.Types.str),
@@ -1956,7 +1956,7 @@ pgPublicationTables = {
     schema: "pg_catalog",
     name: "pg_publication_tables",
     alias: "ppt",
-    columns: \alias -> {
+    columns: |alias| {
         tablename: identifier alias "tablename" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         pubname: identifier alias "pubname" (Sql.Types.nullable Sql.Types.str),
@@ -1969,7 +1969,7 @@ pgLocks = {
     schema: "pg_catalog",
     name: "pg_locks",
     alias: "pl",
-    columns: \alias -> {
+    columns: |alias| {
         fastpath: identifier alias "fastpath" (Sql.Types.nullable Sql.Types.bool),
         granted: identifier alias "granted" (Sql.Types.nullable Sql.Types.bool),
         objsubid: identifier alias "objsubid" (Sql.Types.nullable Sql.Types.i16),
@@ -1993,7 +1993,7 @@ pgCursors = {
     schema: "pg_catalog",
     name: "pg_cursors",
     alias: "pc",
-    columns: \alias -> {
+    columns: |alias| {
         isScrollable: identifier alias "is_scrollable" (Sql.Types.nullable Sql.Types.bool),
         isBinary: identifier alias "is_binary" (Sql.Types.nullable Sql.Types.bool),
         isHoldable: identifier alias "is_holdable" (Sql.Types.nullable Sql.Types.bool),
@@ -2007,7 +2007,7 @@ pgAvailableExtensions = {
     schema: "pg_catalog",
     name: "pg_available_extensions",
     alias: "pae",
-    columns: \alias -> {
+    columns: |alias| {
         name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
         comment: identifier alias "comment" (Sql.Types.nullable Sql.Types.str),
         installedVersion: identifier alias "installed_version" (Sql.Types.nullable Sql.Types.str),
@@ -2019,7 +2019,7 @@ pgAvailableExtensionVersions = {
     schema: "pg_catalog",
     name: "pg_available_extension_versions",
     alias: "paev",
-    columns: \alias -> {
+    columns: |alias| {
         relocatable: identifier alias "relocatable" (Sql.Types.nullable Sql.Types.bool),
         trusted: identifier alias "trusted" (Sql.Types.nullable Sql.Types.bool),
         superuser: identifier alias "superuser" (Sql.Types.nullable Sql.Types.bool),
@@ -2036,7 +2036,7 @@ pgPreparedXacts = {
     schema: "pg_catalog",
     name: "pg_prepared_xacts",
     alias: "ppx",
-    columns: \alias -> {
+    columns: |alias| {
         database: identifier alias "database" (Sql.Types.nullable Sql.Types.str),
         owner: identifier alias "owner" (Sql.Types.nullable Sql.Types.str),
         gid: identifier alias "gid" (Sql.Types.nullable Sql.Types.str),
@@ -2049,7 +2049,7 @@ pgPreparedStatements = {
     schema: "pg_catalog",
     name: "pg_prepared_statements",
     alias: "pps",
-    columns: \alias -> {
+    columns: |alias| {
         fromSql: identifier alias "from_sql" (Sql.Types.nullable Sql.Types.bool),
         customPlans: identifier alias "custom_plans" (Sql.Types.nullable Sql.Types.i64),
         genericPlans: identifier alias "generic_plans" (Sql.Types.nullable Sql.Types.i64),
@@ -2064,7 +2064,7 @@ pgSeclabels = {
     schema: "pg_catalog",
     name: "pg_seclabels",
     alias: "ps",
-    columns: \alias -> {
+    columns: |alias| {
         objsubid: identifier alias "objsubid" (Sql.Types.nullable Sql.Types.i32),
         label: identifier alias "label" (Sql.Types.nullable Sql.Types.str),
         provider: identifier alias "provider" (Sql.Types.nullable Sql.Types.str),
@@ -2080,7 +2080,7 @@ pgTimezoneAbbrevs = {
     schema: "pg_catalog",
     name: "pg_timezone_abbrevs",
     alias: "pta",
-    columns: \alias -> {
+    columns: |alias| {
         isDst: identifier alias "is_dst" (Sql.Types.nullable Sql.Types.bool),
         abbrev: identifier alias "abbrev" (Sql.Types.nullable Sql.Types.str),
         utcOffset: identifier alias "utc_offset" (Sql.Types.nullable (Sql.Types.unsupported "interval")),
@@ -2091,7 +2091,7 @@ pgTimezoneNames = {
     schema: "pg_catalog",
     name: "pg_timezone_names",
     alias: "ptn",
-    columns: \alias -> {
+    columns: |alias| {
         isDst: identifier alias "is_dst" (Sql.Types.nullable Sql.Types.bool),
         abbrev: identifier alias "abbrev" (Sql.Types.nullable Sql.Types.str),
         name: identifier alias "name" (Sql.Types.nullable Sql.Types.str),
@@ -2103,7 +2103,7 @@ pgStatSysTables = {
     schema: "pg_catalog",
     name: "pg_stat_sys_tables",
     alias: "psst",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         autoanalyzeCount: identifier alias "autoanalyze_count" (Sql.Types.nullable Sql.Types.i64),
@@ -2134,7 +2134,7 @@ pgStatXactSysTables = {
     schema: "pg_catalog",
     name: "pg_stat_xact_sys_tables",
     alias: "psxst",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         nTupHotUpd: identifier alias "n_tup_hot_upd" (Sql.Types.nullable Sql.Types.i64),
@@ -2153,7 +2153,7 @@ pgStatUserTables = {
     schema: "pg_catalog",
     name: "pg_stat_user_tables",
     alias: "psut",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         autoanalyzeCount: identifier alias "autoanalyze_count" (Sql.Types.nullable Sql.Types.i64),
@@ -2184,7 +2184,7 @@ pgStatAllTables = {
     schema: "pg_catalog",
     name: "pg_stat_all_tables",
     alias: "psat",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         autoanalyzeCount: identifier alias "autoanalyze_count" (Sql.Types.nullable Sql.Types.i64),
@@ -2215,7 +2215,7 @@ pgStatXactAllTables = {
     schema: "pg_catalog",
     name: "pg_stat_xact_all_tables",
     alias: "psxat",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         nTupHotUpd: identifier alias "n_tup_hot_upd" (Sql.Types.nullable Sql.Types.i64),
@@ -2234,7 +2234,7 @@ pgStatXactUserTables = {
     schema: "pg_catalog",
     name: "pg_stat_xact_user_tables",
     alias: "psxut",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         nTupHotUpd: identifier alias "n_tup_hot_upd" (Sql.Types.nullable Sql.Types.i64),
@@ -2253,7 +2253,7 @@ pgStatioAllTables = {
     schema: "pg_catalog",
     name: "pg_statio_all_tables",
     alias: "psat",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         tidxBlksHit: identifier alias "tidx_blks_hit" (Sql.Types.nullable Sql.Types.i64),
@@ -2272,7 +2272,7 @@ pgStatioSysTables = {
     schema: "pg_catalog",
     name: "pg_statio_sys_tables",
     alias: "psst",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         tidxBlksHit: identifier alias "tidx_blks_hit" (Sql.Types.nullable Sql.Types.i64),
@@ -2291,7 +2291,7 @@ pgStatioUserTables = {
     schema: "pg_catalog",
     name: "pg_statio_user_tables",
     alias: "psut",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         tidxBlksHit: identifier alias "tidx_blks_hit" (Sql.Types.nullable Sql.Types.i64),
@@ -2310,7 +2310,7 @@ pgStatAllIndexes = {
     schema: "pg_catalog",
     name: "pg_stat_all_indexes",
     alias: "psai",
-    columns: \alias -> {
+    columns: |alias| {
         indexrelname: identifier alias "indexrelname" (Sql.Types.nullable Sql.Types.str),
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -2326,7 +2326,7 @@ pgStatSysIndexes = {
     schema: "pg_catalog",
     name: "pg_stat_sys_indexes",
     alias: "pssi",
-    columns: \alias -> {
+    columns: |alias| {
         indexrelname: identifier alias "indexrelname" (Sql.Types.nullable Sql.Types.str),
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -2342,7 +2342,7 @@ pgStatUserIndexes = {
     schema: "pg_catalog",
     name: "pg_stat_user_indexes",
     alias: "psui",
-    columns: \alias -> {
+    columns: |alias| {
         indexrelname: identifier alias "indexrelname" (Sql.Types.nullable Sql.Types.str),
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -2358,7 +2358,7 @@ pgStatioAllIndexes = {
     schema: "pg_catalog",
     name: "pg_statio_all_indexes",
     alias: "psai",
-    columns: \alias -> {
+    columns: |alias| {
         indexrelname: identifier alias "indexrelname" (Sql.Types.nullable Sql.Types.str),
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -2373,7 +2373,7 @@ pgStatioSysIndexes = {
     schema: "pg_catalog",
     name: "pg_statio_sys_indexes",
     alias: "pssi",
-    columns: \alias -> {
+    columns: |alias| {
         indexrelname: identifier alias "indexrelname" (Sql.Types.nullable Sql.Types.str),
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -2388,7 +2388,7 @@ pgStatioUserIndexes = {
     schema: "pg_catalog",
     name: "pg_statio_user_indexes",
     alias: "psui",
-    columns: \alias -> {
+    columns: |alias| {
         indexrelname: identifier alias "indexrelname" (Sql.Types.nullable Sql.Types.str),
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
@@ -2403,7 +2403,7 @@ pgStatioAllSequences = {
     schema: "pg_catalog",
     name: "pg_statio_all_sequences",
     alias: "psas",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         blksHit: identifier alias "blks_hit" (Sql.Types.nullable Sql.Types.i64),
@@ -2416,7 +2416,7 @@ pgStatioSysSequences = {
     schema: "pg_catalog",
     name: "pg_statio_sys_sequences",
     alias: "psss",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         blksHit: identifier alias "blks_hit" (Sql.Types.nullable Sql.Types.i64),
@@ -2429,7 +2429,7 @@ pgStatioUserSequences = {
     schema: "pg_catalog",
     name: "pg_statio_user_sequences",
     alias: "psus",
-    columns: \alias -> {
+    columns: |alias| {
         relname: identifier alias "relname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         blksHit: identifier alias "blks_hit" (Sql.Types.nullable Sql.Types.i64),
@@ -2442,7 +2442,7 @@ pgStatSubscription = {
     schema: "pg_catalog",
     name: "pg_stat_subscription",
     alias: "pss",
-    columns: \alias -> {
+    columns: |alias| {
         subname: identifier alias "subname" (Sql.Types.nullable Sql.Types.str),
         pid: identifier alias "pid" (Sql.Types.nullable Sql.Types.i32),
         relid: identifier alias "relid" (Sql.Types.nullable Sql.Types.i32),
@@ -2459,7 +2459,7 @@ pgStatSsl = {
     schema: "pg_catalog",
     name: "pg_stat_ssl",
     alias: "pss",
-    columns: \alias -> {
+    columns: |alias| {
         ssl: identifier alias "ssl" (Sql.Types.nullable Sql.Types.bool),
         bits: identifier alias "bits" (Sql.Types.nullable Sql.Types.i32),
         pid: identifier alias "pid" (Sql.Types.nullable Sql.Types.i32),
@@ -2475,7 +2475,7 @@ pgStatGssapi = {
     schema: "pg_catalog",
     name: "pg_stat_gssapi",
     alias: "psg",
-    columns: \alias -> {
+    columns: |alias| {
         encrypted: identifier alias "encrypted" (Sql.Types.nullable Sql.Types.bool),
         gssAuthenticated: identifier alias "gss_authenticated" (Sql.Types.nullable Sql.Types.bool),
         pid: identifier alias "pid" (Sql.Types.nullable Sql.Types.i32),
@@ -2487,7 +2487,7 @@ pgReplicationSlots = {
     schema: "pg_catalog",
     name: "pg_replication_slots",
     alias: "prs",
-    columns: \alias -> {
+    columns: |alias| {
         twoPhase: identifier alias "two_phase" (Sql.Types.nullable Sql.Types.bool),
         active: identifier alias "active" (Sql.Types.nullable Sql.Types.bool),
         temporary: identifier alias "temporary" (Sql.Types.nullable Sql.Types.bool),
@@ -2510,7 +2510,7 @@ pgStatReplicationSlots = {
     schema: "pg_catalog",
     name: "pg_stat_replication_slots",
     alias: "psrs",
-    columns: \alias -> {
+    columns: |alias| {
         totalBytes: identifier alias "total_bytes" (Sql.Types.nullable Sql.Types.i64),
         totalTxns: identifier alias "total_txns" (Sql.Types.nullable Sql.Types.i64),
         streamBytes: identifier alias "stream_bytes" (Sql.Types.nullable Sql.Types.i64),
@@ -2528,7 +2528,7 @@ pgStatDatabase = {
     schema: "pg_catalog",
     name: "pg_stat_database",
     alias: "psd",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         sessionsKilled: identifier alias "sessions_killed" (Sql.Types.nullable Sql.Types.i64),
         sessionsFatal: identifier alias "sessions_fatal" (Sql.Types.nullable Sql.Types.i64),
@@ -2564,7 +2564,7 @@ pgStatDatabaseConflicts = {
     schema: "pg_catalog",
     name: "pg_stat_database_conflicts",
     alias: "psdc",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         conflDeadlock: identifier alias "confl_deadlock" (Sql.Types.nullable Sql.Types.i64),
         conflBufferpin: identifier alias "confl_bufferpin" (Sql.Types.nullable Sql.Types.i64),
@@ -2579,7 +2579,7 @@ pgStatUserFunctions = {
     schema: "pg_catalog",
     name: "pg_stat_user_functions",
     alias: "psuf",
-    columns: \alias -> {
+    columns: |alias| {
         funcname: identifier alias "funcname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         calls: identifier alias "calls" (Sql.Types.nullable Sql.Types.i64),
@@ -2593,7 +2593,7 @@ pgStatXactUserFunctions = {
     schema: "pg_catalog",
     name: "pg_stat_xact_user_functions",
     alias: "psxuf",
-    columns: \alias -> {
+    columns: |alias| {
         funcname: identifier alias "funcname" (Sql.Types.nullable Sql.Types.str),
         schemaname: identifier alias "schemaname" (Sql.Types.nullable Sql.Types.str),
         calls: identifier alias "calls" (Sql.Types.nullable Sql.Types.i64),
@@ -2607,7 +2607,7 @@ pgStatArchiver = {
     schema: "pg_catalog",
     name: "pg_stat_archiver",
     alias: "psa",
-    columns: \alias -> {
+    columns: |alias| {
         failedCount: identifier alias "failed_count" (Sql.Types.nullable Sql.Types.i64),
         archivedCount: identifier alias "archived_count" (Sql.Types.nullable Sql.Types.i64),
         lastFailedWal: identifier alias "last_failed_wal" (Sql.Types.nullable Sql.Types.str),
@@ -2622,7 +2622,7 @@ pgStatBgwriter = {
     schema: "pg_catalog",
     name: "pg_stat_bgwriter",
     alias: "psb",
-    columns: \alias -> {
+    columns: |alias| {
         buffersAlloc: identifier alias "buffers_alloc" (Sql.Types.nullable Sql.Types.i64),
         buffersBackendFsync: identifier alias "buffers_backend_fsync" (Sql.Types.nullable Sql.Types.i64),
         buffersBackend: identifier alias "buffers_backend" (Sql.Types.nullable Sql.Types.i64),
@@ -2641,7 +2641,7 @@ pgStatWal = {
     schema: "pg_catalog",
     name: "pg_stat_wal",
     alias: "psw",
-    columns: \alias -> {
+    columns: |alias| {
         walSync: identifier alias "wal_sync" (Sql.Types.nullable Sql.Types.i64),
         walWrite: identifier alias "wal_write" (Sql.Types.nullable Sql.Types.i64),
         walBuffersFull: identifier alias "wal_buffers_full" (Sql.Types.nullable Sql.Types.i64),
@@ -2658,7 +2658,7 @@ pgStatProgressAnalyze = {
     schema: "pg_catalog",
     name: "pg_stat_progress_analyze",
     alias: "pspa",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         childTablesDone: identifier alias "child_tables_done" (Sql.Types.nullable Sql.Types.i64),
         childTablesTotal: identifier alias "child_tables_total" (Sql.Types.nullable Sql.Types.i64),
@@ -2678,7 +2678,7 @@ pgStatProgressVacuum = {
     schema: "pg_catalog",
     name: "pg_stat_progress_vacuum",
     alias: "pspv",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         numDeadTuples: identifier alias "num_dead_tuples" (Sql.Types.nullable Sql.Types.i64),
         maxDeadTuples: identifier alias "max_dead_tuples" (Sql.Types.nullable Sql.Types.i64),
@@ -2697,7 +2697,7 @@ pgStatProgressCluster = {
     schema: "pg_catalog",
     name: "pg_stat_progress_cluster",
     alias: "pspc",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         indexRebuildCount: identifier alias "index_rebuild_count" (Sql.Types.nullable Sql.Types.i64),
         heapBlksScanned: identifier alias "heap_blks_scanned" (Sql.Types.nullable Sql.Types.i64),
@@ -2717,7 +2717,7 @@ pgStatProgressCreateIndex = {
     schema: "pg_catalog",
     name: "pg_stat_progress_create_index",
     alias: "pspci",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         partitionsDone: identifier alias "partitions_done" (Sql.Types.nullable Sql.Types.i64),
         partitionsTotal: identifier alias "partitions_total" (Sql.Types.nullable Sql.Types.i64),
@@ -2741,7 +2741,7 @@ pgStatProgressBasebackup = {
     schema: "pg_catalog",
     name: "pg_stat_progress_basebackup",
     alias: "pspb",
-    columns: \alias -> {
+    columns: |alias| {
         tablespacesStreamed: identifier alias "tablespaces_streamed" (Sql.Types.nullable Sql.Types.i64),
         tablespacesTotal: identifier alias "tablespaces_total" (Sql.Types.nullable Sql.Types.i64),
         backupStreamed: identifier alias "backup_streamed" (Sql.Types.nullable Sql.Types.i64),
@@ -2755,7 +2755,7 @@ pgStatProgressCopy = {
     schema: "pg_catalog",
     name: "pg_stat_progress_copy",
     alias: "pspc",
-    columns: \alias -> {
+    columns: |alias| {
         datname: identifier alias "datname" (Sql.Types.nullable Sql.Types.str),
         tuplesExcluded: identifier alias "tuples_excluded" (Sql.Types.nullable Sql.Types.i64),
         tuplesProcessed: identifier alias "tuples_processed" (Sql.Types.nullable Sql.Types.i64),
@@ -2773,7 +2773,7 @@ pgUserMappings = {
     schema: "pg_catalog",
     name: "pg_user_mappings",
     alias: "pum",
-    columns: \alias -> {
+    columns: |alias| {
         usename: identifier alias "usename" (Sql.Types.nullable Sql.Types.str),
         srvname: identifier alias "srvname" (Sql.Types.nullable Sql.Types.str),
         umuser: identifier alias "umuser" (Sql.Types.nullable Sql.Types.i32),
@@ -2787,7 +2787,7 @@ pgStatSubscriptionStats = {
     schema: "pg_catalog",
     name: "pg_stat_subscription_stats",
     alias: "psss",
-    columns: \alias -> {
+    columns: |alias| {
         subname: identifier alias "subname" (Sql.Types.nullable Sql.Types.str),
         syncErrorCount: identifier alias "sync_error_count" (Sql.Types.nullable Sql.Types.i64),
         applyErrorCount: identifier alias "apply_error_count" (Sql.Types.nullable Sql.Types.i64),
@@ -2806,7 +2806,7 @@ pgLargeobject = {
     schema: "pg_catalog",
     name: "pg_largeobject",
     alias: "pl",
-    columns: \alias -> {
+    columns: |alias| {
         data: identifier alias "data" (Sql.Types.unsupported "bytea"),
         pageno: identifier alias "pageno" pgLargeobjectPageno,
         loid: identifier alias "loid" pgLargeobjectLoid,

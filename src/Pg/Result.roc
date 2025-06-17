@@ -1,143 +1,173 @@
 module [
     CmdResult,
-    RowField,
-    create,
-    len,
-    fields,
-    rows,
-    decode,
     Decode,
-    str,
-    u8,
-    u16,
-    u32,
-    u64,
-    u128,
-    i8,
+    ParameterField,
+    RowField,
+    apply,
+    bool,
+    create,
+    dec,
+    decode,
+    f32,
+    f64,
+    fields,
+    i128,
     i16,
     i32,
     i64,
-    i128,
-    f32,
-    f64,
-    dec,
-    bool,
-    with,
-    apply,
+    i8,
+    len,
+    combine,
+    rows,
+    str,
     succeed,
+    u128,
+    u16,
+    u32,
+    u64,
+    u8,
+    with,
 ]
 
 import Protocol.Backend
 
 RowField : Protocol.Backend.RowField
+ParameterField : Protocol.Backend.ParameterField
 
 CmdResult := {
     fields : List RowField,
     rows : List (List (List U8)),
+    parameters : List ParameterField,
 }
 
 create = @CmdResult
 
 fields : CmdResult -> List RowField
-fields = \@CmdResult result -> result.fields
+fields = |@CmdResult(result)| result.fields
 
 rows : CmdResult -> List (List (List U8))
-rows = \@CmdResult result -> result.rows
+rows = |@CmdResult(result)| result.rows
 
 len : CmdResult -> U64
-len = \@CmdResult result ->
-    List.len result.rows
+len = |@CmdResult(result)|
+    List.len(result.rows)
 
 Decode a err :=
     List RowField
     ->
     Result
-        (List (List U8)
-        ->
-        Result a [FieldNotFound Str]err)
+        (List (List U8) -> Result a [FieldNotFound Str]err)
         [FieldNotFound Str]
 
 decode : CmdResult, Decode a err -> Result (List a) [FieldNotFound Str]err
-decode = \@CmdResult r, @Decode getDecode ->
-    when getDecode r.fields is
-        Ok fn ->
-            List.mapTry r.rows fn
+decode = |@CmdResult(r), @Decode(get_decode)|
+    when get_decode(r.fields) is
+        Ok(fn) ->
+            List.map_try(r.rows, fn)
 
-        Err (FieldNotFound name) ->
-            Err (FieldNotFound name)
+        Err(FieldNotFound(name)) ->
+            Err(FieldNotFound(name))
 
-str = decoder Ok
+str = decoder(Ok)
 
-u8 = decoder Str.toU8
+u8 = decoder(Str.to_u8)
 
-u16 = decoder Str.toU16
+u16 = decoder(Str.to_u16)
 
-u32 = decoder Str.toU32
+u32 = decoder(Str.to_u32)
 
-u64 = decoder Str.toU64
+u64 = decoder(Str.to_u64)
 
-u128 = decoder Str.toU128
+u128 = decoder(Str.to_u128)
 
-i8 = decoder Str.toI8
+i8 = decoder(Str.to_i8)
 
-i16 = decoder Str.toI8
+i16 = decoder(Str.to_i16)
 
-i32 = decoder Str.toI32
+i32 = decoder(Str.to_i32)
 
-i64 = decoder Str.toI64
+i64 = decoder(Str.to_i64)
 
-i128 = decoder Str.toI128
+i128 = decoder(Str.to_i128)
 
-f32 = decoder Str.toF32
+f32 = decoder(Str.to_f32)
 
-f64 = decoder Str.toF64
+f64 = decoder(Str.to_f64)
 
-dec = decoder Str.toDec
+dec = decoder(Str.to_dec)
 
-bool = decoder \v ->
-    when v is
-        "t" -> Ok Bool.true
-        "f" -> Ok Bool.false
-        _ -> Err InvalidBoolStr
+bool = decoder(
+    |v|
+        when v is
+            "t" -> Ok(Bool.true)
+            "f" -> Ok(Bool.false)
+            _ -> Err(InvalidBoolStr),
+)
 
-decoder = \fn -> \name ->
-        rowFields <- @Decode
+decoder = |fn|
+    |name|
+        @Decode(
+            |row_fields|
+                when List.find_first_index(row_fields, |f| f.name == name) is
+                    Ok(index) ->
+                        Ok(
+                            |row|
+                                when List.get(row, index) is
+                                    Ok(bytes) ->
+                                        str_value = Str.from_utf8(bytes)?
+                                        fn(str_value)
 
-        when List.findFirstIndex rowFields \f -> f.name == name is
-            Ok index ->
-                row <- Ok
+                                    Err(OutOfBounds) ->
+                                        Err(FieldNotFound(name)),
+                        )
 
-                when List.get row index is
-                    Ok bytes ->
-                        when Str.fromUtf8 bytes is
-                            Ok strValue ->
-                                fn strValue
+                    Err(NotFound) ->
+                        Err(FieldNotFound(name)),
+        )
 
-                            Err err ->
-                                Err err
+map2 = |@Decode(a), @Decode(b), cb|
+    @Decode(
+        |row_fields|
+            Result.try(
+                a(row_fields),
+                |decode_a|
+                    Result.try(
+                        b(row_fields),
+                        |decode_b|
+                            Ok(
+                                |row|
+                                    Result.try(
+                                        decode_a(row),
+                                        |value_a|
+                                            Result.try(
+                                                decode_b(row),
+                                                |value_b|
+                                                    Ok(cb(value_a, value_b)),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            ),
+    )
 
-                    Err OutOfBounds ->
-                        Err (FieldNotFound name)
+succeed = |value|
+    @Decode(|_| Ok(|_| Ok(value)))
 
-            Err NotFound ->
-                Err (FieldNotFound name)
+with = |a, b| map2(a, b, |fn, val| fn(val))
 
-map2 = \@Decode a, @Decode b, cb ->
-    rowFields <- @Decode
+apply = |a| |fn| with(fn, a)
 
-    decodeA <- Result.try (a rowFields)
-    decodeB <- Result.try (b rowFields)
-
-    row <- Ok
-
-    valueA <- Result.try (decodeA row)
-    valueB <- Result.try (decodeB row)
-
-    Ok (cb valueA valueB)
-
-succeed = \value ->
-    @Decode \_ -> Ok \_ -> Ok value
-
-with = \a, b -> map2 a b (\fn, val -> fn val)
-
-apply = \a -> \fn -> with fn a
+## Use with Roc's [Record Builder](https://www.roc-lang.org/tutorial#record-builder)
+## syntax to build records of your returned rows:
+##
+## ```
+## Pg.Cmd.expect_n(
+##     { Pg.Result.combine <-
+##         name: Pg.Result.str("name"),
+##         age: Pg.Result.u8("age"),
+##     },
+## )
+## ```
+# NOTE: `combine` is an alias of `map2` simply to increase its
+# discoverability and user-friendliness for its intended use-case.
+combine = map2

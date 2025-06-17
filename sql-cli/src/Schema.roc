@@ -4,9 +4,9 @@ module [
     Table,
     Column,
     new,
-    getName,
-    getTables,
-    primaryColumn,
+    get_name,
+    get_tables,
+    primary_column,
 ]
 
 Nullable a : [Null, NotNull a]
@@ -15,7 +15,7 @@ Schema := {
     name : Str,
     tables : List Table,
     references : Dict ColumnId ColumnId,
-    primaryColumns : Dict ColumnId { tableName : Str, columnName : Str },
+    primary_columns : Dict ColumnId { table_name : Str, column_name : Str },
 }
 
 ColumnId : (I32, I16)
@@ -30,191 +30,210 @@ Table : {
 Column : {
     num : I16,
     name : Str,
-    dataType : Str,
-    typeCategory : Str,
-    elemDataType : Nullable Str,
-    isNullable : Bool,
+    data_type : Str,
+    type_category : Str,
+    elem_data_type : Nullable Str,
+    is_nullable : Bool,
 }
 
 Constraint : {
     type : Str,
     columns : List I16,
-    foreignTable : I32, # pg sets this to 0 if not foreign key
-    foreignColumns : List I16,
+    foreign_table : I32, # pg sets this to 0 if not foreign key
+    foreign_columns : List I16,
 }
 
 new : Str, List Table -> Schema
-new = \schemaName, tables ->
-    tablesLen : U64
-    tablesLen = List.len tables
+new = |schema_name, tables|
+    tables_len : U64
+    tables_len = List.len(tables)
 
     keys : {
-        primaryColumns : Dict ColumnId { tableName : Str, columnName : Str },
+        primary_columns : Dict ColumnId { table_name : Str, column_name : Str },
         references : Dict ColumnId ColumnId,
     }
     keys =
-        stateTable, table <- List.walk tables {
-                primaryColumns: Dict.withCapacity tablesLen,
-                references: Dict.withCapacity (tablesLen * 4),
-            }
-        state, constraint <- List.walk table.constraints stateTable
+        List.walk(
+            tables,
+            {
+                primary_columns: Dict.with_capacity(tables_len),
+                references: Dict.with_capacity((tables_len * 4)),
+            },
+            |state_table, table|
+                List.walk(
+                    table.constraints,
+                    state_table,
+                    |state, constraint|
+                        when constraint.type is
+                            "p" ->
+                                new_primary_columns =
+                                    constraint.columns
+                                    |> List.map(
+                                        |col_num|
 
-        when constraint.type is
-            "p" ->
-                newPrimaryColumns =
-                    constraint.columns
-                    |> List.map \colNum ->
+                                            names =
+                                                when List.find_first(table.columns, |col| col.num == col_num) is
+                                                    Ok({ name }) ->
+                                                        {
+                                                            table_name: table.name,
+                                                            column_name: name,
+                                                        }
 
-                        names =
-                            when List.findFirst table.columns \col -> col.num == colNum is
-                                Ok { name } ->
-                                    {
-                                        tableName: table.name,
-                                        columnName: name,
-                                    }
+                                                    Err(NotFound) ->
+                                                        {
+                                                            table_name: "${Num.to_str(table.id)}",
+                                                            column_name: "${Num.to_str(col_num)}",
+                                                        }
 
-                                Err NotFound ->
-                                    {
-                                        tableName: "$(Num.toStr table.id)",
-                                        columnName: "$(Num.toStr colNum)",
-                                    }
+                                            ((table.id, col_num), names),
+                                    )
+                                    |> Dict.from_list
 
-                        ((table.id, colNum), names)
-                    |> Dict.fromList
+                                { state & primary_columns: Dict.insert_all(state.primary_columns, new_primary_columns) }
 
-                { state & primaryColumns: Dict.insertAll state.primaryColumns newPrimaryColumns }
+                            "f" ->
+                                new_references =
+                                    constraint.columns
+                                    |> List.map2(
+                                        constraint.foreign_columns,
+                                        |col_num, foreign_column|
+                                            ((table.id, col_num), (constraint.foreign_table, foreign_column)),
+                                    )
+                                    |> Dict.from_list
 
-            "f" ->
-                newReferences =
-                    constraint.columns
-                    |> List.map2 constraint.foreignColumns \colNum, foreignColumn ->
-                        ((table.id, colNum), (constraint.foreignTable, foreignColumn))
-                    |> Dict.fromList
+                                { state & references: Dict.insert_all(state.references, new_references) }
 
-                { state & references: Dict.insertAll state.references newReferences }
+                            _ ->
+                                state,
+                ),
+        )
+    @Schema(
+        {
+            name: schema_name,
+            tables,
+            primary_columns: keys.primary_columns,
+            references: keys.references,
+        },
+    )
 
-            _ ->
-                state
+get_tables : Schema -> List Table
+get_tables = |@Schema(schema)| schema.tables
 
-    @Schema {
-        name: schemaName,
-        tables,
-        primaryColumns: keys.primaryColumns,
-        references: keys.references,
-    }
-
-getTables : Schema -> List Table
-getTables = \@Schema schema -> schema.tables
-
-getName : Schema -> Str
-getName = \@Schema schema -> schema.name
+get_name : Schema -> Str
+get_name = |@Schema(schema)| schema.name
 
 ## Recursively find the final column referenced by another column.
 ##
 ## Returns itself if it's part of a primary key and no foreign key.
-primaryColumn : Schema,
+primary_column :
+    Schema,
     ColumnId
     -> Result
         {
             id : ColumnId,
-            tableName : Str,
-            columnName : Str,
+            table_name : Str,
+            column_name : Str,
         }
         [KeyNotFound]
-primaryColumn = \@Schema schema, column ->
-    when Dict.get schema.references column is
-        Ok refColumn ->
-            primaryColumn (@Schema schema) refColumn
+primary_column = |@Schema(schema), column|
+    when Dict.get(schema.references, column) is
+        Ok(ref_column) ->
+            primary_column(@Schema(schema), ref_column)
 
-        Err KeyNotFound ->
-            Dict.get schema.primaryColumns column
-            |> Result.map \names -> {
-                id: column,
-                tableName: names.tableName,
-                columnName: names.columnName,
-            }
+        Err(KeyNotFound) ->
+            Dict.get(schema.primary_columns, column)
+            |> Result.map_ok(
+                |names| {
+                    id: column,
+                    table_name: names.table_name,
+                    column_name: names.column_name,
+                },
+            )
 
-expect primaryColumn testSchema (1, 1) == Ok { id: (1, 1), tableName: "users", columnName: "id" }
-expect primaryColumn testSchema (1, 2) == Err KeyNotFound
-expect primaryColumn testSchema (2, 1) == Ok { id: (2, 1), tableName: "posts", columnName: "id" }
-expect primaryColumn testSchema (2, 2) == Ok { id: (1, 1), tableName: "users", columnName: "id" }
-expect primaryColumn testSchema (2, 3) == Err KeyNotFound
+expect primary_column(test_schema, (1, 1)) == Ok({ id: (1, 1), table_name: "users", column_name: "id" })
+expect primary_column(test_schema, (1, 2)) == Err(KeyNotFound)
+expect primary_column(test_schema, (2, 1)) == Ok({ id: (2, 1), table_name: "posts", column_name: "id" })
+expect primary_column(test_schema, (2, 2)) == Ok({ id: (1, 1), table_name: "users", column_name: "id" })
+expect primary_column(test_schema, (2, 3)) == Err(KeyNotFound)
 
-testSchema =
-    new "public" [
-        {
-            id: 1,
-            name: "users",
-            columns: [
-                {
-                    num: 1,
-                    name: "id",
-                    dataType: "int4",
-                    typeCategory: "N",
-                    elemDataType: Null,
-                    isNullable: Bool.false,
-                },
-                {
-                    num: 2,
-                    name: "name",
-                    dataType: "text",
-                    typeCategory: "S",
-                    elemDataType: Null,
-                    isNullable: Bool.false,
-                },
-            ],
-            constraints: [
-                {
-                    type: "p",
-                    columns: [1],
-                    foreignTable: 0,
-                    foreignColumns: [],
-                },
-            ],
-        },
-        {
-            id: 2,
-            name: "posts",
-            columns: [
-                {
-                    num: 1,
-                    name: "id",
-                    dataType: "int4",
-                    typeCategory: "N",
-                    elemDataType: Null,
-                    isNullable: Bool.false,
-                },
-                {
-                    num: 2,
-                    name: "user_id",
-                    dataType: "int4",
-                    typeCategory: "N",
-                    elemDataType: Null,
-                    isNullable: Bool.false,
-                },
-                {
-                    num: 3,
-                    name: "title",
-                    dataType: "text",
-                    typeCategory: "S",
-                    elemDataType: Null,
-                    isNullable: Bool.false,
-                },
-            ],
-            constraints: [
-                {
-                    type: "p",
-                    columns: [1],
-                    foreignTable: 0,
-                    foreignColumns: [],
-                },
-                {
-                    type: "f",
-                    columns: [2],
-                    foreignTable: 1,
-                    foreignColumns: [1],
-                },
-            ],
-        },
-    ]
+test_schema =
+    new(
+        "public",
+        [
+            {
+                id: 1,
+                name: "users",
+                columns: [
+                    {
+                        num: 1,
+                        name: "id",
+                        data_type: "int4",
+                        type_category: "N",
+                        elem_data_type: Null,
+                        is_nullable: Bool.false,
+                    },
+                    {
+                        num: 2,
+                        name: "name",
+                        data_type: "text",
+                        type_category: "S",
+                        elem_data_type: Null,
+                        is_nullable: Bool.false,
+                    },
+                ],
+                constraints: [
+                    {
+                        type: "p",
+                        columns: [1],
+                        foreign_table: 0,
+                        foreign_columns: [],
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: "posts",
+                columns: [
+                    {
+                        num: 1,
+                        name: "id",
+                        data_type: "int4",
+                        type_category: "N",
+                        elem_data_type: Null,
+                        is_nullable: Bool.false,
+                    },
+                    {
+                        num: 2,
+                        name: "user_id",
+                        data_type: "int4",
+                        type_category: "N",
+                        elem_data_type: Null,
+                        is_nullable: Bool.false,
+                    },
+                    {
+                        num: 3,
+                        name: "title",
+                        data_type: "text",
+                        type_category: "S",
+                        elem_data_type: Null,
+                        is_nullable: Bool.false,
+                    },
+                ],
+                constraints: [
+                    {
+                        type: "p",
+                        columns: [1],
+                        foreign_table: 0,
+                        foreign_columns: [],
+                    },
+                    {
+                        type: "f",
+                        columns: [2],
+                        foreign_table: 1,
+                        foreign_columns: [1],
+                    },
+                ],
+            },
+        ],
+    )
 

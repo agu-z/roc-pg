@@ -1,40 +1,42 @@
-app [main] {
+app [main!] {
+    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.19.0/Hj-J_zxz7V9YurCSTFcFdu6cQJie4guzsPMUi5kBYUk.tar.br",
     pg: "../src/main.roc",
-    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.15.0/SlwdbJ-3GR7uBWQo6zlmYWNYOxnvo8r6YABXD-45UOw.tar.br",
 }
 
 import pf.Stdout
 import pg.Pg.Cmd
-import pg.Pg.BasicCliClient
+import pg.Pg.Client
 import pg.Pg.Result
 
-main =
-    client = Pg.BasicCliClient.connect! {
-        host: "localhost",
-        port: 5432,
-        user: "postgres",
-        auth: None,
-        database: "postgres",
-    }
+main! = |_|
+    client = Pg.Client.connect!(
+        {
+            host: "localhost",
+            port: 5432,
+            user: "postgres",
+            auth: None,
+            database: "postgres",
+        },
+    )?
 
-    Stdout.line! "Connected!"
+    _ = Stdout.line!("Connected!")
 
-    addCmd =
+    add_cmd =
         "select $1::int + $2::int as result"
-            |> Pg.BasicCliClient.prepare! { client, name: "add" }
+        |> Pg.Client.prepare!({ client, name: "add" })?
 
-    addAndPrint = \a, b ->
+    add_and_print! = |a, b|
         result =
-            addCmd
-                |> Pg.Cmd.bind [Pg.Cmd.u8 a, Pg.Cmd.u8 b]
-                |> Pg.Cmd.expect1 (Pg.Result.u8 "result")
-                |> Pg.BasicCliClient.command! client
+            add_cmd
+            |> Pg.Cmd.bind([Pg.Cmd.u8(a), Pg.Cmd.u8(b)])
+            |> Pg.Cmd.expect1(Pg.Result.u8("result"))
+            |> Pg.Client.command!(client)?
 
-        aStr = Num.toStr a
-        bStr = Num.toStr b
-        resultStr = Num.toStr result
+        a_str = Num.to_str(a)
+        b_str = Num.to_str(b)
+        result_str = Num.to_str(result)
 
-        Stdout.line "$(aStr) + $(bStr) = $(resultStr)"
+        Stdout.line!("${a_str} + ${b_str} = ${result_str}")
 
-    addAndPrint! 1 2
-    addAndPrint! 11 31
+    _ = add_and_print!(1, 2)
+    add_and_print!(11, 31)
