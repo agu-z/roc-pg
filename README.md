@@ -14,13 +14,8 @@ You can already use this to build useful applications. However, until we have a 
 
 ### Query Builder
 
-The query builder is one of the most exciting features of this package, but more experimental than the lower-level API.
-
-You can currently generate a Roc module from your schema that you can use through the functions exposed under [`Sql`](./src/Sql.roc) to compose type-safe `SELECT` statements.
-
-The plan is to support all the other SQL commands, but that's coming later. In the meantime, you can perform those by creating a raw SQL command with `Pg.Cmd.new`.
-
-**See an [example](./examples/store) of a simple HTTP API built with the query builder!**
+For a while, I explored creating a type-safe query builder on top of roc-pg. I gave some cool demos, and the core idea seemed promising. Unfortunately, I didn't get to build enough of it to be helpful in a real application, and nowadays, I don't have the time it'd require to make it so.
+You can see an example of what that looked like [here](https://github.com/agu-z/roc-pg/blob/6c17c7b438bdb349cebaad1c8e100045ff3f6aeb/examples/store/server.roc).
 
 ## Examples
 
