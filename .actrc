@@ -1,0 +1,20 @@
+# Default image to use when running actions locally
+# Using the medium image which has more tools pre-installed
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+-P ubuntu-20.04=catthehacker/ubuntu:act-20.04
+
+# Use docker to run actions
+--container-architecture linux/amd64
+
+# Disable socket mounting for podman compatibility
+--container-daemon-socket -
+
+# Reuse containers to speed up subsequent runs
+--reuse
+
+# Use the .env file if it exists
+--env-file .env
+
+# Default workflow file to run if not specified
+--workflows .github/workflows/check.yaml
