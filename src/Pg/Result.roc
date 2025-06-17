@@ -17,7 +17,7 @@ module [
     i64,
     i8,
     len,
-    record_builder,
+    combine,
     rows,
     str,
     succeed,
@@ -162,12 +162,12 @@ apply = |a| |fn| with(fn, a)
 ##
 ## ```
 ## Pg.Cmd.expect_n(
-##     { Pg.Result.record_builder <-
+##     { Pg.Result.combine <-
 ##         name: Pg.Result.str("name"),
 ##         age: Pg.Result.u8("age"),
 ##     },
 ## )
 ## ```
-# NOTE: `record_builder` is an alias of `map2` simply to increase its
+# NOTE: `combine` is an alias of `map2` simply to increase its
 # discoverability and user-friendliness for its intended use-case.
-record_builder = map2
+combine = map2

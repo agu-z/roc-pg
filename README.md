@@ -2,7 +2,7 @@
 
 Interface with PostgreSQL databases from Roc.
 
-This package implements a PostgreSQL client on pure Roc that depends only on a TCP effect from the platform. 
+This package implements a PostgreSQL client on pure Roc that depends only on a TCP effect from the platform.
 
 It exposes a simple API that allows you to run SQL commands as strings and a query builder that helps you write composable type-safe queries against your schema.
 
@@ -41,7 +41,7 @@ products! = |_|
 
     Pg.Cmd.new("select name, price from products")
     |> Pg.Cmd.expect_n(
-        { Pg.Result.record_builder <-
+        { Pg.Result.combine <-
             name: Pg.Result.str("name"),
             price: Pg.Result.dec("price"),
         },
@@ -58,7 +58,7 @@ Parameterized queries
 Pg.Cmd.new("select name, price from products where id = $1")
 |> Pg.Cmd.bind([ Pg.Cmd.u32(product_id) ])
 |> Pg.Cmd.expect1(
-    { Pg.Result.record_builder <-
+    { Pg.Result.combine <-
         name: Pg.Result.str("name"),
         price: Pg.Result.dec("price"),
     },
@@ -111,7 +111,7 @@ Pg.Batch.succeed(|email| |products| { email, products })
         )
         |> Pg.Cmd.bind([Pg.Cmd.u32(order_id)])
         |> Pg.Cmd.expect_n(
-            { Pg.Result.record_builder <-
+            { Pg.Result.combine <-
                 name: Pg.Result.str("name"),
                 price: Pg.Result.dec("price"),
             },

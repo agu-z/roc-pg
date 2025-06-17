@@ -40,7 +40,7 @@ respond! = |_request, model|
         )
         |> Pg.Cmd.bind([Pg.Cmd.str("John"), Pg.Cmd.u8(32)])
         |> Pg.Cmd.expect_n(
-            { Pg.Result.record_builder <-
+            { Pg.Result.combine <-
                 name: Pg.Result.str("name"),
                 age: Pg.Result.u8("age"),
             },

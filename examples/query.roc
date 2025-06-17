@@ -31,15 +31,16 @@ main! = |_|
         )
         |> Pg.Cmd.bind([Pg.Cmd.str("John"), Pg.Cmd.u8(32)])
         |> Pg.Cmd.expect_n(
-            Pg.Result.succeed(
-                |name|
-                    |age|
-                        age_str = Num.to_str(age)
-                        "${name}: ${age_str}",
-            )
-            |> Pg.Result.with(Pg.Result.str("name"))
-            |> Pg.Result.with(Pg.Result.u8("age")),
+            { Pg.Result.combine <-
+                name: Pg.Result.str("name"),
+                age: Pg.Result.u8("age"),
+            },
         )
         |> Pg.Client.command!(client)?
 
-    Stdout.line!(Str.join_with(rows, "\n"))
+    str =
+        rows
+        |> List.map(Inspect.to_str)
+        |> Str.join_with("\n")
+
+    Stdout.line!("Got records:\n${str}")
