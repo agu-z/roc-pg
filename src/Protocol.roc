@@ -178,8 +178,8 @@ Protocol :: [].{
 
 		Status : [Idle, TransactionBlock, FailedTransactionBlock]
 
-		header : Decode({ msg_type : U8, len : I32 }, _)
-		header = Decode.await(
+		header : {} -> Decode({ msg_type : U8, len : I32 }, _)
+		header = |{}| Decode.await(
 			Decode.u8({}),
 			|msg_type| Decode.map(
 				Decode.i32({}),
@@ -189,20 +189,20 @@ Protocol :: [].{
 
 		message : U8 -> Decode(Message, _)
 		message = |msg_type| match msg_type {
-			'R' => auth_request
-			'S' => param_status
-			'K' => backend_key_data
-			'Z' => ready_for_query
-			'E' => error_response
+			'R' => auth_request({})
+			'S' => param_status({})
+			'K' => backend_key_data({})
+			'Z' => ready_for_query({})
+			'E' => error_response({})
 			'1' => Decode.succeed(ParseComplete)
 			'2' => Decode.succeed(BindComplete)
-			'N' => notice_response
+			'N' => notice_response({})
 			'n' => Decode.succeed(NoData)
-			'T' => row_description
-			't' => parameter_description
-			'D' => data_row
+			'T' => row_description({})
+			't' => parameter_description({})
+			'D' => data_row({})
 			's' => Decode.succeed(PortalSuspended)
-			'C' => command_complete
+			'C' => command_complete({})
 			'I' => Decode.succeed(EmptyQueryResponse)
 			'3' => Decode.succeed(CloseComplete)
 			_ => Decode.fail(UnrecognizedBackendMessage(msg_type))
@@ -250,8 +250,8 @@ prepend_length = |msg| {
 
 # Backend  Helpers
 
-backend_key_data : Decode(Backend.Message, _)
-backend_key_data = Decode.await(
+backend_key_data : {} -> Decode(Backend.Message, _)
+backend_key_data = |{}| Decode.await(
 	Decode.i32({}),
 	|process_id| Decode.await(
 		Decode.i32({}),
@@ -260,8 +260,8 @@ backend_key_data = Decode.await(
 	),
 )
 
-ready_for_query : Decode(Backend.Message, _)
-ready_for_query = Decode.await(
+ready_for_query : {} -> Decode(Backend.Message, _)
+ready_for_query = |{}| Decode.await(
 	Decode.u8({}),
 	|status| match status {
 		'I' => Decode.succeed(ReadyForQuery(Idle))
@@ -271,8 +271,8 @@ ready_for_query = Decode.await(
 	},
 )
 
-read_notice_responses : Decode(List({ code : U8, value : Str }), _)
-read_notice_responses = Decode.loop(
+read_notice_responses : {} -> Decode(List({ code : U8, value : Str }), _)
+read_notice_responses = |{}| Decode.loop(
 	[],
 	|collected|
 		Decode.await(
@@ -289,15 +289,15 @@ read_notice_responses = Decode.loop(
 		),
 )
 
-notice_response = Decode.await(
-	read_notice_responses,
+notice_response = |{}| Decode.await(
+	read_notice_responses({}),
 	|notices|
 		Decode.succeed(NoticeResponse(notices)),
 )
 
 # TODO
-error_response : Decode(Backend.Message, _)
-error_response = known_str_fields.await(
+error_response : {} -> Decode(Backend.Message, _)
+error_response = |{}| known_str_fields({}).await(
 	|dict| 'S'
 		|> required_field(
 			dict,
@@ -401,8 +401,8 @@ decode_severity = |str|
 		_ => Err(InvalidSeverity(str))
 	}
 
-known_str_fields : Decode(Dict(U8, Str), _)
-known_str_fields = Decode.loop(
+known_str_fields : {} -> Decode(Dict(U8, Str), _)
+known_str_fields = |{}| Decode.loop(
 	Dict.empty(),
 	|collected| Decode.await(
 		Decode.u8({}),
@@ -413,33 +413,33 @@ known_str_fields = Decode.loop(
 	),
 )
 
-parameter_description : Decode(Backend.Message, _)
-parameter_description = Decode.await(
+parameter_description : {} -> Decode(Backend.Message, _)
+parameter_description = |{}| Decode.await(
 	Decode.i16({}),
 	|field_count|
 		if (field_count == 0) Decode.succeed(ParameterDescription([]))
-		else fixed_list(field_count, parameter_field)
+		else fixed_list(field_count, parameter_field({}))
 			|> Decode.map(
 				|d| ParameterDescription(d),
 			),
 )
 
-parameter_field : Decode(Backend.ParameterField, _)
-parameter_field = Decode.await(
+parameter_field : {} -> Decode(Backend.ParameterField, _)
+parameter_field = |{}| Decode.await(
 	Decode.i32({}),
 	|data_type_oid| Decode.succeed({ data_type_oid: data_type_oid }),
 )
 
-row_description : Decode(Backend.Message, _)
-row_description =
+row_description : {} -> Decode(Backend.Message, _)
+row_description = |{}|
 	Decode.await(
 		Decode.i16({}),
 		|field_count|
-			fixed_list(field_count, row_field) |> Decode.map(|d| RowDescription(d)),
+			fixed_list(field_count, row_field({})) |> Decode.map(|d| RowDescription(d)),
 	)
 
-row_field : Decode(Backend.RowField, _)
-row_field = Decode.c_str({}).await(
+row_field : {} -> Decode(Backend.RowField, _)
+row_field = |{}| Decode.c_str({}).await(
 	|name| Decode.i32({}).await(
 		|table_oid| Decode.i16({}).await(
 			|attribute_number| Decode.i32({}).await(
@@ -470,8 +470,8 @@ row_field = Decode.c_str({}).await(
 	),
 )
 
-data_row : Decode(Backend.Message, _)
-data_row = Decode.await(
+data_row : {} -> Decode(Backend.Message, _)
+data_row = |{}| Decode.await(
 	Decode.i16({}),
 	|column_count| fixed_list(
 		column_count,
@@ -502,13 +502,13 @@ fixed_list = |count, item_decode| Decode.loop(
 	),
 )
 
-command_complete : Decode(Backend.Message, _)
-command_complete = Decode.map(Decode.c_str({}), |str| CommandComplete(str))
+command_complete : {} -> Decode(Backend.Message, _)
+command_complete = |{}| Decode.map(Decode.c_str({}), |str| CommandComplete(str))
 
 Msg : []
 
-auth_request : Decode(Backend.Message, _)
-auth_request = Decode.map(
+auth_request : {} -> Decode(Backend.Message, _)
+auth_request = |{}| Decode.map(
 	Decode.i32({}),
 	|auth_type| match auth_type {
 		0 => AuthOk
@@ -517,8 +517,8 @@ auth_request = Decode.map(
 	},
 )
 
-param_status : Decode(Backend.Message, _)
-param_status = Decode.await(
+param_status : {} -> Decode(Backend.Message, _)
+param_status = |{}| Decode.await(
 	Decode.c_str({}),
 	|name| Decode.await(
 		Decode.c_str({}),
