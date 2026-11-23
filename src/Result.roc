@@ -74,6 +74,7 @@ Result :: {
 
 	apply = |a| |fn| result_with(fn, a)
 
+	map2 : Decode(a, err), Decode(b, err), (a, b -> c) -> Decode(c, err)
 	map2 = |Decode.(a), Decode.(b), cb| Decode.(
 		|row_fields| {
 			decode_a = a(row_fields)?
