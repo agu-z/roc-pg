@@ -53,8 +53,8 @@ Bytes :: [].{
 
 		# Unsigned Integers
 
-		u8 : Decode(U8, [UnexpectedEnd, ..])
-		u8 = Decode.(
+		u8 : {} -> Decode(U8, [UnexpectedEnd])
+		u8 = |{}| Decode.(
 			|bytes| match bytes {
 				[byte, ..] => Ok({
 					decoded: byte,
@@ -64,8 +64,8 @@ Bytes :: [].{
 			},
 		)
 
-		u16 : Decode(U16, [UnexpectedEnd, ..])
-		u16 = Decode.(
+		u16 : {} -> Decode(U16, [UnexpectedEnd])
+		u16 = |{}| Decode.(
 			|bytes| match bytes {
 				[b0, b1, ..] => Ok({
 					decoded: b0.to_u16().shl_wrap(8)
@@ -76,8 +76,8 @@ Bytes :: [].{
 			},
 		)
 
-		u32 : Decode(U32, [UnexpectedEnd, ..])
-		u32 = Decode.(
+		u32 : {} -> Decode(U32, [UnexpectedEnd])
+		u32 = |{}| Decode.(
 			|bytes| match bytes {
 				[b0, b1, b2, b3, ..] => Ok({
 					decoded: b0.to_u32().shl_wrap(24)
@@ -90,8 +90,8 @@ Bytes :: [].{
 			},
 		)
 
-		u64 : Decode(U64, [UnexpectedEnd, ..])
-		u64 = Decode.(
+		u64 : {} -> Decode(U64, [UnexpectedEnd])
+		u64 = |{}| Decode.(
 			|bytes| match bytes {
 				[b0, b1, b2, b3, b4, b5, b6, b7, ..] => Ok({
 					decoded: b0.to_u64().shl_wrap(56)
@@ -110,23 +110,23 @@ Bytes :: [].{
 
 		# Signed Integers
 
-		i8 : Decode(I8, [UnexpectedEnd, ..])
-		i8 = map(u8, U8.to_i8_wrap)
+		i8 : {} -> Decode(I8, [UnexpectedEnd])
+		i8 = |{}| map(u8({}), U8.to_i8_wrap)
 
-		i16 : Decode(I16, [UnexpectedEnd, ..])
-		i16 = map(u16, U16.to_i16_wrap)
+		i16 : {} -> Decode(I16, [UnexpectedEnd])
+		i16 = |{}| map(u16({}), U16.to_i16_wrap)
 
-		i32 : Decode(I32, [UnexpectedEnd, ..])
-		i32 = map(u32, U32.to_i32_wrap)
+		i32 : {} -> Decode(I32, [UnexpectedEnd])
+		i32 = |{}| map(u32({}), U32.to_i32_wrap)
 
-		i64 : Decode(I64, [UnexpectedEnd, ..])
-		i64 = map(u64, U64.to_i64_wrap)
+		i64 : {} -> Decode(I64, [UnexpectedEnd])
+		i64 = |{}| map(u64({}), U64.to_i64_wrap)
 
-		take : U64, (List(U8) -> value) -> Decode(value, [UnexpectedEnd, ..])
+		take : U64, (List(U8) -> value) -> Decode(value, [UnexpectedEnd])
 		take = |count, callback| Decode.(
 			|bytes| {
 				{ before, others } = bytes.split_at(count)
-				if before.len() == count
+				if (before.len() == count)
 					Ok({ decoded: callback(before), remaining: others })
 				else
 					Err(UnexpectedEnd)
@@ -135,8 +135,8 @@ Bytes :: [].{
 
 		# Strings
 
-		c_str : Decode(Str, [TerminatorNotFound, Utf8DecodeError(_), ..])
-		c_str = Decode.(
+		c_str : {} -> Decode(Str, [TerminatorNotFound, Utf8DecodeError(_)])
+		c_str = |{}| Decode.(
 			|bytes| match bytes.split_first(0) {
 				Ok({ before, after }) => match Str.from_utf8(before) {
 					Ok(value) => Ok({ decoded: value, remaining: after })
@@ -148,8 +148,8 @@ Bytes :: [].{
 
 		# Bools
 
-		bool : Decode(Bool, [UnexpectedEnd, ..])
-		bool = Decode.(
+		bool : {} -> Decode(Bool, [UnexpectedEnd])
+		bool = |{}| Decode.(
 			|bytes| match bytes {
 				[byte, ..] => Ok({
 					decoded: byte == 1,
@@ -235,5 +235,5 @@ loop_help = |step, state, bytes| {
 			loop_help(step, new_state, remaining)
 		Done(result) =>
 			Ok({ decoded: result, remaining })
-		}
+	}
 }

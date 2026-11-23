@@ -1,4 +1,4 @@
-import Result as InternalResult
+import Result
 import Cmd as InternalCmd
 import Batch as InternalBatch
 import Protocol
@@ -8,7 +8,7 @@ tcp_timeout = 5_000
 
 Pg :: [].{
 
-	Result : InternalResult
+	Result : Result
 
 	Cmd(a, err) :: InternalCmd(a, err).{
 
@@ -107,10 +107,10 @@ Pg :: [].{
 		f64 = |num| Binding.(Text(num.to_str()))
 
 		bool : Bool -> Binding
-		bool = |value| Binding.(Binary([if value 1 else 0]))
+		bool = |value| Binding.(Binary([if (value) 1 else 0]))
 
 		bytes : List(U8) -> Binding
-		bytes = |bytes| Binding.(Binary(bytes))
+		bytes = |b| Binding.(Binary(b))
 	}
 
 	Batch(a, err) :: InternalBatch(a, err).{
@@ -186,13 +186,12 @@ Pg :: [].{
 							},
 						)
 
-						return Ok(Done(client))
+						Ok(Done(client))
 					}
 
 					_ => unexpected(msg)
 				},
 			)
-
 		}
 
 		command! : Client(tcp_stream),
@@ -205,7 +204,6 @@ Pg :: [].{
 				TcpReadErr(_),
 				TcpUnexpectedEOF,
 				TcpWriteErr(_),
-				..,
 			],
 		)
 
@@ -274,7 +272,6 @@ Pg :: [].{
 				TcpReadErr(_),
 				TcpUnexpectedEOF,
 				TcpWriteErr(_),
-				..,
 			],
 		)
 			where [
@@ -318,7 +315,6 @@ Pg :: [].{
 				},
 				|state| batch_read_step!(batch_decode, stream, state),
 			)
-
 		}
 
 		prepare! : Client(tcp_stream),
@@ -330,7 +326,6 @@ Pg :: [].{
 				TcpReadErr(_),
 				TcpUnexpectedEOF,
 				TcpWriteErr(_),
-				..,
 			],
 		)
 			where [
@@ -435,7 +430,7 @@ init_batched_cmd = |reused_indexes, cmd, cmd_index| {
 	match cmd.kind {
 		SqlCmd(sql) => {
 			name =
-				if reused_indexes.contains(cmd_index)
+				if (reused_indexes.contains(cmd_index))
 					InternalBatch.reuse_name(cmd_index)
 				else ""
 
@@ -503,7 +498,17 @@ batch_read_step! = |batch_decode, stream, { remaining, results }| match remainin
 	}
 
 	[first, ..] => {
-		fields = batched_cmd_fields(results, first.fields)?
+		fields =
+			# match first.fields {
+			# 	Describe => Ok([])
+			# 	ReuseFrom(index) => match results.get(index) {
+			# 		Ok(result) => Ok(Result.fields(result))
+			# 		# TODO: better name
+			# 		Err(OutOfBounds) => Err(PgProtoErr(ResultOutOfBounds))
+			# 	}
+			# 	Known(fields) => Ok(fields)
+			# }?
+			batched_cmd_fields(results, first.fields)?
 		result = read_cmd_result!(fields, stream)?
 
 		next({
@@ -633,11 +638,11 @@ read_ready_for_query! = |stream|
 		},
 	)
 
-next : a -> Try([Step(a), ..], _)
+next : a -> Try([Step(a)], _)
 next = |state| Ok(Step(state))
 
-return_ : a -> Try([Done(a), ..], _)
+return_ : a -> Try([Done(a)], _)
 return_ = |result| Ok(Done(result))
 
-unexpected : a -> Try(_, [PgProtoErr([UnexpectedMsg(a), ..]), ..])
+unexpected : msg -> Try(_, [PgProtoErr([UnexpectedMsg(msg)])])
 unexpected = |msg| Err(PgProtoErr(UnexpectedMsg(msg)))
