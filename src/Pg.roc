@@ -213,7 +213,7 @@ Pg :: [].{
 			]
 		command! = |Client.({ stream, backend_key: _ }), Cmd.(cmd)| {
 			{ kind, limit, bindings } = cmd.params()
-			{ format_codes, param_values } = Cmd.encode_bindings(bindings)
+			{ format_codes, param_values } = InternalCmd.encode_bindings(bindings)
 
 			init = match kind {
 				SqlCmd(sql) => {
@@ -255,7 +255,7 @@ Pg :: [].{
 
 			result = read_cmd_result!(init.fields, stream)?
 
-			decoded = Cmd.decode(result, cmd).map_err(|e| PgExpectErr(e))?
+			decoded = InternalCmd.decode(result, cmd).map_err(|e| PgExpectErr(e))?
 
 			read_ready_for_query!(stream)?
 
@@ -537,7 +537,7 @@ read_message! = |stream| {
 	proto_decode = |bytes, dec|
 		Bytes.Decode.decode(bytes, dec).map_err(|e| PgProtoErr(e))
 
-	meta = proto_decode(header_bytes, Protocol.Backend.header)?
+	meta = proto_decode(header_bytes, Protocol.Backend.header({}))?
 
 	if meta.len > 0 {
 		len_u64 = meta.len.to_u64_try().ok_or(1)
