@@ -8,7 +8,6 @@ import pf.Tcp
 import pf.Duration
 
 import pg.Pg
-import pg.Result
 
 main! = |_| {
 	client = Pg.Client.connect!({
@@ -34,9 +33,9 @@ main! = |_| {
 		.bind([Pg.Cmd.str("John"), Pg.Cmd.u8(32)])
 		.expect_n(
 			{
-				name: Result.str("name"),
-				age: Result.u8("age"),
-			}.Result,
+				name: Pg.Result.str({})("name"),
+				age: Pg.Result.u8({})("age"),
+			}.Pg.Result,
 		)
 		.send!(client)?
 

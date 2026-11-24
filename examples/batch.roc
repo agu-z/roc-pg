@@ -8,7 +8,6 @@ import pf.Tcp
 import pf.Duration
 
 import pg.Pg
-import pg.Result
 
 main! = |_| {
 	client = Pg.Client.connect!({
@@ -32,17 +31,17 @@ main! = |_| {
 	)
 		.with_cmd(
 			Pg.Cmd.new("select 'hi' as value")
-				.expect_1(Result.str("value")),
+				.expect_1(Pg.Result.str({})("value")),
 		)
 		.with_cmd(
 			Pg.Cmd.new("select $1::int as value")
 				.bind([Pg.Cmd.u8(11)])
-				.expect_1(Result.u8("value")),
+				.expect_1(Pg.Result.u8({})("value")),
 		)
 		.with_cmd(
 			Pg.Cmd.new("select $1::int as value")
 				.bind([Pg.Cmd.u8(31)])
-				.expect_1(Result.u8("value")),
+				.expect_1(Pg.Result.u8({})("value")),
 		)
 		.send!(client)?
 
@@ -50,13 +49,12 @@ main! = |_| {
 	Stdout.line!("${result.hi} ${str42}")?
 
 	result_seq = Pg.Batch.sequence(
-		List.from_iter(0..=20)
-			.map(
-				|num|
-					Pg.Cmd.new("select $1::int as value")
-						.bind([Pg.Cmd.u8(num)])
-						.expect_1(Result.u8("value")),
-			),
+		(0..=20).iter().map(
+			|num|
+				Pg.Cmd.new("select $1::int as value")
+					.bind([Pg.Cmd.u8(num)])
+					.expect_1(Pg.Result.u8({})("value")),
+		).collect(),
 	).send!(client)?
 
 	result_seq_str = result_seq

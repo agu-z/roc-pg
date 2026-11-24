@@ -8,7 +8,6 @@ import pf.Tcp
 import pf.Duration
 
 import pg.Pg
-import pg.Result
 
 main! = |_| {
 	client = Pg.Client.connect!({
@@ -34,7 +33,7 @@ main! = |_| {
 	add_and_print! = |a, b| {
 		result = add_cmd
 			.bind([Pg.Cmd.u8(a), Pg.Cmd.u8(b)])
-			.expect_1(Result.u8("result"))
+			.expect_1(Pg.Result.u8({})("result"))
 			.send!(client)?
 
 		a_str = (a).to_str()
