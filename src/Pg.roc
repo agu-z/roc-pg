@@ -5,7 +5,6 @@ import Protocol
 import Bytes
 
 Pg :: [].{
-
 	Result : Result
 
 	Cmd(a, err) :: InternalCmd(a, err).{
@@ -336,7 +335,7 @@ Pg :: [].{
 				Protocol.Frontend.sync,
 			])
 
-			connection.write_bytes!(parse_and_describe )?
+			connection.write_bytes!(parse_and_describe)?
 
 			message_loop!(
 				connection,

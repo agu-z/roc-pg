@@ -31,35 +31,35 @@ Result :: {
 			Err(FieldNotFound(name)) => Err(FieldNotFound(name))
 		}
 
-	str = decoder(|s| Ok(s))
+	str = |{}| decoder(|s| Ok(s))
 
-	u8 = decoder(U8.from_str)
+	u8 = |{}| decoder(U8.from_str)
 
-	u16 = decoder(U16.from_str)
+	u16 = |{}| decoder(U16.from_str)
 
-	u32 = decoder(U32.from_str)
+	u32 = |{}| decoder(U32.from_str)
 
-	u64 = decoder(U64.from_str)
+	u64 = |{}| decoder(U64.from_str)
 
-	u128 = decoder(U128.from_str)
+	u128 = |{}| decoder(U128.from_str)
 
-	i8 = decoder(I8.from_str)
+	i8 = |{}| decoder(I8.from_str)
 
-	i16 = decoder(I16.from_str)
+	i16 = |{}| decoder(I16.from_str)
 
-	i32 = decoder(I32.from_str)
+	i32 = |{}| decoder(I32.from_str)
 
-	i64 = decoder(I64.from_str)
+	i64 = |{}| decoder(I64.from_str)
 
-	i128 = decoder(I128.from_str)
+	i128 = |{}| decoder(I128.from_str)
 
-	f32 = decoder(F32.from_str)
+	f32 = |{}| decoder(F32.from_str)
 
-	f64 = decoder(F64.from_str)
+	f64 = |{}| decoder(F64.from_str)
 
-	dec = decoder(Dec.from_str)
+	dec = |{}| decoder(Dec.from_str)
 
-	bool = decoder(
+	bool = |{}| decoder(
 		|v| match v {
 			"t" => Ok(Bool.True)
 			"f" => Ok(Bool.False)
@@ -90,6 +90,7 @@ Result :: {
 	)
 }
 
+# decoder : (Str -> Try(_, _)) -> (Str -> Result.Decode(_, _))
 decoder = |fn| |name| Decode.(
 	|row_fields|
 		match row_fields.find_first_index(|f| f.name == name) {
