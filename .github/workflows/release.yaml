@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version, for example 1.2.3 or 1.0.0-rc1
+        required: true
+
+permissions:
+  contents: read
+
+# Serialize release runs in one group; PR validation runs get per-ref groups
+# so they never cancel a queued release run.
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && format('release-{0}', github.repository) || format('release-validate-{0}-{1}', github.repository, github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.validate.outputs.release_version }}
+      docs_version: ${{ steps.validate.outputs.docs_version }}
+      test_matrix: ${{ steps.bundles.outputs.test_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: roc-lang/setup-roc@<setup-roc-ref>
+        with:
+          version: nightly-new-compiler
+
+      - id: validate
+        uses: roc-lang/release-package/actions/validate-release@<release-package-ref>
+        with:
+          release_version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || '' }}
+          dry_run: ${{ github.event_name != 'workflow_dispatch' }}
+          github_token: ${{ github.token }}
+
+      - run: ./ci/all_tests.sh
+
+      - id: previous
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: roc-lang/release-package/actions/resolve-previous-release@<release-package-ref>
+        with:
+          github_token: ${{ github.token }}
+
+      - uses: roc-lang/release-package/actions/run-bump-check@<release-package-ref>
+        with:
+          release_version: ${{ steps.validate.outputs.release_version }}
+          dry_run: ${{ github.event_name != 'workflow_dispatch' }}
+          previous_url: ${{ steps.previous.outputs.previous_url }}
+          bump_check: require
+          bump_entrypoint: main.roc
+
+      - run: ./scripts/bundle.sh --output-dir dist
+
+      - id: bundles
+        uses: roc-lang/release-package/actions/prepare-bundles@<release-package-ref>
+        with:
+          bundle_glob: dist/*.tar.zst
+          test_os_json: '["ubuntu-latest"]'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-bundles
+          path: .release/bundles/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-metadata
+          path: |
+            .release/bump-output.txt
+            .release/previous-url.txt
+            .release/release-bundles.json
+            .release/test-matrix.json
+          if-no-files-found: error
+
+  test-bundles:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.build.outputs.test_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: roc-lang/setup-roc@<setup-roc-ref>
+        with:
+          version: nightly-new-compiler
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundles
+          path: .release/test-bundles
+
+      - uses: roc-lang/release-package/actions/test-bundle@<release-package-ref>
+        with:
+          test_bundle_command: python3 ci/test_bundle_examples.py --bundle-path
+          bundle_path: .release/test-bundles/${{ matrix.artifact_file }}
+          bundle_name: ${{ matrix.bundle_name }}
+          release_version: ${{ needs.build.outputs.release_version }}
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs:
+      - build
+      - test-bundles
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundles
+          path: .release/bundles
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: .release
+
+      - uses: roc-lang/release-package/actions/make-release-notes@<release-package-ref>
+        with:
+          release_version: ${{ needs.build.outputs.release_version }}
+          github_token: ${{ github.token }}
+
+      - uses: roc-lang/release-package/actions/publish-release@<release-package-ref>
+        with:
+          release_version: ${{ needs.build.outputs.release_version }}
+          github_token: ${{ github.token }}
