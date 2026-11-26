@@ -2,6 +2,7 @@ app [Context, program] {
 	http: "https://github.com/roc-lang/http/releases/download/2.0.0/6ZUwqYhCS8PU9Mo6MF7oV82ET2o7KYb57CLKDq4cq4sS.tar.zst",
 	pf: platform "https://github.com/roc-lang/basic-webserver/releases/download/0.22.0/BM2BUXA8mwbcoKPUfRV8cLtsUdnsSBPwjNLPRUJQAQ7Q.tar.zst",
 	pg: "../src/main.roc",
+	roc: "0.1.0",
 }
 
 ## Wrapper around platform's Tcp.Connection to adapt API to what Pg.Client
